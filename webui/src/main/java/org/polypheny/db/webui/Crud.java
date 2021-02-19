@@ -30,7 +30,6 @@ import com.google.gson.JsonSerializer;
 import com.google.gson.JsonSyntaxException;
 import com.j256.simplemagic.ContentInfo;
 import com.j256.simplemagic.ContentInfoUtil;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
@@ -81,7 +80,6 @@ import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Part;
-
 import kong.unirest.HttpResponse;
 import kong.unirest.Unirest;
 import lombok.extern.slf4j.Slf4j;
@@ -152,15 +150,9 @@ import org.polypheny.db.rel.RelCollations;
 import org.polypheny.db.rel.RelNode;
 import org.polypheny.db.rel.RelRoot;
 import org.polypheny.db.rel.core.Sort;
-import org.polypheny.db.rel.core.TableModify;
 import org.polypheny.db.rel.type.RelDataType;
-import org.polypheny.db.sql.SqlDataTypeSpec;
-import org.polypheny.db.sql.SqlIdentifier;
-import org.polypheny.db.sql.SqlInsert;
 import org.polypheny.db.sql.SqlKind;
 import org.polypheny.db.sql.SqlNode;
-import org.polypheny.db.sql.ddl.altertable.SqlAlterTableAddColumn;
-import org.polypheny.db.sql.parser.SqlParserPos;
 import org.polypheny.db.statistic.StatisticsManager;
 import org.polypheny.db.transaction.Statement;
 import org.polypheny.db.transaction.Transaction;
@@ -169,7 +161,6 @@ import org.polypheny.db.transaction.TransactionException;
 import org.polypheny.db.transaction.TransactionManager;
 import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeFamily;
-import org.polypheny.db.type.PolyTypeUtil;
 import org.polypheny.db.util.DateTimeStringUtils;
 import org.polypheny.db.util.FileSystemManager;
 import org.polypheny.db.util.ImmutableIntList;
@@ -3274,20 +3265,12 @@ public class Crud implements InformationObserver {
 
         SqlNode parsed = sqlProcessor.parse( sql );
 
-        SchemaType type = SchemaType.RELATIONAL;
-
-        if ( parsed instanceof SqlInsert ) {
-            type = ((SqlInsert) parsed).getSchemaType();
-        }
-
         if ( parsed.isA( SqlKind.DDL ) ) {
             signature = sqlProcessor.prepareDdl( statement, parsed );
         } else {
-            RelRoot logicalRoot;
-            Pair<SqlNode, RelDataType> validated = null;
 
-            validated = sqlProcessor.validate( statement.getTransaction(), parsed, RuntimeConfig.ADD_DEFAULT_VALUES_IN_INSERTS.getBoolean() );
-            logicalRoot = sqlProcessor.translate( statement, validated.left );
+            Pair<SqlNode, RelDataType> validated = sqlProcessor.validate( statement.getTransaction(), parsed, RuntimeConfig.ADD_DEFAULT_VALUES_IN_INSERTS.getBoolean() );
+            RelRoot logicalRoot = sqlProcessor.translate( statement, validated.left );
 
             // Prepare
             signature = statement.getQueryProcessor().prepareQuery( logicalRoot );

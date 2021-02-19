@@ -286,7 +286,7 @@ public class SqlProcessorImpl implements SqlProcessor, ViewExpander {
             SchemaType schemaType = Catalog.getInstance().getSchema( catalogTable.schemaId ).schemaType;
 
             if ( schemaType == SchemaType.DOCUMENT ) {
-                createMissingColumns( insert, oldColumnList, catalogTable, transaction.createStatement() );
+                // createMissingColumns( insert, oldColumnList, catalogTable, transaction.createStatement() );
                 return;
             }
 
@@ -379,7 +379,7 @@ public class SqlProcessorImpl implements SqlProcessor, ViewExpander {
                 String name = ((SqlIdentifier) column).names.get( 0 );
 
                 if ( !(columnNames.contains( name )) ) {
-                    catalog.addDocumentColumn( catalogTable.id, name, statement );
+                    //catalog.addDocumentColumn( catalogTable.id, name, statement );
                 }
             }
         }

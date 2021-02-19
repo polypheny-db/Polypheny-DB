@@ -61,10 +61,6 @@ import org.polypheny.db.catalog.exceptions.UnknownTableTypeException;
 import org.polypheny.db.catalog.exceptions.UnknownUserException;
 import org.polypheny.db.config.ConfigManager;
 import org.polypheny.db.config.RuntimeConfig;
-import org.polypheny.db.routing.Router;
-import org.polypheny.db.runtime.Resources.Default;
-import org.polypheny.db.transaction.PUID;
-import org.polypheny.db.transaction.Statement;
 import org.polypheny.db.transaction.Transaction;
 import org.polypheny.db.type.PolyType;
 
@@ -562,10 +558,6 @@ public abstract class Catalog {
      */
     public abstract CatalogColumn getColumn( String databaseName, String schemaName, String tableName, String columnName ) throws UnknownColumnException, UnknownSchemaException, UnknownDatabaseException, UnknownTableException;
 
-    /**
-     * Wrapper function to call addColumn without schemaType
-     */
-    public abstract long addColumn( String name, long tableId, int position, PolyType type, PolyType collectionsType, Integer length, Integer scale, Integer dimension, Integer cardinality, boolean nullable, Collation collation );
 
     /**
      * Adds a column.
@@ -578,24 +570,10 @@ public abstract class Catalog {
      * @param scale The number of digits after the decimal point (if applicable, else null)
      * @param nullable Weather the column can contain null values
      * @param collation The collation of the field (if applicable, else null)
-     * @param schemaType The schemaType of the column
      * @return The id of the inserted column
      */
-    public abstract long addColumn( String name, long tableId, int position, PolyType type, PolyType collectionsType, Integer length, Integer scale, Integer dimension, Integer cardinality, boolean nullable, Collation collation, SchemaType schemaType );
+    public abstract long addColumn( String name, long tableId, int position, PolyType type, PolyType collectionsType, Integer length, Integer scale, Integer dimension, Integer cardinality, boolean nullable, Collation collation );
 
-    /**
-     * @param tableId Id of target-table to which the column belongs
-     * @param name
-     * @param statement
-     */
-    public abstract void addDocumentColumn( long tableId, String name, Statement statement );
-
-    /**
-     * Deletes every DocumentColumn of a table
-     *
-     * @param tableId the target table id
-     */
-    public abstract void deleteDocumentColumns( long tableId );
 
     /**
      * Renames a column
@@ -1112,6 +1090,7 @@ public abstract class Catalog {
             }
             throw new UnknownCollationException( str );
         }
+
 
         public static Collation getDefaultCollation() {
             return getById( RuntimeConfig.DEFAULT_COLLATION.getInteger() );

@@ -40,7 +40,6 @@ import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.Catalog.SchemaType;
 import org.polypheny.db.catalog.exceptions.UnknownDatabaseException;
 import org.polypheny.db.catalog.exceptions.UnknownSchemaException;
-import org.polypheny.db.config.ConfigManager;
 import org.polypheny.db.sql.parser.SqlParserPos;
 import org.polypheny.db.sql.validate.SqlValidator;
 import org.polypheny.db.sql.validate.SqlValidatorScope;
@@ -187,9 +186,8 @@ public class SqlInsert extends SqlCall {
         try {
             return Catalog.getInstance().getSchema( "APP", ((SqlIdentifier) targetTable).names.get( 0 )).schemaType;
         } catch ( UnknownSchemaException | UnknownDatabaseException e ) {
-            e.printStackTrace();
+            throw new RuntimeException( e );
         }
-        return SchemaType.getDefault();
     }
 
 }

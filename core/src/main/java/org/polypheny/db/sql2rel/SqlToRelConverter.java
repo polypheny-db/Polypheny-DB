@@ -34,8 +34,6 @@
 package org.polypheny.db.sql2rel;
 
 
-import static org.polypheny.db.util.Static.RESOURCE;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
@@ -64,10 +62,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.calcite.avatica.util.Spaces;
 import org.apache.calcite.linq4j.Ord;
-import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.Catalog.SchemaType;
-import org.polypheny.db.catalog.exceptions.UnknownDatabaseException;
-import org.polypheny.db.catalog.exceptions.UnknownSchemaException;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptSamplingParameters;
@@ -2982,16 +2977,29 @@ public class SqlToRelConverter {
         final RelOptTable targetTable = getTargetTable( call );
         final RelDataType targetRowType = RelOptTableImpl.realRowType( targetTable );
         final List<RelDataTypeField> targetFields = targetRowType.getFieldList();
-        final List<RexNode> sourceExps = new ArrayList<>( Collections.nCopies( targetFields.size(), null ) );
-        final List<String> fieldNames = new ArrayList<>( Collections.nCopies( targetFields.size(), null ) );
+        boolean isDocument = call.getSchemaType() == SchemaType.DOCUMENT;
+
+        List<RexNode> sourceExps = new ArrayList<>( Collections.nCopies( targetFields.size(), null ) );
+        List<String> fieldNames = new ArrayList<>( Collections.nCopies( targetFields.size(), null ) ); // TODO DL: reevaluate and make final again?
+        if ( isDocument ) {
+            sourceExps = new ArrayList<>( Collections.nCopies( targetColumnNames.size(), null ) );
+            fieldNames = new ArrayList<>( Collections.nCopies( targetColumnNames.size(), null ) );
+        }
 
         final InitializerExpressionFactory initializerFactory = getInitializerFactory( validator.getNamespace( call ).getTable() );
 
         // Walk the name list and place the associated value in the expression list according to the ordinal value returned from the table construct, leaving nulls in the list for columns
         // that are not referenced.
         final SqlNameMatcher nameMatcher = catalogReader.nameMatcher();
+        int dynamicCount = 0;
         for ( Pair<String, RexNode> p : Pair.zip( targetColumnNames, columnExprs ) ) {
             RelDataTypeField field = nameMatcher.field( targetRowType, p.left );
+
+            if ( field == null && isDocument ) {
+                field = new RelDataTypeFieldImpl( p.left, targetRowType.getFieldCount() + dynamicCount, new BasicPolyType( RelDataTypeSystem.DEFAULT, PolyType.JSON ) );
+                dynamicCount++;
+            }
+
             assert field != null : "column " + p.left + " not found";
             sourceExps.set( field.getIndex(), p.right );
         }
@@ -3030,7 +3038,7 @@ public class SqlToRelConverter {
         final List<String> targetFields = targetTable.getRowType().getFieldNames();
         for ( String targetColumnName : targetColumnNames ) {
             final int i = targetFields.indexOf( targetColumnName );
-            if ( i != -1 ){ // TODO DL: change
+            if ( i != -1 ) { // TODO DL: change
                 switch ( strategies.get( i ) ) {
                     case STORED:
                     case VIRTUAL:
@@ -3099,14 +3107,10 @@ public class SqlToRelConverter {
             }
         } else {
 
-            List<String> names = targetTable.getQualifiedName();
-            SchemaType schemaType = SchemaType.RELATIONAL;
-            try {
-                schemaType = Catalog.getInstance().getSchema( "APP", names.get( 0 ) ).getSchemaType();
-            } catch ( UnknownSchemaException | UnknownDatabaseException e ) {
-                e.printStackTrace();
+            boolean allowDynamic = false;
+            if ( call.getSchemaType() == SchemaType.DOCUMENT ) {
+                allowDynamic = true;
             }
-
 
             for ( int i = 0; i < targetColumnList.size(); i++ ) {
                 SqlIdentifier id = (SqlIdentifier) targetColumnList.get( i );
@@ -3116,7 +3120,8 @@ public class SqlToRelConverter {
                                 typeFactory,
                                 id,
                                 catalogReader,
-                                targetTable );
+                                targetTable,
+                                allowDynamic );
                 assert field != null : "column " + id.toString() + " not found";
 
                 targetColumnNames.add( field.getName() );
@@ -3130,7 +3135,7 @@ public class SqlToRelConverter {
         for ( String columnName : targetColumnNames ) {
             final int i = tableRowType.getFieldNames().indexOf( columnName );
             final RexNode expr;
-            if( i != -1 ) {
+            if ( i != -1 ) {
                 switch ( strategies.get( i ) ) {
                     case STORED:
                         final InitializerExpressionFactory f = Util.first( targetTable.unwrap( InitializerExpressionFactory.class ), NullInitializerExpressionFactory.INSTANCE );
@@ -3142,7 +3147,7 @@ public class SqlToRelConverter {
                     default:
                         expr = bb.nameToNodeMap.get( columnName );
                 }
-            }else {
+            } else {
                 expr = bb.nameToNodeMap.get( columnName );
             }
             columnExprs.add( expr );

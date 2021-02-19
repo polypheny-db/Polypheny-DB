@@ -64,5 +64,6 @@ public interface SqlValidatorTable extends Wrapper {
 
     boolean supportsModality( SqlModality modality );
 
+
 }
 

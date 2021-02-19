@@ -67,10 +67,7 @@ import javax.annotation.Nonnull;
 import org.apache.calcite.linq4j.Ord;
 import org.apache.calcite.linq4j.function.Function2;
 import org.apache.calcite.linq4j.function.Functions;
-import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.Catalog.SchemaType;
-import org.polypheny.db.catalog.exceptions.UnknownDatabaseException;
-import org.polypheny.db.catalog.exceptions.UnknownSchemaException;
 import org.polypheny.db.plan.RelOptTable;
 import org.polypheny.db.plan.RelOptUtil;
 import org.polypheny.db.prepare.Prepare;
@@ -78,7 +75,6 @@ import org.polypheny.db.rel.type.DynamicRecordType;
 import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.rel.type.RelDataTypeFactory;
 import org.polypheny.db.rel.type.RelDataTypeField;
-import org.polypheny.db.rel.type.RelDataTypeFieldImpl;
 import org.polypheny.db.rel.type.RelDataTypeSystem;
 import org.polypheny.db.rel.type.RelRecordType;
 import org.polypheny.db.rex.RexBuilder;
@@ -91,7 +87,6 @@ import org.polypheny.db.runtime.PolyphenyDbException;
 import org.polypheny.db.runtime.Resources;
 import org.polypheny.db.schema.ColumnStrategy;
 import org.polypheny.db.schema.PolyphenyDbSchema;
-import org.polypheny.db.schema.Schema;
 import org.polypheny.db.schema.Table;
 import org.polypheny.db.schema.impl.ModifiableViewTable;
 import org.polypheny.db.sql.JoinConditionType;
@@ -141,7 +136,6 @@ import org.polypheny.db.sql.util.SqlShuttle;
 import org.polypheny.db.sql.util.SqlVisitor;
 import org.polypheny.db.sql2rel.InitializerContext;
 import org.polypheny.db.type.ArrayType;
-import org.polypheny.db.type.BasicPolyType;
 import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeUtil;
 import org.polypheny.db.type.checker.AssignableOperandTypeChecker;
@@ -4008,6 +4002,11 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     }
 
 
+    protected RelDataType createTargetRowType( SqlValidatorTable table, SqlNodeList targetColumnList, boolean append ) {
+        return createTargetRowType( table, targetColumnList, append, false );
+    }
+
+
     /**
      * Derives a row-type for INSERT and UPDATE operations.
      *
@@ -4016,7 +4015,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
      * @param append Whether to append fields to those in <code>baseRowType</code>
      * @return Rowtype
      */
-    protected RelDataType createTargetRowType( SqlValidatorTable table, SqlNodeList targetColumnList, boolean append ) {
+    protected RelDataType createTargetRowType( SqlValidatorTable table, SqlNodeList targetColumnList, boolean append, boolean allowDynamic ) {
         RelDataType baseRowType = table.getRowType();
         if ( targetColumnList == null ) {
             return baseRowType;
@@ -4038,7 +4037,8 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
                             typeFactory,
                             id,
                             catalogReader,
-                            relOptTable );
+                            relOptTable,
+                            allowDynamic );
 
             if ( targetField == null ) {
 
@@ -4069,8 +4069,13 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
                         ? targetNamespace.getTable()
                         : relOptTable.unwrap( SqlValidatorTable.class );
 
+        boolean allowDynamic = false;
+        if ( insert.getSchemaType() == SchemaType.DOCUMENT ) {
+            allowDynamic = true;
+        }
+
         // INSERT has an optional column name list.  If present then reduce the rowtype to the columns specified.  If not present then the entire target rowtype is used.
-        final RelDataType targetRowType = createTargetRowType( table, insert.getTargetColumnList(), false );
+        final RelDataType targetRowType = createTargetRowType( table, insert.getTargetColumnList(), false, allowDynamic );
 
         final SqlNode source = insert.getSource();
         if ( source instanceof SqlSelect ) {
