@@ -37,8 +37,11 @@ package org.polypheny.db.sql.ddl;
 import static org.polypheny.db.util.Static.RESOURCE;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import org.apache.calcite.linq4j.Ord;
 import org.polypheny.db.adapter.DataStore;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.Catalog.PlacementType;
@@ -46,6 +49,9 @@ import org.polypheny.db.catalog.exceptions.TableAlreadyExistsException;
 import org.polypheny.db.catalog.exceptions.UnknownDatabaseException;
 import org.polypheny.db.catalog.exceptions.UnknownSchemaException;
 import org.polypheny.db.ddl.DdlManager;
+import org.polypheny.db.ddl.DdlManager.ColumnInformation;
+import org.polypheny.db.ddl.DdlManager.ConstraintInformation;
+import org.polypheny.db.ddl.exception.NoColumnsException;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.sql.SqlCreate;
 import org.polypheny.db.sql.SqlExecutableStatement;
@@ -60,6 +66,7 @@ import org.polypheny.db.sql.SqlWriter;
 import org.polypheny.db.sql.parser.SqlParserPos;
 import org.polypheny.db.transaction.Statement;
 import org.polypheny.db.util.ImmutableNullableList;
+import org.polypheny.db.util.Pair;
 
 
 /**
@@ -151,12 +158,52 @@ public class SqlCreateTable extends SqlCreate implements SqlExecutableStatement 
 
         PlacementType placementType = store == null ? PlacementType.AUTOMATIC : PlacementType.MANUAL;
 
+        List<ColumnInformation> columns = null;
+        List<ConstraintInformation> constraints = null;
+
+        if ( columnList != null ) {
+            Pair<List<ColumnInformation>, List<ConstraintInformation>> columnsConstraints = separateColumnList();
+            columns = columnsConstraints.left;
+            constraints = columnsConstraints.right;
+        }
+
         try {
-            DdlManager.getInstance().createTable( schemaId, tableName, columnList != null ? columnList.getList() : null, ifNotExists, stores, placementType, statement );
+            DdlManager.getInstance().createTable( schemaId, tableName, columns, constraints, ifNotExists, stores, placementType, statement );
         } catch ( TableAlreadyExistsException e ) {
             throw SqlUtil.newContextException( name.getParserPosition(), RESOURCE.tableExists( tableName ) );
+        } catch ( NoColumnsException e ) {
+            throw SqlUtil.newContextException( SqlParserPos.ZERO, RESOURCE.createTableRequiresColumnList() );
         }
     }
+
+
+    private Pair<List<ColumnInformation>, List<ConstraintInformation>> separateColumnList() {
+        List<ColumnInformation> columnInformations = new ArrayList<>();
+        List<ConstraintInformation> constraintInformations = new ArrayList<>();
+
+        int position = 1;
+        for ( Ord<SqlNode> c : Ord.zip( columnList ) ) {
+            if ( c.e instanceof SqlColumnDeclaration ) {
+                final SqlColumnDeclaration columnDeclaration = (SqlColumnDeclaration) c.e;
+
+                String defaultValue = columnDeclaration.getExpression() == null ? null : columnDeclaration.getExpression().toString();
+
+                columnInformations.add( new ColumnInformation( columnDeclaration.getName().getSimple(), columnDeclaration.getDataType(), columnDeclaration.getCollation(), defaultValue, position ) );
+
+            } else if ( c.e instanceof SqlKeyConstraint ) {
+                SqlKeyConstraint constraint = (SqlKeyConstraint) c.e;
+                String constraintName = constraint.getName() != null ? constraint.getName().getSimple() : null;
+
+                constraintInformations.add( new ConstraintInformation( constraintName, constraint.getConstraintType(), constraint.getColumnList().getList().stream().map( SqlNode::toString ).collect( Collectors.toList() ) ) );
+            } else {
+                throw new AssertionError( c.e.getClass() );
+            }
+            position++;
+        }
+
+        return new Pair<>( columnInformations, constraintInformations );
+    }
+
 
 }
 

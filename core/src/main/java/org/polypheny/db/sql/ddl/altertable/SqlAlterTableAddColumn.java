@@ -130,6 +130,8 @@ public class SqlAlterTableAddColumn extends SqlAlterTable {
             getDataStoreInstance( storeId );
         }
 
+        String defaultValue = this.defaultValue == null ? null : this.defaultValue.toString();
+
         try {
             DdlManager.getInstance().alterTableAddColumn( column.getSimple(), catalogTable, beforeColumn, afterColumn, type, nullable, defaultValue, statement );
         } catch ( NotNullAndDefaultValueException e ) {

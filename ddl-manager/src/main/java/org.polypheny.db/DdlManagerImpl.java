@@ -16,8 +16,6 @@
 
 package org.polypheny.db;
 
-import static org.polypheny.db.util.Static.RESOURCE;
-
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -25,8 +23,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
-import org.apache.calcite.linq4j.Ord;
 import org.apache.commons.lang3.StringUtils;
 import org.polypheny.db.adapter.Adapter;
 import org.polypheny.db.adapter.AdapterManager;
@@ -78,6 +74,7 @@ import org.polypheny.db.ddl.exception.IndexExistsException;
 import org.polypheny.db.ddl.exception.IndexPreventsRemovalException;
 import org.polypheny.db.ddl.exception.LastPlacementException;
 import org.polypheny.db.ddl.exception.MissingColumnPlacementException;
+import org.polypheny.db.ddl.exception.NoColumnsException;
 import org.polypheny.db.ddl.exception.NotNullAndDefaultValueException;
 import org.polypheny.db.ddl.exception.PlacementAlreadyExistsException;
 import org.polypheny.db.ddl.exception.PlacementIsPrimaryException;
@@ -90,10 +87,6 @@ import org.polypheny.db.routing.Router;
 import org.polypheny.db.runtime.PolyphenyDbContextException;
 import org.polypheny.db.runtime.PolyphenyDbException;
 import org.polypheny.db.sql.SqlDataTypeSpec;
-import org.polypheny.db.sql.SqlNode;
-import org.polypheny.db.sql.SqlUtil;
-import org.polypheny.db.sql.ddl.SqlColumnDeclaration;
-import org.polypheny.db.sql.ddl.SqlKeyConstraint;
 import org.polypheny.db.sql.parser.SqlParserPos;
 import org.polypheny.db.transaction.Statement;
 import org.polypheny.db.transaction.TransactionException;
@@ -113,6 +106,18 @@ public class DdlManagerImpl extends DdlManager {
     private void checkIfTableType( TableType tableType ) throws DdlOnSourceException {
         if ( tableType != TableType.TABLE ) {
             throw new DdlOnSourceException();
+        }
+    }
+
+
+    private void addDefaultValue( String defaultValue, long addedColumnId ) {
+        if ( defaultValue != null ) {
+            // TODO: String is only a temporal solution for default values
+            String v = defaultValue;
+            if ( v.startsWith( "'" ) ) {
+                v = v.substring( 1, v.length() - 1 );
+            }
+            catalog.setDefaultValue( addedColumnId, PolyType.VARCHAR, v );
         }
     }
 
@@ -194,7 +199,7 @@ public class DdlManagerImpl extends DdlManager {
                             exportedColumn.dimension,
                             exportedColumn.cardinality,
                             exportedColumn.nullable,
-                            Collation.CASE_INSENSITIVE );
+                            Collation.getDefaultCollation() );
                     catalog.addColumnPlacement(
                             adapter.getAdapterId(),
                             columnId,
@@ -274,45 +279,37 @@ public class DdlManagerImpl extends DdlManager {
             // Rest plan cache and implementation cache
             processor.resetCaches();
         }
-
         AdapterManager.getInstance().removeAdapter( catalogAdapter.id );
-
     }
 
 
     @Override
     public void alterSchemaOwner( String schemaName, String ownerName, long databaseId ) throws UnknownUserException, UnknownSchemaException {
-
         CatalogSchema catalogSchema = catalog.getSchema( databaseId, schemaName );
         CatalogUser catalogUser = catalog.getUser( ownerName );
         catalog.setSchemaOwner( catalogSchema.id, catalogUser.id );
-
     }
 
 
     @Override
     public void alterSchemaRename( String newName, String oldName, long databaseId ) throws SchemaAlreadyExistsException, UnknownSchemaException {
-
         if ( catalog.checkIfExistsSchema( databaseId, newName ) ) {
             throw new SchemaAlreadyExistsException();
         }
         CatalogSchema catalogSchema = catalog.getSchema( databaseId, oldName );
         catalog.renameSchema( catalogSchema.id, newName );
-
     }
 
 
     @Override
-    public void alterSourceTableAddColumn( CatalogTable catalogTable, String columnPhysicalName, String columnLogicalName, CatalogColumn beforeColumn, CatalogColumn afterColumn, SqlNode defaultValue, Statement statement ) throws ColumnAlreadyExistsException {
+    public void alterSourceTableAddColumn( CatalogTable catalogTable, String columnPhysicalName, String columnLogicalName, CatalogColumn beforeColumn, CatalogColumn afterColumn, String defaultValue, Statement statement ) throws ColumnAlreadyExistsException, DdlOnSourceException {
 
         if ( catalog.checkIfExistsColumn( catalogTable.id, columnLogicalName ) ) {
             throw new ColumnAlreadyExistsException( columnLogicalName, catalogTable.name );
         }
 
         // Make sure that the table is of table type SOURCE
-        if ( catalogTable.tableType != TableType.SOURCE ) {
-            throw new RuntimeException( "Table '" + catalogTable.name + "' is not of type SOURCE!" );
-        }
+        checkIfTableType( catalogTable.tableType );
 
         // Make sure there is only one adapter
         if ( catalog.getColumnPlacements( catalogTable.columnIds.get( 0 ) ).size() != 1 ) {
@@ -343,19 +340,7 @@ public class DdlManagerImpl extends DdlManager {
             }
         }
 
-        List<CatalogColumn> columns = catalog.getColumns( catalogTable.id );
-        int position = columns.size() + 1;
-        if ( beforeColumn != null || afterColumn != null ) {
-            if ( beforeColumn != null ) {
-                position = beforeColumn.position;
-            } else {
-                position = afterColumn.position + 1;
-            }
-            // Update position of the other columns
-            for ( int i = columns.size(); i >= position; i-- ) {
-                catalog.setColumnPosition( columns.get( i - 1 ).id, i + 1 );
-            }
-        }
+        int position = updateAdjacentPositions( catalogTable, beforeColumn, afterColumn );
 
         long columnId = catalog.addColumn(
                 columnLogicalName,
@@ -368,22 +353,12 @@ public class DdlManagerImpl extends DdlManager {
                 exportedColumn.dimension,
                 exportedColumn.cardinality,
                 exportedColumn.nullable,
-                Collation.CASE_INSENSITIVE
+                Collation.getDefaultCollation()
         );
-        CatalogColumn addedColumn = catalog.getColumn( columnId );
 
         // Add default value
-        if ( defaultValue != null ) {
-            // TODO: String is only a temporal solution for default values
-            String v = defaultValue.toString();
-            if ( v.startsWith( "'" ) ) {
-                v = v.substring( 1, v.length() - 1 );
-            }
-            catalog.setDefaultValue( addedColumn.id, PolyType.VARCHAR, v );
-
-            // Update addedColumn variable
-            addedColumn = catalog.getColumn( columnId );
-        }
+        addDefaultValue( defaultValue, columnId );
+        CatalogColumn addedColumn = catalog.getColumn( columnId );
 
         // Add column placement
         catalog.addColumnPlacement(
@@ -402,18 +377,7 @@ public class DdlManagerImpl extends DdlManager {
     }
 
 
-    @Override
-    public void alterTableAddColumn( String columnName, CatalogTable catalogTable, CatalogColumn beforeColumn, CatalogColumn afterColumn, SqlDataTypeSpec type, boolean nullable, SqlNode defaultValue, Statement statement ) throws NotNullAndDefaultValueException, ColumnAlreadyExistsException {
-
-        // Check if the column either allows null values or has a default value defined.
-        if ( defaultValue == null && !nullable ) {
-            throw new NotNullAndDefaultValueException();
-        }
-
-        if ( catalog.checkIfExistsColumn( catalogTable.id, columnName ) ) {
-            throw new ColumnAlreadyExistsException( columnName, catalogTable.name );
-        }
-
+    private int updateAdjacentPositions( CatalogTable catalogTable, CatalogColumn beforeColumn, CatalogColumn afterColumn ) {
         List<CatalogColumn> columns = catalog.getColumns( catalogTable.id );
         int position = columns.size() + 1;
         if ( beforeColumn != null || afterColumn != null ) {
@@ -427,35 +391,41 @@ public class DdlManagerImpl extends DdlManager {
                 catalog.setColumnPosition( columns.get( i - 1 ).id, i + 1 );
             }
         }
-        final PolyType collectionsType = type.getCollectionsTypeName() == null ?
-                null : PolyType.get( type.getCollectionsTypeName().getSimple() );
+        return position;
+    }
+
+
+    @Override
+    public void alterTableAddColumn( String columnName, CatalogTable catalogTable, CatalogColumn beforeColumn, CatalogColumn afterColumn, SqlDataTypeSpec type, boolean nullable, String defaultValue, Statement statement ) throws NotNullAndDefaultValueException, ColumnAlreadyExistsException {
+
+        // Check if the column either allows null values or has a default value defined.
+        if ( defaultValue == null && !nullable ) {
+            throw new NotNullAndDefaultValueException();
+        }
+
+        if ( catalog.checkIfExistsColumn( catalogTable.id, columnName ) ) {
+            throw new ColumnAlreadyExistsException( columnName, catalogTable.name );
+        }
+
+        int position = updateAdjacentPositions( catalogTable, beforeColumn, afterColumn );
+
         long columnId = catalog.addColumn(
                 columnName,
                 catalogTable.id,
                 position,
-                PolyType.get( type.getTypeName().getSimple() ),
-                collectionsType,
+                type.getType(),
+                type.getCollectionsType(),
                 type.getPrecision() == -1 ? null : type.getPrecision(),
                 type.getScale() == -1 ? null : type.getScale(),
                 type.getDimension() == -1 ? null : type.getDimension(),
                 type.getCardinality() == -1 ? null : type.getCardinality(),
                 nullable,
-                Collation.CASE_INSENSITIVE
+                Collation.getDefaultCollation()
         );
-        CatalogColumn addedColumn = catalog.getColumn( columnId );
 
         // Add default value
-        if ( defaultValue != null ) {
-            // TODO: String is only a temporal solution for default values
-            String v = defaultValue.toString();
-            if ( v.startsWith( "'" ) ) {
-                v = v.substring( 1, v.length() - 1 );
-            }
-            catalog.setDefaultValue( addedColumn.id, PolyType.VARCHAR, v );
-
-            // Update addedColumn variable
-            addedColumn = catalog.getColumn( columnId );
-        }
+        addDefaultValue( defaultValue, columnId );
+        CatalogColumn addedColumn = catalog.getColumn( columnId );
 
         // Ask router on which stores this column shall be placed
         List<DataStore> stores = statement.getRouter().addColumn( catalogTable, statement );
@@ -491,7 +461,6 @@ public class DdlManagerImpl extends DdlManager {
             referencesIds.add( catalogColumn.id );
         }
         catalog.addForeignKey( catalogTable.id, columnIds, refTable.id, referencesIds, constraintName, onUpdate, onDelete );
-
     }
 
 
@@ -587,7 +556,6 @@ public class DdlManagerImpl extends DdlManager {
 
             storeInstance.addIndex( statement.getPrepareContext(), catalog.getIndex( indexId ) );
         }
-
     }
 
 
@@ -848,19 +816,16 @@ public class DdlManagerImpl extends DdlManager {
 
 
     @Override
-    public void alterTableModifyColumn( CatalogTable catalogTable, CatalogColumn catalogColumn, SqlDataTypeSpec type, String collation, SqlNode defaultValue, Boolean nullable, Boolean dropDefault, CatalogColumn beforeColumn, CatalogColumn afterColumn, Statement statement ) throws DdlOnSourceException {
+    public void alterTableModifyColumn( CatalogTable catalogTable, CatalogColumn catalogColumn, SqlDataTypeSpec type, Collation collation, String defaultValue, Boolean nullable, Boolean dropDefault, CatalogColumn beforeColumn, CatalogColumn afterColumn, Statement statement ) throws DdlOnSourceException {
         try {
             if ( type != null ) {
                 // Make sure that this is a table of type TABLE (and not SOURCE)
                 checkIfTableType( catalogTable.tableType );
 
-                PolyType dataType = PolyType.get( type.getTypeName().getSimple() );
-                final PolyType collectionsType = type.getCollectionsTypeName() == null ?
-                        null : PolyType.get( type.getCollectionsTypeName().getSimple() );
                 catalog.setColumnType(
                         catalogColumn.id,
-                        dataType,
-                        collectionsType,
+                        type.getType(),
+                        type.getCollectionsType(),
                         type.getPrecision() == -1 ? null : type.getPrecision(),
                         type.getScale() == -1 ? null : type.getScale(),
                         type.getDimension() == -1 ? null : type.getDimension(),
@@ -920,15 +885,9 @@ public class DdlManagerImpl extends DdlManager {
                 // Make sure that this is a table of type TABLE (and not SOURCE)
                 checkIfTableType( catalogTable.tableType );
 
-                Collation col = Collation.parse( collation );
-                catalog.setCollation( catalogColumn.id, col );
+                catalog.setCollation( catalogColumn.id, collation );
             } else if ( defaultValue != null ) {
-                // TODO: String is only a temporal solution for default values
-                String v = defaultValue.toString();
-                if ( v.startsWith( "'" ) ) {
-                    v = v.substring( 1, v.length() - 1 );
-                }
-                catalog.setDefaultValue( catalogColumn.id, PolyType.VARCHAR, v );
+                addDefaultValue( defaultValue, catalogColumn.id );
             } else if ( dropDefault != null && dropDefault ) {
                 catalog.deleteDefaultValue( catalogColumn.id );
             } else {
@@ -937,7 +896,7 @@ public class DdlManagerImpl extends DdlManager {
 
             // Rest plan cache and implementation cache (not sure if required in this case)
             statement.getQueryProcessor().resetCaches();
-        } catch ( GenericCatalogException | UnknownCollationException e ) {
+        } catch ( GenericCatalogException e ) {
             throw new RuntimeException( e );
         }
     }
@@ -1124,9 +1083,8 @@ public class DdlManagerImpl extends DdlManager {
     }
 
 
-    // TODO DL: refactor remove SqlNode
     @Override
-    public void createTable( long schemaId, String tableName, List<SqlNode> columnList, boolean ifNotExists, List<DataStore> stores, PlacementType placementType, Statement statement ) throws TableAlreadyExistsException {
+    public void createTable( long schemaId, String tableName, List<ColumnInformation> columns, List<ConstraintInformation> constraints, boolean ifNotExists, List<DataStore> stores, PlacementType placementType, Statement statement ) throws TableAlreadyExistsException, NoColumnsException {
         try {
             // Check if there is already a table with this name
             if ( catalog.checkIfExistsTable( schemaId, tableName ) ) {
@@ -1136,11 +1094,6 @@ public class DdlManagerImpl extends DdlManager {
                 } else {
                     throw new TableAlreadyExistsException();
                 }
-            }
-
-            if ( columnList == null ) {
-                // "CREATE TABLE t" is invalid; because there is no "AS query" we need a list of column names and types, "CREATE TABLE t (INT c)".
-                throw SqlUtil.newContextException( SqlParserPos.ZERO, RESOURCE.createTableRequiresColumnList() );
             }
 
             if ( stores == null ) {
@@ -1156,24 +1109,12 @@ public class DdlManagerImpl extends DdlManager {
                     true,
                     null );
 
-            int position = 1;
-            for ( Ord<SqlNode> c : Ord.zip( columnList ) ) {
-                if ( c.e instanceof SqlColumnDeclaration ) {
-                    final SqlColumnDeclaration columnDeclaration = (SqlColumnDeclaration) c.e;
+            for ( ColumnInformation column : columns ) {
+                addColumn( column.name, column.dataType, column.collation, column.defaultValue, tableId, column.position, stores, placementType );
+            }
 
-                    String defaultValue = columnDeclaration.getExpression() == null ? null : columnDeclaration.getExpression().toString();
-
-                    addColumn( columnDeclaration.getName().getSimple(), columnDeclaration.getDataType(), columnDeclaration.getCollation(), defaultValue, tableId, position, stores, placementType );
-
-                } else if ( c.e instanceof SqlKeyConstraint ) {
-                    SqlKeyConstraint constraint = (SqlKeyConstraint) c.e;
-                    String constraintName = constraint.getName() != null ? constraint.getName().getSimple() : null;
-
-                    addKeyConstraint( constraintName, constraint.getConstraintType(), constraint.getColumnList().getList().stream().map( SqlNode::toString ).collect( Collectors.toList() ), tableId );
-                } else {
-                    throw new AssertionError( c.e.getClass() );
-                }
-                position++;
+            for ( ConstraintInformation constraint : constraints ) {
+                addKeyConstraint( constraint.name, constraint.type, constraint.columnNames, tableId );
             }
 
             CatalogTable catalogTable = catalog.getTable( tableId );
@@ -1213,14 +1154,7 @@ public class DdlManagerImpl extends DdlManager {
         }
 
         // Add default value
-        if ( defaultValue != null ) {
-            // TODO: String is only a temporal solution for default values
-            String v = defaultValue;
-            if ( v.startsWith( "'" ) ) {
-                v = v.substring( 1, v.length() - 1 );
-            }
-            catalog.setDefaultValue( addedColumnId, PolyType.VARCHAR, v );
-        }
+        addDefaultValue( defaultValue, addedColumnId );
     }
 
 

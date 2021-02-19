@@ -21,16 +21,10 @@ import static org.polypheny.db.util.Static.RESOURCE;
 
 import java.util.List;
 import lombok.NonNull;
-import org.polypheny.db.adapter.AdapterManager;
-import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.Catalog.Collation;
-import org.polypheny.db.catalog.Catalog.TableType;
 import org.polypheny.db.catalog.entity.CatalogColumn;
-import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
 import org.polypheny.db.catalog.entity.CatalogTable;
-import org.polypheny.db.catalog.exceptions.GenericCatalogException;
 import org.polypheny.db.catalog.exceptions.UnknownCollationException;
-import org.polypheny.db.catalog.exceptions.UnknownColumnException;
 import org.polypheny.db.ddl.DdlManager;
 import org.polypheny.db.ddl.exception.DdlOnSourceException;
 import org.polypheny.db.jdbc.Context;
@@ -42,7 +36,6 @@ import org.polypheny.db.sql.SqlWriter;
 import org.polypheny.db.sql.ddl.SqlAlterTable;
 import org.polypheny.db.sql.parser.SqlParserPos;
 import org.polypheny.db.transaction.Statement;
-import org.polypheny.db.type.PolyType;
 import org.polypheny.db.util.ImmutableNullableList;
 
 
@@ -146,10 +139,14 @@ public class SqlAlterTableModifyColumn extends SqlAlterTable {
         CatalogColumn beforeCatalogColumn = beforeColumn != null ? getCatalogColumn( catalogTable.id, beforeColumn ) : null;
         CatalogColumn afterCatalogColumn = afterColumn != null ? getCatalogColumn( catalogTable.id, afterColumn ) : null;
 
+        String defaultValue = this.defaultValue == null ? null : this.defaultValue.toString();
+
         try {
-            DdlManager.getInstance().alterTableModifyColumn( catalogTable, catalogColumn, type, collation, defaultValue, nullable, dropDefault, beforeCatalogColumn, afterCatalogColumn, statement );
+            DdlManager.getInstance().alterTableModifyColumn( catalogTable, catalogColumn, type, collation == null ? null : Collation.parse( collation ), defaultValue, nullable, dropDefault, beforeCatalogColumn, afterCatalogColumn, statement );
         } catch ( DdlOnSourceException e ) {
             throw SqlUtil.newContextException( tableName.getParserPosition(), RESOURCE.ddlOnSourceTable() );
+        } catch ( UnknownCollationException e ) {
+            throw new RuntimeException( e );
         }
     }
 

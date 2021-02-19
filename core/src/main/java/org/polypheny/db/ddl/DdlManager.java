@@ -45,6 +45,7 @@ import org.polypheny.db.ddl.exception.IndexExistsException;
 import org.polypheny.db.ddl.exception.IndexPreventsRemovalException;
 import org.polypheny.db.ddl.exception.LastPlacementException;
 import org.polypheny.db.ddl.exception.MissingColumnPlacementException;
+import org.polypheny.db.ddl.exception.NoColumnsException;
 import org.polypheny.db.ddl.exception.NotNullAndDefaultValueException;
 import org.polypheny.db.ddl.exception.PlacementAlreadyExistsException;
 import org.polypheny.db.ddl.exception.PlacementIsPrimaryException;
@@ -54,7 +55,6 @@ import org.polypheny.db.ddl.exception.UnknownIndexMethodException;
 import org.polypheny.db.processing.QueryProcessor;
 import org.polypheny.db.routing.Router;
 import org.polypheny.db.sql.SqlDataTypeSpec;
-import org.polypheny.db.sql.SqlNode;
 import org.polypheny.db.sql.parser.SqlParserPos;
 import org.polypheny.db.transaction.Statement;
 import org.polypheny.db.transaction.TransactionException;
@@ -169,7 +169,7 @@ public abstract class DdlManager {
      * @param afterColumn the column after the column, which is inserted; can be null
      * @param defaultValue the default value of the inserted column
      */
-    public abstract void alterSourceTableAddColumn( CatalogTable catalogTable, String columnPhysicalName, String columnLogicalName, CatalogColumn beforeColumn, CatalogColumn afterColumn, SqlNode defaultValue, Statement statement ) throws ColumnAlreadyExistsException;
+    public abstract void alterSourceTableAddColumn( CatalogTable catalogTable, String columnPhysicalName, String columnLogicalName, CatalogColumn beforeColumn, CatalogColumn afterColumn, String defaultValue, Statement statement ) throws ColumnAlreadyExistsException, DdlOnSourceException;
 
     /**
      * Adds a column to an existing table
@@ -183,7 +183,7 @@ public abstract class DdlManager {
      * @param defaultValue provides a default value for the column
      * @param statement the query statement
      */
-    public abstract void alterTableAddColumn( String columnName, CatalogTable catalogTable, CatalogColumn beforeColumn, CatalogColumn afterColumn, SqlDataTypeSpec type, boolean nullable, SqlNode defaultValue, Statement statement ) throws NotNullAndDefaultValueException, ColumnAlreadyExistsException;
+    public abstract void alterTableAddColumn( String columnName, CatalogTable catalogTable, CatalogColumn beforeColumn, CatalogColumn afterColumn, SqlDataTypeSpec type, boolean nullable, String defaultValue, Statement statement ) throws NotNullAndDefaultValueException, ColumnAlreadyExistsException;
 
     /**
      * Adds foreign keys to a table
@@ -305,7 +305,7 @@ public abstract class DdlManager {
      * @param afterColumn the column after the modified column
      * @param statement the used statement
      */
-    public abstract void alterTableModifyColumn( CatalogTable catalogTable, CatalogColumn catalogColumn, SqlDataTypeSpec type, String collation, SqlNode defaultValue, Boolean nullable, Boolean dropDefault, CatalogColumn beforeColumn, CatalogColumn afterColumn, Statement statement ) throws DdlOnSourceException;
+    public abstract void alterTableModifyColumn( CatalogTable catalogTable, CatalogColumn catalogColumn, SqlDataTypeSpec type, Collation collation, String defaultValue, Boolean nullable, Boolean dropDefault, CatalogColumn beforeColumn, CatalogColumn afterColumn, Statement statement ) throws DdlOnSourceException;
 
     /**
      * Modifies a placement in a table
@@ -368,13 +368,14 @@ public abstract class DdlManager {
      *
      * @param schemaId the id of the schema to which the table belongs
      * @param tableName the name of the new table
-     * @param columnList the list of the table
+     * @param columns all columns of the table
+     * @param constraints all constraints for the table
      * @param ifNotExists if the table is only created, when it not exists
      * @param stores all stores on which the table should be created
      * @param placementType which placement type should be used
      * @param statement the used statement
      */
-    public abstract void createTable( long schemaId, String tableName, List<SqlNode> columnList, boolean ifNotExists, List<DataStore> stores, PlacementType placementType, Statement statement ) throws TableAlreadyExistsException;
+    public abstract void createTable( long schemaId, String tableName, List<ColumnInformation> columns, List<ConstraintInformation> constraints, boolean ifNotExists, List<DataStore> stores, PlacementType placementType, Statement statement ) throws TableAlreadyExistsException, NoColumnsException;
 
 
     /**
@@ -457,5 +458,49 @@ public abstract class DdlManager {
      * Sets a specific option
      */
     public abstract void setOption();
+
+
+    /**
+     * Helper class to hold all needed information for a new column,
+     * decoupled from a specific query language //TODO DL: reevaluate
+     */
+    public static class ColumnInformation {
+
+        public final String name;
+        public final SqlDataTypeSpec dataType;
+        public final Collation collation;
+        public final String defaultValue;
+        public final int position;
+
+
+        public ColumnInformation( String name, SqlDataTypeSpec dataType, Collation collation, String defaultValue, int position ) {
+            this.name = name;
+            this.dataType = dataType;
+            this.collation = collation;
+            this.defaultValue = defaultValue;
+            this.position = position;
+        }
+
+    }
+
+
+    /**
+     * Helper class to hold all needed information for a new constraint,
+     * decoupled from its query language
+     */
+    public static class ConstraintInformation {
+
+        public final String name;
+        public final ConstraintType type;
+        public final List<String> columnNames;
+
+
+        public ConstraintInformation( String name, ConstraintType type, List<String> columnNames ) {
+            this.name = name;
+            this.type = type;
+            this.columnNames = columnNames;
+        }
+
+    }
 
 }

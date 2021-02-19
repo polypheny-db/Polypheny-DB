@@ -22,11 +22,11 @@ import static org.polypheny.db.util.Static.RESOURCE;
 import java.util.List;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
-import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.catalog.exceptions.ColumnAlreadyExistsException;
 import org.polypheny.db.ddl.DdlManager;
+import org.polypheny.db.ddl.exception.DdlOnSourceException;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.sql.SqlIdentifier;
 import org.polypheny.db.sql.SqlNode;
@@ -117,10 +117,14 @@ public class SqlAlterSourceTableAddColumn extends SqlAlterTable {
             afterColumn = getCatalogColumn( catalogTable.id, afterColumnName );
         }
 
+        String defaultValue = this.defaultValue == null ? null : this.defaultValue.toString();
+
         try {
             DdlManager.getInstance().alterSourceTableAddColumn( catalogTable, columnPhysical.getSimple(), columnLogical.getSimple(), beforeColumn, afterColumn, defaultValue, statement );
         } catch ( ColumnAlreadyExistsException e ) {
             throw SqlUtil.newContextException( columnLogical.getParserPosition(), RESOURCE.columnExists( columnLogical.getSimple() ) );
+        } catch ( DdlOnSourceException e ) {
+            throw SqlUtil.newContextException( table.getParserPosition(), RESOURCE.ddlOnSourceTable() );
         }
 
     }
