@@ -188,6 +188,11 @@ public class JdbcTable extends AbstractQueryableTable implements TranslatableTab
     }
 
 
+    public boolean hasPhysicalColumnName( String logicalColumnName ) {
+        return logicalColumnNames.contains( logicalColumnName );
+    }
+
+
     @Override
     public RelNode toRel( RelOptTable.ToRelContext context, RelOptTable relOptTable ) {
         return new JdbcTableScan( context.getCluster(), relOptTable, this, jdbcSchema.getConvention() );

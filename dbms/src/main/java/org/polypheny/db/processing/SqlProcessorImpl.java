@@ -21,6 +21,7 @@ import static org.polypheny.db.util.Static.RESOURCE;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import lombok.Setter;
@@ -285,15 +286,15 @@ public class SqlProcessorImpl implements SqlProcessor, ViewExpander {
             CatalogTable catalogTable = getCatalogTable( transaction, (SqlIdentifier) insert.getTargetTable() );
             SchemaType schemaType = Catalog.getInstance().getSchema( catalogTable.schemaId ).schemaType;
 
-            if ( schemaType == SchemaType.DOCUMENT ) {
-                // createMissingColumns( insert, oldColumnList, catalogTable, transaction.createStatement() );
-                return;
-            }
-
             catalogTable = getCatalogTable( transaction, (SqlIdentifier) insert.getTargetTable() );
 
             SqlNodeList newColumnList = new SqlNodeList( SqlParserPos.ZERO );
             int size = (int) catalogTable.columnIds.size();
+            if ( schemaType == SchemaType.DOCUMENT ) {
+                List<String> columnNames = catalogTable.getColumnNames();
+                size += oldColumnList.getList().stream().filter( column -> columnNames.contains( ((SqlIdentifier) column).names.get( 0 ) ) ).count();
+            }
+
             SqlNode[][] newValues = new SqlNode[((SqlBasicCall) insert.getSource()).getOperands().length][size];
             int pos = 0;
             List<CatalogColumn> columns = Catalog.getInstance().getColumns( catalogTable.id );
@@ -350,6 +351,32 @@ public class SqlProcessorImpl implements SqlProcessor, ViewExpander {
                     i++;
                 }
                 pos++;
+            }
+
+            // add doc values back TODO DL: change
+            if ( schemaType == SchemaType.DOCUMENT ) {
+                List<SqlIdentifier> documentColumns = new ArrayList<>();
+                for ( SqlNode column : oldColumnList.getList() ) {
+                    if ( newColumnList.getList()
+                            .stream()
+                            .filter( c -> c instanceof SqlIdentifier )
+                            .map( c -> ((SqlIdentifier) c).names.get( 0 ) )
+                            .noneMatch( c -> c.equals( ((SqlIdentifier) column).names.get( 0 ) ) ) ) {
+                        documentColumns.add( (SqlIdentifier) column );
+                    }
+                }
+
+                for ( SqlIdentifier doc : documentColumns ) {
+                    int i = 0;
+                    newColumnList.add( doc );
+
+                    for ( SqlNode sqlNode : ((SqlBasicCall) insert.getSource()).getOperands() ) {
+                        int position = getPositionInSqlNodeList( oldColumnList, doc.getSimple() );
+                        newValues[i][pos] = ((SqlBasicCall) sqlNode).getOperands()[position];
+                    }
+                    pos++;
+                }
+
             }
 
             // Add new column list

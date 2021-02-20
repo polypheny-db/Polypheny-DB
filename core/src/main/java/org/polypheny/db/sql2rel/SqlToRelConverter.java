@@ -2982,8 +2982,9 @@ public class SqlToRelConverter {
         List<RexNode> sourceExps = new ArrayList<>( Collections.nCopies( targetFields.size(), null ) );
         List<String> fieldNames = new ArrayList<>( Collections.nCopies( targetFields.size(), null ) ); // TODO DL: reevaluate and make final again?
         if ( isDocument ) {
-            sourceExps = new ArrayList<>( Collections.nCopies( targetColumnNames.size(), null ) );
-            fieldNames = new ArrayList<>( Collections.nCopies( targetColumnNames.size(), null ) );
+            int size = (int) (targetFields.size() + targetColumnNames.stream().filter( name -> !targetFields.stream().map( RelDataTypeField::getName ).collect( Collectors.toList() ).contains( name ) ).count());
+            sourceExps = new ArrayList<>( Collections.nCopies( size, null ) );
+            fieldNames = new ArrayList<>( Collections.nCopies( size, null ) );
         }
 
         final InitializerExpressionFactory initializerFactory = getInitializerFactory( validator.getNamespace( call ).getTable() );

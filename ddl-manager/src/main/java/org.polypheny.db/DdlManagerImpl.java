@@ -18,6 +18,7 @@ package org.polypheny.db;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -87,6 +88,7 @@ import org.polypheny.db.routing.Router;
 import org.polypheny.db.runtime.PolyphenyDbContextException;
 import org.polypheny.db.runtime.PolyphenyDbException;
 import org.polypheny.db.sql.SqlDataTypeSpec;
+import org.polypheny.db.sql.SqlIdentifier;
 import org.polypheny.db.sql.parser.SqlParserPos;
 import org.polypheny.db.transaction.Statement;
 import org.polypheny.db.transaction.TransactionException;
@@ -1109,8 +1111,15 @@ public class DdlManagerImpl extends DdlManager {
                     true,
                     null );
 
+            int offset = 0;
+            if ( catalog.getSchema( schemaId ).schemaType == SchemaType.DOCUMENT ) {
+                SqlDataTypeSpec dataType = new SqlDataTypeSpec( null, new SqlIdentifier( Collections.singletonList( "JSON" ), SqlParserPos.ZERO ), 300, -1, -1, -1, null, null, true, SqlParserPos.ZERO );
+                columns.add( new ColumnInformation( "_hidden", dataType, Collation.getDefaultCollation(), null, 0 ) );
+                offset++;
+            }
+
             for ( ColumnInformation column : columns ) {
-                addColumn( column.name, column.dataType, column.collation, column.defaultValue, tableId, column.position, stores, placementType );
+                addColumn( column.name, column.dataType, column.collation, column.defaultValue, tableId, column.position + offset, stores, placementType );
             }
 
             for ( ConstraintInformation constraint : constraints ) {

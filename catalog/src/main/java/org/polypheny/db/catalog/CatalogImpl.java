@@ -1785,7 +1785,7 @@ public class CatalogImpl extends Catalog {
         Integer fixedLength = length;
         Collation fixedCollation = collation;
         if ( type == PolyType.JSON ) {
-            fixedLength = 300;
+            fixedLength = scale == null ? 300 : scale;
             fixedCollation = Collation.CASE_INSENSITIVE;
         }
 

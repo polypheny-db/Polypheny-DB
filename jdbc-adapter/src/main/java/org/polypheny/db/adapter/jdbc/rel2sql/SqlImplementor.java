@@ -38,10 +38,13 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.math.BigDecimal;
 import java.util.AbstractList;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
@@ -55,6 +58,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.calcite.linq4j.Ord;
 import org.apache.calcite.linq4j.tree.Expressions;
@@ -89,6 +93,7 @@ import org.polypheny.db.sql.SqlCall;
 import org.polypheny.db.sql.SqlDialect;
 import org.polypheny.db.sql.SqlDynamicParam;
 import org.polypheny.db.sql.SqlIdentifier;
+import org.polypheny.db.sql.SqlInsert;
 import org.polypheny.db.sql.SqlJoin;
 import org.polypheny.db.sql.SqlKind;
 import org.polypheny.db.sql.SqlLiteral;
@@ -371,19 +376,58 @@ public abstract class SqlImplementor {
                 || aliases instanceof LinkedHashMap
                 || aliases instanceof ImmutableMap
                 : "must use a Map implementation that preserves order";
+
+        if ( node instanceof SqlInsert ) {
+            List<SqlIdentifier> targets = ((SqlInsert) node).getTargetColumnList().getList().stream().map( n -> (SqlIdentifier) n ).collect( Collectors.toList() );
+            // only works on single inserts for now
+            List<SqlNode> sources = Arrays.asList( ((SqlBasicCall) ((SqlBasicCall) ((SqlInsert) node).getSource()).getOperands()[0]).operands );
+
+            SqlNodeList newColumnList = new SqlNodeList( SqlParserPos.ZERO );
+            List<SqlNode> newSources = new ArrayList<>();
+            JsonObject json = new JsonObject();
+
+            int i = 0;
+            for ( SqlIdentifier target : targets ) {
+                if ( target.getSimple().startsWith( "_" ) ) {
+                    json.add( target.getSimple().substring( 1 ), JsonParser.parseString( sources.get( i ).toString() ) );
+                } else {
+                    newColumnList.add( target );
+                    newSources.add( sources.get( i ) );
+                }
+                i++;
+            }
+
+            newSources.set( 0, SqlLiteral.createCharString(
+                    json.toString(),
+                    SqlParserPos.ZERO ) );
+
+            ((SqlInsert) node).setColumnList( newColumnList );
+            SqlBasicCall call = ((SqlBasicCall) ((SqlBasicCall) ((SqlInsert) node).getSource()).getOperands()[0]);
+
+            ((SqlBasicCall) ((SqlInsert) node).getSource()).getOperands()[0] = call.getOperator().createCall(
+                    call.getFunctionQuantifier(),
+                    call.getParserPosition(),
+                    newSources.toArray( SqlNode.EMPTY_ARRAY ) );
+        }
+
         final String alias2 = SqlValidatorUtil.getAlias( node, -1 );
         final String alias3 = alias2 != null ? alias2 : "t";
         final String alias4 = SqlValidatorUtil.uniquify( alias3, aliasSet, SqlValidatorUtil.EXPR_SUGGESTER );
         if ( aliases != null && !aliases.isEmpty() && (!dialect.hasImplicitTableAlias() || aliases.size() > 1) ) {
             return new Result( node, clauses, alias4, rel.getRowType(), aliases );
         }
+
         final String alias5;
         if ( alias2 == null || !alias2.equals( alias4 ) || !dialect.hasImplicitTableAlias() ) {
             alias5 = alias4;
         } else {
             alias5 = null;
         }
-        return new Result( node, clauses, alias5, rel.getRowType(), ImmutableMap.of( alias4, rel.getRowType() ) );
+        return new
+
+                Result( node, clauses, alias5, rel.getRowType(), ImmutableMap.
+
+                of( alias4, rel.getRowType() ) );
     }
 
 
