@@ -117,8 +117,6 @@ import org.polypheny.db.rel.stream.LogicalDelta;
 import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.rel.type.RelDataTypeFactory;
 import org.polypheny.db.rel.type.RelDataTypeField;
-import org.polypheny.db.rel.type.RelDataTypeFieldImpl;
-import org.polypheny.db.rel.type.RelDataTypeSystem;
 import org.polypheny.db.rex.RexBuilder;
 import org.polypheny.db.rex.RexCall;
 import org.polypheny.db.rex.RexCallBinding;
@@ -208,7 +206,6 @@ import org.polypheny.db.sql.validate.SqlValidatorTable;
 import org.polypheny.db.sql.validate.SqlValidatorUtil;
 import org.polypheny.db.tools.RelBuilder;
 import org.polypheny.db.tools.RelBuilderFactory;
-import org.polypheny.db.type.BasicPolyType;
 import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeUtil;
 import org.polypheny.db.type.inference.PolyReturnTypeInference;
@@ -2996,8 +2993,8 @@ public class SqlToRelConverter {
         for ( Pair<String, RexNode> p : Pair.zip( targetColumnNames, columnExprs ) ) {
             RelDataTypeField field = nameMatcher.field( targetRowType, p.left );
 
-            if ( field == null && isDocument ) {
-                field = new RelDataTypeFieldImpl( p.left, targetRowType.getFieldCount() + dynamicCount, new BasicPolyType( RelDataTypeSystem.DEFAULT, PolyType.JSON ) );
+            if ( field.isDynamic() ) {
+                field.setIndex( targetRowType.getFieldCount() + dynamicCount );
                 dynamicCount++;
             }
 
