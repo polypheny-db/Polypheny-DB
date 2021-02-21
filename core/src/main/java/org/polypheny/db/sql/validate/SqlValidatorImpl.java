@@ -4045,7 +4045,8 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
                 throw newValidationError( id, RESOURCE.unknownTargetColumn( id.toString() ) );
 
             }
-            if ( !assignedFields.add( targetField.getIndex() ) ) {
+            // skipping this validation for document for now TODO DL: reevaluate
+            if ( !allowDynamic && !assignedFields.add( targetField.getIndex() ) ) {
                 throw newValidationError( id, RESOURCE.duplicateTargetColumn( targetField.getName() ) );
             }
             fields.add( targetField );

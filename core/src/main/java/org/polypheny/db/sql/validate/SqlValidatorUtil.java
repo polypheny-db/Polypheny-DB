@@ -491,7 +491,7 @@ public class SqlValidatorUtil {
             RelDataTypeField typeField = nameMatcher.field( rowType, id.getSimple() );
 
             if ( typeField == null && isDocument ) {
-                return new RelDataTypeFieldImpl( id.getSimple(), -1, new BasicPolyType( RelDataTypeSystem.DEFAULT, PolyType.JSON ) );
+                return new RelDataTypeFieldImpl( id.getSimple(), -1, new BasicPolyType( RelDataTypeSystem.DEFAULT, PolyType.JSON, 300 ) );
             }
 
             return typeField;
@@ -957,6 +957,7 @@ public class SqlValidatorUtil {
     public interface Suggester {
 
         String apply( String original, int attempt, int size );
+
     }
 
 
@@ -990,6 +991,8 @@ public class SqlValidatorUtil {
             // TODO: create an expression that could have no other source
             return SqlLiteral.createCharString( "xyz" + groupCount++, SqlParserPos.ZERO );
         }
+
     }
+
 }
 

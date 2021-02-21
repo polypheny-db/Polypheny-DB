@@ -292,7 +292,7 @@ public class SqlProcessorImpl implements SqlProcessor, ViewExpander {
             int size = (int) catalogTable.columnIds.size();
             if ( schemaType == SchemaType.DOCUMENT ) {
                 List<String> columnNames = catalogTable.getColumnNames();
-                size += oldColumnList.getList().stream().filter( column -> columnNames.contains( ((SqlIdentifier) column).names.get( 0 ) ) ).count();
+                size += oldColumnList.getList().stream().filter( column -> !columnNames.contains( ((SqlIdentifier) column).names.get( 0 ) ) ).count();
             }
 
             SqlNode[][] newValues = new SqlNode[((SqlBasicCall) insert.getSource()).getOperands().length][size];
