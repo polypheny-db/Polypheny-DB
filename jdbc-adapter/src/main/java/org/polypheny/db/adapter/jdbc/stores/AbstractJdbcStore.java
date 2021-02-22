@@ -18,6 +18,7 @@ package org.polypheny.db.adapter.jdbc.stores;
 
 
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,6 @@ import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.information.Information;
 import org.polypheny.db.information.InformationGroup;
-import org.polypheny.db.information.InformationManager;
 import org.polypheny.db.information.InformationPage;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.runtime.PolyphenyDbException;
@@ -50,7 +50,7 @@ import org.polypheny.db.type.PolyType;
 public abstract class AbstractJdbcStore extends DataStore {
 
     private InformationPage informationPage;
-    private InformationGroup informationGroup;
+    private List<InformationGroup> informationGroups;
     private List<Information> informationElements;
 
     protected SqlDialect dialect;
@@ -70,22 +70,15 @@ public abstract class AbstractJdbcStore extends DataStore {
         this.connectionFactory = connectionFactory;
         this.dialect = dialect;
         // Register the JDBC Pool Size as information in the information manager
-        registerJdbcPoolSizeInformation( uniqueName );
+        registerJdbcInformation( uniqueName );
     }
 
 
-    protected void registerJdbcPoolSizeInformation( String uniqueName ) {
+    protected void registerJdbcInformation( String uniqueName ) {
         informationPage = new InformationPage( uniqueName ).setLabel( "Stores" );
-        informationGroup = new InformationGroup( informationPage, "JDBC Connection Pool" );
-        informationElements = JdbcUtils.buildInformationPoolSize( informationPage, informationGroup, connectionFactory, getUniqueName() );
-
-        InformationManager im = InformationManager.getInstance();
-        im.addPage( informationPage );
-        im.addGroup( informationGroup );
-
-        for ( Information information : informationElements ) {
-            im.registerInformation( information );
-        }
+        informationGroups = new ArrayList<>();
+        informationElements = new ArrayList<>();
+        JdbcUtils.buildInformationPage( informationPage, informationGroups, informationElements, connectionFactory, getUniqueName(), getAdapterId() );
     }
 
 
@@ -399,12 +392,7 @@ public abstract class AbstractJdbcStore extends DataStore {
 
 
     protected void removeInformationPage() {
-        if ( informationElements.size() > 0 ) {
-            InformationManager im = InformationManager.getInstance();
-            im.removeInformation( informationElements.toArray( new Information[0] ) );
-            im.removeGroup( informationGroup );
-            im.removePage( informationPage );
-        }
+        JdbcUtils.removeInformationPage( informationPage, informationGroups, informationElements );
     }
 
 }

@@ -39,7 +39,6 @@ import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.information.Information;
 import org.polypheny.db.information.InformationGroup;
-import org.polypheny.db.information.InformationManager;
 import org.polypheny.db.information.InformationPage;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.schema.SchemaPlus;
@@ -54,7 +53,7 @@ import org.polypheny.db.type.PolyType;
 public abstract class AbstractJdbcSource extends DataSource {
 
     private InformationPage informationPage;
-    private InformationGroup informationGroup;
+    private List<InformationGroup> informationGroups;
     private List<Information> informationElements;
 
     protected SqlDialect dialect;
@@ -74,22 +73,16 @@ public abstract class AbstractJdbcSource extends DataSource {
         this.connectionFactory = createConnectionFactory( settings, MysqlSqlDialect.DEFAULT, diverClass );
         this.dialect = dialect;
         // Register the JDBC Pool Size as information in the information manager
-        registerJdbcPoolSizeInformation( uniqueName );
+        registerJdbcInformation( uniqueName );
     }
 
 
-    protected void registerJdbcPoolSizeInformation( String uniqueName ) {
+    protected void registerJdbcInformation( String uniqueName ) {
         informationPage = new InformationPage( uniqueName ).setLabel( "Sources" );
-        informationGroup = new InformationGroup( informationPage, "JDBC Connection Pool" );
-        informationElements = JdbcUtils.buildInformationPoolSize( informationPage, informationGroup, connectionFactory, getUniqueName() );
+        informationGroups = new ArrayList<>();
+        informationElements = new ArrayList<>();
+        JdbcUtils.buildInformationPage( informationPage, informationGroups, informationElements, connectionFactory, getUniqueName(), getAdapterId() );
 
-        InformationManager im = InformationManager.getInstance();
-        im.addPage( informationPage );
-        im.addGroup( informationGroup );
-
-        for ( Information information : informationElements ) {
-            im.registerInformation( information );
-        }
     }
 
 
@@ -193,12 +186,7 @@ public abstract class AbstractJdbcSource extends DataSource {
 
 
     protected void removeInformationPage() {
-        if ( informationElements.size() > 0 ) {
-            InformationManager im = InformationManager.getInstance();
-            im.removeInformation( informationElements.toArray( new Information[0] ) );
-            im.removeGroup( informationGroup );
-            im.removePage( informationPage );
-        }
+        JdbcUtils.removeInformationPage( informationPage, informationGroups, informationElements );
     }
 
 

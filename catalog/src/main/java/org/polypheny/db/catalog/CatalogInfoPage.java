@@ -22,7 +22,6 @@ import java.beans.PropertyChangeListener;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -82,13 +81,12 @@ public class CatalogInfoPage implements PropertyChangeListener {
     }
 
 
-    private InformationTable addPersistentInfo( InformationPage page ) {
+    private void addPersistentInfo( InformationPage page ) {
         InformationGroup catalogGroup = new InformationGroup( page, "Persistency" );
         infoManager.addGroup( catalogGroup );
         InformationTable table = new InformationTable( catalogGroup, Collections.singletonList( "is persistent" ) );
         infoManager.registerInformation( table );
         table.addRow( catalog.isPersistent ? "✔" : "X" );
-        return table;
     }
 
 

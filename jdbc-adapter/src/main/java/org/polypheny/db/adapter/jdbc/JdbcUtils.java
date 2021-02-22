@@ -47,7 +47,6 @@ import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -62,11 +61,13 @@ import org.apache.calcite.linq4j.function.Function0;
 import org.apache.calcite.linq4j.function.Function1;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.polypheny.db.adapter.jdbc.connection.ConnectionFactory;
+import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.information.Information;
 import org.polypheny.db.information.InformationGraph;
 import org.polypheny.db.information.InformationGraph.GraphData;
 import org.polypheny.db.information.InformationGraph.GraphType;
 import org.polypheny.db.information.InformationGroup;
+import org.polypheny.db.information.InformationManager;
 import org.polypheny.db.information.InformationPage;
 import org.polypheny.db.information.InformationTable;
 import org.polypheny.db.sql.SqlDialect;
@@ -137,6 +138,7 @@ public final class JdbcUtils {
                 }
             }
         }
+
     }
 
 
@@ -236,6 +238,7 @@ public final class JdbcUtils {
             int offset = TimeZone.getDefault().getOffset( time );
             return new Date( time + offset );
         }
+
     }
 
 
@@ -273,8 +276,57 @@ public final class JdbcUtils {
     }
 
 
-    public static List<Information> buildInformationPoolSize( InformationPage page, InformationGroup group, ConnectionFactory connectionFactory, String uniqueName ) {
-        List<Information> informationElements = new ArrayList<>();
+    /**
+     * Builds new InformationPages for a JdbcAdapter and also registers them in the InformationManager
+     *
+     * @param informationPage the information page of this jdbc adapter
+     * @param informationGroups all group used in this informationPage
+     * @param informationElements all elements part of these groups
+     * @param connectionFactory which is used to get information regarding connections
+     * @param uniqueName the name of the adapter
+     * @param adapterId the id of the adapter
+     */
+    public static void buildInformationPage( InformationPage informationPage, List<InformationGroup> informationGroups, List<Information> informationElements, ConnectionFactory connectionFactory, String uniqueName, int adapterId ) {
+
+        buildInformationPoolSize( informationPage, informationGroups, informationElements, connectionFactory, uniqueName );
+        buildInformationPhysicalNames( informationPage, informationGroups, informationElements, adapterId );
+
+        InformationManager im = InformationManager.getInstance();
+        im.addPage( informationPage );
+        informationGroups.forEach( im::addGroup );
+
+        for ( Information information : informationElements ) {
+            im.registerInformation( information );
+        }
+    }
+
+
+    /**
+     * Removes all information object from the provided information objects from the InformationManager
+     *
+     * @param informationPage the information page of this jdbc adapter
+     * @param informationGroups all group used in this informationPage
+     * @param informationElements all elements part of these groups
+     */
+    public static void removeInformationPage( InformationPage informationPage, List<InformationGroup> informationGroups, List<Information> informationElements ) {
+        if ( informationElements.size() > 0 ) {
+            InformationManager im = InformationManager.getInstance();
+            im.removeInformation( informationElements.toArray( new Information[0] ) );
+            informationGroups.forEach( im::removeGroup );
+            im.removePage( informationPage );
+        }
+    }
+
+
+    /**
+     * Builds and adds an new information group, observing the connection pool, to the provided information objects
+     *
+     * @param informationPage the information page used to show information of this jdbc adapter
+     * @param groups a collection of the group on this page
+     * @param informationElements a collection of all already registered elements of these groups on this specific page
+     */
+    public static void buildInformationPoolSize( InformationPage informationPage, List<InformationGroup> groups, List<Information> informationElements, ConnectionFactory connectionFactory, String uniqueName ) {
+        InformationGroup group = new InformationGroup( informationPage, "JDBC Connection Pool" );
 
         InformationGraph connectionPoolSizeGraph = new InformationGraph(
                 group,
@@ -305,7 +357,36 @@ public final class JdbcUtils {
             connectionPoolSizeTable.addRow( "Max", max );
         } );
 
-        return informationElements;
+        groups.add( group );
+
+    }
+
+
+    /**
+     * Builds and adds an new information group, observing physical naming of columns, to the provided information objects
+     *
+     * @param page the information page used to show information of this jdbc adapter
+     * @param groups a collection of the group on this page
+     * @param informationElements a collection of all already registered elements of these groups on this specific page
+     * @param adapterId the id of the adapter, which can be used to retrieve the physical column names
+     */
+    public static void buildInformationPhysicalNames( InformationPage page, List<InformationGroup> groups, List<Information> informationElements, int adapterId ) {
+
+        InformationGroup group = new InformationGroup( page, "Physical Names" );
+        InformationTable physicalColumnNames = new InformationTable(
+                group,
+                Arrays.asList( "Id", "Name", "Physical Name" )
+        );
+        informationElements.add( physicalColumnNames );
+
+        group.setRefreshFunction( () -> {
+            physicalColumnNames.reset();
+            Catalog.getInstance().getColumnPlacementsOnAdapter( adapterId ).forEach( placement -> {
+                physicalColumnNames.addRow( placement.columnId, Catalog.getInstance().getColumn( placement.columnId ).name, placement.physicalSchemaName + "." + placement.physicalTableName + "." + placement.physicalColumnName );
+            } );
+        } );
+
+        groups.add( group );
     }
 
 }
