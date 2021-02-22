@@ -130,6 +130,7 @@ abstract class AbstractNamespace implements SqlValidatorNamespace {
             validator.validateNamespace( this, validator.unknownType );
             Preconditions.checkArgument( rowType != null, "validate must set rowType" );
         }
+
         return rowType;
     }
 

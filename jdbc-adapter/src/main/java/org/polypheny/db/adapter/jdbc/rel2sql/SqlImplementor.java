@@ -377,6 +377,18 @@ public abstract class SqlImplementor {
                 || aliases instanceof ImmutableMap
                 : "must use a Map implementation that preserves order";
 
+        /*
+        if ( node instanceof SqlSelect ) {
+            SqlSelect select = (SqlSelect) node;
+            SqlBasicCall where = (SqlBasicCall) select.getWhere();
+            where.setOperator( SqlStdOperatorTable.LIKE );
+            SqlIdentifier hidden = new SqlIdentifier( "col28", SqlParserPos.ZERO );
+            SqlCharStringLiteral testValue = SqlCharStringLiteral.createCharString( "%\"te\":\"test\"%", SqlParserPos.ZERO );
+            where.setOperand( 0, hidden );
+            where.setOperand( 1, testValue );
+        }*/
+
+        // remove dynamic fields from query and insert them into "_hidden" field
         if ( node instanceof SqlInsert ) {
             List<SqlIdentifier> targets = ((SqlInsert) node).getTargetColumnList().getList().stream().map( n -> (SqlIdentifier) n ).collect( Collectors.toList() );
             // only works on single inserts for now

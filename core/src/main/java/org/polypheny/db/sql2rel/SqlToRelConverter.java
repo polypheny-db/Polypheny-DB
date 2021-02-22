@@ -391,13 +391,19 @@ public class SqlToRelConverter {
         // Verify that conversion from SQL to relational algebra did not perturb any type information.
         // (We can't do this if the SQL statement is something like an INSERT which has no
         // validator type information associated with its result, hence the namespace check above.)
-        final List<RelDataTypeField> validatedFields = validator.getValidatedNodeType( query ).getFieldList();
+        List<RelDataTypeField> validatedFields = validator.getValidatedNodeType( query ).getFieldList(); // TODO DL readd final
         final RelDataType validatedRowType =
                 validator.getTypeFactory().createStructType(
                         Pair.right( validatedFields ),
                         SqlValidatorUtil.uniquify(
                                 Pair.left( validatedFields ),
                                 catalogReader.nameMatcher().isCaseSensitive() ) );
+        int diff = validatedFields.size() - result.getRowType().getFieldList().size();
+        if ( diff > 0 ) {
+            for ( int i = 0; i < diff; i++ ) {
+                validatedFields.remove( i + 1 );
+            }
+        }
 
         final List<RelDataTypeField> convertedFields = result.getRowType().getFieldList().subList( 0, validatedFields.size() );
         final RelDataType convertedRowType = validator.getTypeFactory().createStructType( convertedFields );
@@ -3313,7 +3319,11 @@ public class SqlToRelConverter {
         RexNode e = e0.left;
         for ( String name : qualified.suffix() ) {
             if ( e == e0.left && e0.right != null ) {
-                int i = e0.right.get( name );
+                int i = 2; // TODO DL: remove
+                if ( e0.right.containsKey( name ) || !e0.right.containsKey( "_hidden" ) ) {
+                    i = e0.right.get( name );
+                }
+
                 e = rexBuilder.makeFieldAccess( e, i );
             } else {
                 final boolean caseSensitive = true; // name already fully-qualified
