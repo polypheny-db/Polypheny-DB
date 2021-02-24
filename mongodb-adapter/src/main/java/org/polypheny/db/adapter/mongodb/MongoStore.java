@@ -31,7 +31,6 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.bson.Document;
 import org.polypheny.db.adapter.DataStore;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
@@ -131,14 +130,16 @@ public class MongoStore extends DataStore {
 
     @Override
     public void createNewSchema( SchemaPlus rootSchema, String name ) {
-        this.currentSchema = new MongoSchema( "localhost", Integer.parseInt( settings.get( "port" ) ), name );
-        this.currentSchema.mongoDb.getCollection( "testing_new" ).insertOne( new Document( "test", "test" ) );
+        String[] splits = name.split( "_" );
+        String database = splits[0] + "_" + splits[1];
+        // TODO DL: physical schema name is null here
+        currentSchema = new MongoSchema( "localhost", Integer.parseInt( settings.get( "port" ) ), database );
     }
 
 
     @Override
     public Table createTableSchema( CatalogTable combinedTable, List<CatalogColumnPlacement> columnPlacementsOnStore ) {
-        return new MongoTable( combinedTable.name );
+        return currentSchema.createTable( combinedTable, columnPlacementsOnStore );
     }
 
 
@@ -198,18 +199,13 @@ public class MongoStore extends DataStore {
         Catalog catalog = Catalog.getInstance();
         this.currentSchema.mongoDb.createCollection( catalogTable.name );
 
-        catalogTable.columnIds.forEach( id -> {
-            String name = catalog.getColumn( id ).name;
-            this.currentSchema.mongoDb.createCollection( name );
-        } );
-
         for ( CatalogColumnPlacement placement : catalog.getColumnPlacementsOnAdapter( getAdapterId(), catalogTable.id ) ) {
             catalog.updateColumnPlacementPhysicalNames(
                     getAdapterId(),
                     placement.columnId,
-                    databaseName,
+                    catalogTable.getSchemaName(),
                     catalogTable.name,
-                    placement.physicalColumnName,
+                    placement.getLogicalColumnName(),
                     true );
         }
     }
@@ -223,13 +219,13 @@ public class MongoStore extends DataStore {
 
     @Override
     public void addColumn( Context context, CatalogTable catalogTable, CatalogColumn catalogColumn ) {
-        this.currentSchema.mongoDb.createCollection( catalogColumn.name );
+
     }
 
 
     @Override
     public void dropColumn( Context context, CatalogColumnPlacement columnPlacement ) {
-        this.currentSchema.mongoDb.getCollection( columnPlacement.physicalColumnName ).drop();
+
     }
 
 

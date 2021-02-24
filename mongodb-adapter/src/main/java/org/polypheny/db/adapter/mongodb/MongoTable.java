@@ -38,6 +38,7 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -51,32 +52,44 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.java.AbstractQueryableTable;
+import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptTable;
+import org.polypheny.db.prepare.Prepare.CatalogReader;
 import org.polypheny.db.rel.RelNode;
+import org.polypheny.db.rel.core.TableModify;
+import org.polypheny.db.rel.core.TableModify.Operation;
+import org.polypheny.db.rel.logical.LogicalTableModify;
 import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.rel.type.RelDataTypeFactory;
+import org.polypheny.db.rel.type.RelProtoDataType;
+import org.polypheny.db.rex.RexNode;
+import org.polypheny.db.schema.ModifiableTable;
 import org.polypheny.db.schema.SchemaPlus;
 import org.polypheny.db.schema.TranslatableTable;
 import org.polypheny.db.schema.impl.AbstractTableQueryable;
-import org.polypheny.db.type.PolyType;
 import org.polypheny.db.util.Util;
 
 
 /**
  * Table based on a MongoDB collection.
  */
-public class MongoTable extends AbstractQueryableTable implements TranslatableTable {
+public class MongoTable extends AbstractQueryableTable implements TranslatableTable, ModifiableTable {
 
     private final String collectionName;
+
+    private final RelProtoDataType protoRowType;
+    private MongoSchema mongoSchema;
 
 
     /**
      * Creates a MongoTable.
      */
-    MongoTable( String collectionName ) {
+    MongoTable( String collectionName, MongoSchema schema, RelProtoDataType proto ) {
         super( Object[].class );
         this.collectionName = collectionName;
+        this.protoRowType = proto;
+        this.mongoSchema = schema;
     }
 
 
@@ -87,12 +100,14 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
     @Override
     public RelDataType getRowType( RelDataTypeFactory typeFactory ) {
-        final RelDataType mapType =
+       /* final RelDataType mapType =
                 typeFactory.createMapType(
                         typeFactory.createPolyType( PolyType.VARCHAR ),
                         typeFactory.createTypeWithNullability( typeFactory.createPolyType( PolyType.ANY ), true ) );
+        */
         // TODO (PCP)
-        return typeFactory.builder().add( "_MAP", null, mapType ).build();
+        // return typeFactory.builder().add( "_MAP", null, mapType ).build();
+        return protoRowType.apply( typeFactory );
     }
 
 
@@ -182,6 +197,36 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
     }
 
 
+    @Override
+    public Collection getModifiableCollection() {
+        throw new RuntimeException( "getModifiableCollection() is not implemented for MongoDB adapter!" );
+    }
+
+
+    @Override
+    public TableModify toModificationRel(
+            RelOptCluster cluster,
+            RelOptTable table,
+            CatalogReader catalogReader,
+            RelNode child,
+            Operation operation,
+            List<String> updateColumnList,
+            List<RexNode> sourceExpressionList,
+            boolean flattened ) {
+        mongoSchema.getConvention().register( cluster.getPlanner() );
+        return new LogicalTableModify(
+                cluster,
+                cluster.traitSetOf( Convention.NONE ),
+                table,
+                catalogReader,
+                child,
+                operation,
+                updateColumnList,
+                sourceExpressionList,
+                flattened );
+    }
+
+
     /**
      * Implementation of {@link org.apache.calcite.linq4j.Queryable} based on a {@link org.polypheny.db.adapter.mongodb.MongoTable}.
      *
@@ -236,5 +281,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
         public Enumerable<Object> find( String filterJson, String projectJson, List<Map.Entry<String, Class>> fields ) {
             return getTable().find( getMongoDb(), filterJson, projectJson, fields );
         }
+
     }
+
 }

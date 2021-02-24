@@ -35,21 +35,25 @@ package org.polypheny.db.adapter.mongodb;
 
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableMap;
 import com.mongodb.MongoClient;
-import com.mongodb.MongoClientOptions;
-import com.mongodb.MongoCredential;
-import com.mongodb.ServerAddress;
 import com.mongodb.client.MongoDatabase;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
-import org.bson.Document;
+import lombok.Getter;
+import org.polypheny.db.catalog.Catalog;
+import org.polypheny.db.catalog.entity.CatalogColumn;
+import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
+import org.polypheny.db.catalog.entity.CatalogTable;
+import org.polypheny.db.plan.Convention;
+import org.polypheny.db.rel.type.RelDataType;
+import org.polypheny.db.rel.type.RelDataTypeFactory;
+import org.polypheny.db.rel.type.RelDataTypeImpl;
+import org.polypheny.db.rel.type.RelDataTypeSystem;
 import org.polypheny.db.schema.Table;
 import org.polypheny.db.schema.impl.AbstractSchema;
+import org.polypheny.db.type.PolyTypeFactoryImpl;
 
 
 /**
@@ -59,24 +63,35 @@ public class MongoSchema extends AbstractSchema {
 
     final MongoDatabase mongoDb;
 
+    @Getter
+    private final Convention convention = new MongoConvetion();
+
+    private final Map<String, Table> tableMap;
+
 
     /**
      * Creates a MongoDB schema.
      *
-     * @param host            Mongo host, e.g. "localhost"
-     * @param credentialsList Optional credentials (empty list for none)
-     * @param options         Mongo connection options
-     * @param database        Mongo database name, e.g. "foodmart"
+     * @param host Mongo host, e.g. "localhost"
+     * @param database Mongo database name, e.g. "foodmart"
+     * @param tableMap
      */
     //public MongoSchema( String host, String database, List<MongoCredential> credentialsList, MongoClientOptions options ) { // TODO DL: evaluate what options are needed in the end
-    public MongoSchema(final String host, final int port, String database) {
+    public MongoSchema( final String host, final int port, String database, Map<String, Table> tableMap ) {
         super();
+        this.tableMap = tableMap;
+
         try {
-            final MongoClient mongo = new MongoClient(host, port);
-            this.mongoDb = mongo.getDatabase(database);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            final MongoClient mongo = new MongoClient( host, port );
+            this.mongoDb = mongo.getDatabase( database );
+        } catch ( Exception e ) {
+            throw new RuntimeException( e );
         }
+    }
+
+
+    public MongoSchema( final String host, final int port, String database ) {
+        this( host, port, database, new HashMap<>() );
     }
 
 
@@ -86,19 +101,33 @@ public class MongoSchema extends AbstractSchema {
      * @param mongoDb existing mongo database instance
      */
     @VisibleForTesting
-    MongoSchema(MongoDatabase mongoDb) {
+    MongoSchema( MongoDatabase mongoDb ) {
         super();
-        this.mongoDb = Objects.requireNonNull(mongoDb, "mongoDb");
+        this.tableMap = new HashMap<>();
+        this.mongoDb = Objects.requireNonNull( mongoDb, "mongoDb" );
     }
 
 
     @Override
     protected Map<String, Table> getTableMap() {
-        final ImmutableMap.Builder<String, Table> builder = ImmutableMap.builder();
-        for (String collectionName : mongoDb.listCollectionNames()) {
-            builder.put(collectionName, new MongoTable(collectionName));
-        }
-        return builder.build();
+        return tableMap;
     }
+
+
+    public MongoTable createTable( CatalogTable catalogTable, List<CatalogColumnPlacement> columnPlacementsOnStore ) {
+        final RelDataTypeFactory typeFactory = new PolyTypeFactoryImpl( RelDataTypeSystem.DEFAULT );
+        final RelDataTypeFactory.Builder fieldInfo = typeFactory.builder();
+
+        for ( CatalogColumnPlacement placement : columnPlacementsOnStore ) {
+            CatalogColumn catalogColumn = Catalog.getInstance().getColumn( placement.columnId );
+            RelDataType sqlType = catalogColumn.getRelDataType( typeFactory );
+            fieldInfo.add( catalogColumn.name, catalogColumn.name, sqlType ).nullable( catalogColumn.nullable );
+        }
+        MongoTable table = new MongoTable( catalogTable.name, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
+        tableMap.put( catalogTable.name, table );
+        return table;
+
+    }
+
 }
 

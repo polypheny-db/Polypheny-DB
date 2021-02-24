@@ -39,18 +39,23 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.Getter;
 import org.polypheny.db.adapter.enumerable.RexImpTable;
 import org.polypheny.db.adapter.enumerable.RexToLixTranslator;
 import org.polypheny.db.adapter.java.JavaTypeFactory;
 import org.polypheny.db.plan.Convention;
+import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptRule;
+import org.polypheny.db.plan.RelOptTable;
 import org.polypheny.db.plan.RelTrait;
 import org.polypheny.db.plan.RelTraitSet;
+import org.polypheny.db.prepare.Prepare.CatalogReader;
 import org.polypheny.db.rel.InvalidRelException;
 import org.polypheny.db.rel.RelCollations;
 import org.polypheny.db.rel.RelNode;
 import org.polypheny.db.rel.convert.ConverterRule;
 import org.polypheny.db.rel.core.Sort;
+import org.polypheny.db.rel.core.TableModify;
 import org.polypheny.db.rel.logical.LogicalAggregate;
 import org.polypheny.db.rel.logical.LogicalFilter;
 import org.polypheny.db.rel.logical.LogicalProject;
@@ -60,6 +65,7 @@ import org.polypheny.db.rex.RexInputRef;
 import org.polypheny.db.rex.RexLiteral;
 import org.polypheny.db.rex.RexNode;
 import org.polypheny.db.rex.RexVisitorImpl;
+import org.polypheny.db.schema.ModifiableTable;
 import org.polypheny.db.sql.SqlKind;
 import org.polypheny.db.sql.SqlOperator;
 import org.polypheny.db.sql.fun.SqlStdOperatorTable;
@@ -82,11 +88,13 @@ public class MongoRules {
 
     protected static final Logger LOGGER = PolyphenyDbTrace.getPlannerTracer();
 
+    @Getter
     public static final RelOptRule[] RULES = {
             MongoSortRule.INSTANCE,
             MongoFilterRule.INSTANCE,
             MongoProjectRule.INSTANCE,
             MongoAggregateRule.INSTANCE,
+            MongoTableModificationRule.INSTANCE
     };
 
 
@@ -273,6 +281,7 @@ public class MongoRules {
             }
             return strings;
         }
+
     }
 
 
@@ -288,6 +297,7 @@ public class MongoRules {
             super( clazz, in, out, description );
             this.out = out;
         }
+
     }
 
 
@@ -310,6 +320,7 @@ public class MongoRules {
             final RelTraitSet traitSet = sort.getTraitSet().replace( out ).replace( sort.getCollation() );
             return new MongoSort( rel.getCluster(), traitSet, convert( sort.getInput(), traitSet.replace( RelCollations.EMPTY ) ), sort.getCollation(), sort.offset, sort.fetch );
         }
+
     }
 
 
@@ -332,6 +343,7 @@ public class MongoRules {
             final RelTraitSet traitSet = filter.getTraitSet().replace( out );
             return new MongoFilter( rel.getCluster(), traitSet, convert( filter.getInput(), out ), filter.getCondition() );
         }
+
     }
 
 
@@ -354,6 +366,56 @@ public class MongoRules {
             final RelTraitSet traitSet = project.getTraitSet().replace( out );
             return new MongoProject( project.getCluster(), traitSet, convert( project.getInput(), out ), project.getProjects(), project.getRowType() );
         }
+
+    }
+
+
+    private static class MongoTableModificationRule extends MongoConverterRule {
+
+        private static final MongoTableModificationRule INSTANCE = new MongoTableModificationRule();
+
+
+        MongoTableModificationRule() {
+            super( TableModify.class, Convention.NONE, MongoRel.CONVENTION, "JdbcTableModificationRule." + MongoRel.CONVENTION );
+        }
+
+
+        @Override
+        public RelNode convert( RelNode rel ) {
+            final TableModify modify = (TableModify) rel;
+            final ModifiableTable modifiableTable = modify.getTable().unwrap( ModifiableTable.class );
+            if ( modifiableTable == null ) {
+                return null;
+            }
+            final RelTraitSet traitSet = modify.getTraitSet().replace( out );
+            return new MongoTableModify(
+                    modify.getCluster(),
+                    traitSet,
+                    modify.getTable(),
+                    modify.getCatalogReader(),
+                    RelOptRule.convert( modify.getInput(), traitSet ),
+                    modify.getOperation(),
+                    modify.getUpdateColumnList(),
+                    modify.getSourceExpressionList(),
+                    modify.isFlattened() );
+        }
+
+    }
+
+
+    private static class MongoTableModify extends TableModify implements MongoRel {
+
+
+        protected MongoTableModify( RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, CatalogReader catalogReader, RelNode input, Operation operation, List<String> updateColumnList, List<RexNode> sourceExpressionList, boolean flattened ) {
+            super( cluster, traitSet, table, catalogReader, input, operation, updateColumnList, sourceExpressionList, flattened );
+        }
+
+
+        @Override
+        public void implement( Implementor implementor ) {
+
+        }
+
     }
 
 /*
@@ -560,6 +622,7 @@ public class MongoRules {
                 return null;
             }
         }
+
     }
 
 /*
