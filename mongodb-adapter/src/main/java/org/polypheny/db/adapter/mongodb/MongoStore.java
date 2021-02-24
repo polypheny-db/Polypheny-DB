@@ -46,7 +46,7 @@ import org.polypheny.db.transaction.PolyXid;
 import org.polypheny.db.util.FileSystemManager;
 
 @Slf4j
-public class MongoDBStore extends DataStore {
+public class MongoStore extends DataStore {
 
     @SuppressWarnings("WeakerAccess")
     public static final String ADAPTER_NAME = "MongoDB";
@@ -65,7 +65,7 @@ public class MongoDBStore extends DataStore {
     private String databaseName = "test_db";
 
 
-    public MongoDBStore( int adapterId, String uniqueName, Map<String, String> settings ) {
+    public MongoStore( int adapterId, String uniqueName, Map<String, String> settings ) {
         super( adapterId, uniqueName, settings, Boolean.parseBoolean( settings.get( "persistent" ) ) );
         FileSystemManager fileManger = FileSystemManager.getInstance();
         //String certPath = fileManger.registerNewFolder("certs").getAbsolutePath();
@@ -97,6 +97,9 @@ public class MongoDBStore extends DataStore {
         } catch ( InterruptedException | ConflictException e ) {
             e.printStackTrace();
         }
+
+        addInformationPhysicalNames();
+        enableInformationPage();
     }
 
 
@@ -179,6 +182,8 @@ public class MongoDBStore extends DataStore {
     public void shutdown() {
         client.stopContainerCmd( getUniqueName() ).exec();
         client.removeContainerCmd( getUniqueName() ).exec();
+
+        removeInformationPage();
     }
 
 

@@ -38,13 +38,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import java.math.BigDecimal;
 import java.util.AbstractList;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
@@ -58,7 +55,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.IntFunction;
-import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.calcite.linq4j.Ord;
 import org.apache.calcite.linq4j.tree.Expressions;
@@ -93,7 +89,6 @@ import org.polypheny.db.sql.SqlCall;
 import org.polypheny.db.sql.SqlDialect;
 import org.polypheny.db.sql.SqlDynamicParam;
 import org.polypheny.db.sql.SqlIdentifier;
-import org.polypheny.db.sql.SqlInsert;
 import org.polypheny.db.sql.SqlJoin;
 import org.polypheny.db.sql.SqlKind;
 import org.polypheny.db.sql.SqlLiteral;
@@ -389,7 +384,7 @@ public abstract class SqlImplementor {
         }*/
 
         // remove dynamic fields from query and insert them into "_hidden" field
-        if ( node instanceof SqlInsert ) {
+        /*if ( node instanceof SqlInsert ) {
             List<SqlIdentifier> targets = ((SqlInsert) node).getTargetColumnList().getList().stream().map( n -> (SqlIdentifier) n ).collect( Collectors.toList() );
             // only works on single inserts for now
             List<SqlNode> sources = Arrays.asList( ((SqlBasicCall) ((SqlBasicCall) ((SqlInsert) node).getSource()).getOperands()[0]).operands );
@@ -420,7 +415,7 @@ public abstract class SqlImplementor {
                     call.getFunctionQuantifier(),
                     call.getParserPosition(),
                     newSources.toArray( SqlNode.EMPTY_ARRAY ) );
-        }
+        }*/
 
         final String alias2 = SqlValidatorUtil.getAlias( node, -1 );
         final String alias3 = alias2 != null ? alias2 : "t";

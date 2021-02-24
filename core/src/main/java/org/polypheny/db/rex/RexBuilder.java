@@ -204,6 +204,7 @@ public class RexBuilder {
         if ( (i < 0) || (i >= fields.size()) ) {
             throw new AssertionError( "Field ordinal " + i + " is invalid for type '" + type + "'" );
         }
+
         return makeFieldAccessInternal( expr, fields.get( i ) );
     }
 

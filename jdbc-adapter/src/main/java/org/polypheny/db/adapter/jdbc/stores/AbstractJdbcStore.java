@@ -18,7 +18,6 @@ package org.polypheny.db.adapter.jdbc.stores;
 
 
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -33,9 +32,6 @@ import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
 import org.polypheny.db.catalog.entity.CatalogTable;
-import org.polypheny.db.information.Information;
-import org.polypheny.db.information.InformationGroup;
-import org.polypheny.db.information.InformationPage;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.runtime.PolyphenyDbException;
 import org.polypheny.db.schema.SchemaPlus;
@@ -48,10 +44,6 @@ import org.polypheny.db.type.PolyType;
 
 @Slf4j
 public abstract class AbstractJdbcStore extends DataStore {
-
-    private InformationPage informationPage;
-    private List<InformationGroup> informationGroups;
-    private List<Information> informationElements;
 
     protected SqlDialect dialect;
     protected JdbcSchema currentJdbcSchema;
@@ -70,15 +62,14 @@ public abstract class AbstractJdbcStore extends DataStore {
         this.connectionFactory = connectionFactory;
         this.dialect = dialect;
         // Register the JDBC Pool Size as information in the information manager
-        registerJdbcInformation( uniqueName );
+        registerJdbcInformation();
     }
 
 
-    protected void registerJdbcInformation( String uniqueName ) {
-        informationPage = new InformationPage( uniqueName ).setLabel( "Stores" );
-        informationGroups = new ArrayList<>();
-        informationElements = new ArrayList<>();
-        JdbcUtils.buildInformationPage( informationPage, informationGroups, informationElements, connectionFactory, getUniqueName(), getAdapterId() );
+    protected void registerJdbcInformation() {
+        JdbcUtils.addInformationPoolSize( informationPage, informationGroups, informationElements, connectionFactory, getUniqueName() );
+        addInformationPhysicalNames();
+        enableInformationPage();
     }
 
 
@@ -390,9 +381,5 @@ public abstract class AbstractJdbcStore extends DataStore {
 
     protected abstract String getDefaultPhysicalSchemaName();
 
-
-    protected void removeInformationPage() {
-        JdbcUtils.removeInformationPage( informationPage, informationGroups, informationElements );
-    }
 
 }

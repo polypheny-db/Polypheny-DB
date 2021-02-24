@@ -37,9 +37,6 @@ import org.polypheny.db.adapter.jdbc.connection.ConnectionHandlerException;
 import org.polypheny.db.adapter.jdbc.connection.TransactionalConnectionFactory;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogTable;
-import org.polypheny.db.information.Information;
-import org.polypheny.db.information.InformationGroup;
-import org.polypheny.db.information.InformationPage;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.schema.SchemaPlus;
 import org.polypheny.db.sql.SqlDialect;
@@ -51,10 +48,6 @@ import org.polypheny.db.type.PolyType;
 
 @Slf4j
 public abstract class AbstractJdbcSource extends DataSource {
-
-    private InformationPage informationPage;
-    private List<InformationGroup> informationGroups;
-    private List<Information> informationElements;
 
     protected SqlDialect dialect;
     protected JdbcSchema currentJdbcSchema;
@@ -73,16 +66,14 @@ public abstract class AbstractJdbcSource extends DataSource {
         this.connectionFactory = createConnectionFactory( settings, MysqlSqlDialect.DEFAULT, diverClass );
         this.dialect = dialect;
         // Register the JDBC Pool Size as information in the information manager
-        registerJdbcInformation( uniqueName );
+        registerInformationPage();
     }
 
 
-    protected void registerJdbcInformation( String uniqueName ) {
-        informationPage = new InformationPage( uniqueName ).setLabel( "Sources" );
-        informationGroups = new ArrayList<>();
-        informationElements = new ArrayList<>();
-        JdbcUtils.buildInformationPage( informationPage, informationGroups, informationElements, connectionFactory, getUniqueName(), getAdapterId() );
-
+    protected void registerInformationPage() {
+        JdbcUtils.addInformationPoolSize( informationPage, informationGroups, informationElements, connectionFactory, getUniqueName() );
+        addInformationPhysicalNames();
+        enableInformationPage();
     }
 
 
@@ -182,11 +173,6 @@ public abstract class AbstractJdbcSource extends DataSource {
         } else {
             log.warn( "There is no connection to rollback (Unique name: {}, XID: {})!", getUniqueName(), xid );
         }
-    }
-
-
-    protected void removeInformationPage() {
-        JdbcUtils.removeInformationPage( informationPage, informationGroups, informationElements );
     }
 
 

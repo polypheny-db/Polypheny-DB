@@ -398,12 +398,12 @@ public class SqlToRelConverter {
                         SqlValidatorUtil.uniquify(
                                 Pair.left( validatedFields ),
                                 catalogReader.nameMatcher().isCaseSensitive() ) );
-        int diff = validatedFields.size() - result.getRowType().getFieldList().size();
+        /*int diff = validatedFields.size() - result.getRowType().getFieldList().size();
         if ( diff > 0 ) {
             for ( int i = 0; i < diff; i++ ) {
                 validatedFields.remove( i + 1 );
             }
-        }
+        }*/
 
         final List<RelDataTypeField> convertedFields = result.getRowType().getFieldList().subList( 0, validatedFields.size() );
         final RelDataType convertedRowType = validator.getTypeFactory().createStructType( convertedFields );
