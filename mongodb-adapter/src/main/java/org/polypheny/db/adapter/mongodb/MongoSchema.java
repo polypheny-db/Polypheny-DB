@@ -64,7 +64,7 @@ public class MongoSchema extends AbstractSchema {
     final MongoDatabase mongoDb;
 
     @Getter
-    private final Convention convention = new MongoConvetion();
+    private final Convention convention = MongoRel.CONVENTION;
 
     private final Map<String, Table> tableMap;
 

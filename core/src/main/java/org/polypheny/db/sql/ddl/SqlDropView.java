@@ -64,5 +64,6 @@ public class SqlDropView extends SqlDropObject {
     public void execute( Context context, Statement statement ) {
         DdlManager.getInstance().dropView();
     }
+
 }
 

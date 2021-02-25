@@ -52,8 +52,6 @@ import org.polypheny.db.ddl.exception.PlacementIsPrimaryException;
 import org.polypheny.db.ddl.exception.PlacementNotExistsException;
 import org.polypheny.db.ddl.exception.SchemaNotExistException;
 import org.polypheny.db.ddl.exception.UnknownIndexMethodException;
-import org.polypheny.db.processing.QueryProcessor;
-import org.polypheny.db.routing.Router;
 import org.polypheny.db.sql.SqlDataTypeSpec;
 import org.polypheny.db.sql.parser.SqlParserPos;
 import org.polypheny.db.transaction.Statement;
@@ -61,8 +59,8 @@ import org.polypheny.db.transaction.TransactionException;
 
 /**
  * Abstract class for the DDLManager, goal of this class is to expose a unified interface,
- * which allows to handle ddls. Especially with regard to different models.
- * The ddl methods should contain all logic needed for them and throw appropriate Exceptions
+ * which allows to handle DDLs. Especially with regard to different models.
+ * The ddl methods should contain all logic needed for them and throw appropriate exceptions to the callee.
  */
 public abstract class DdlManager {
 
@@ -135,10 +133,9 @@ public abstract class DdlManager {
      * Drops an adapter
      *
      * @param name name of the adapter to drop
-     * @param router
-     * @param processor
+     * @param statement the query statement
      */
-    public abstract void dropAdapter( String name, Router router, QueryProcessor processor ) throws UnknownAdapterException;
+    public abstract void dropAdapter( String name, Statement statement ) throws UnknownAdapterException;
 
 
     /**
@@ -297,7 +294,7 @@ public abstract class DdlManager {
      * @param catalogTable the target table
      * @param catalogColumn the specific column, which is modified
      * @param type the sql specific type
-     * @param collation
+     * @param collation the collation of the modified column
      * @param defaultValue the default value of the column
      * @param nullable if the column is nullable
      * @param dropDefault if the default is dropped
@@ -382,12 +379,12 @@ public abstract class DdlManager {
      * Adds a new column to a given table
      *
      * @param columnName the name of the column which is added
-     * @param dataTypeSpec
+     * @param dataTypeSpec the dataspec of the column
      * @param collation the collation type of the new column
      * @param defaultValue the default value of the new column
      * @param tableId the id of the target table
      * @param position the position of the new column
-     * @param stores the stores on which the column should be addded
+     * @param stores the stores on which the column should be added
      * @param placementType the placement type used
      */
     public abstract void addColumn( String columnName, SqlDataTypeSpec dataTypeSpec, Collation collation, String defaultValue, long tableId, int position, List<DataStore> stores, PlacementType placementType ) throws GenericCatalogException, UnknownCollationException, UnknownColumnException;
@@ -462,7 +459,7 @@ public abstract class DdlManager {
 
     /**
      * Helper class to hold all needed information for a new column,
-     * decoupled from a specific query language //TODO DL: reevaluate
+     * decoupled from a specific query language
      */
     public static class ColumnInformation {
 

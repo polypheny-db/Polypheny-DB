@@ -19,24 +19,12 @@ package org.polypheny.db.sql.ddl;
 
 import static org.polypheny.db.util.Static.RESOURCE;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.polypheny.db.adapter.AdapterManager;
-import org.polypheny.db.catalog.Catalog;
-import org.polypheny.db.catalog.Catalog.TableType;
-import org.polypheny.db.catalog.entity.CatalogAdapter;
-import org.polypheny.db.catalog.entity.CatalogAdapter.AdapterType;
-import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
-import org.polypheny.db.catalog.entity.CatalogTable;
-import org.polypheny.db.catalog.exceptions.GenericCatalogException;
 import org.polypheny.db.catalog.exceptions.UnknownAdapterException;
 import org.polypheny.db.ddl.DdlManager;
 import org.polypheny.db.jdbc.Context;
-import org.polypheny.db.runtime.PolyphenyDbContextException;
 import org.polypheny.db.sql.SqlAlter;
 import org.polypheny.db.sql.SqlKind;
 import org.polypheny.db.sql.SqlNode;
@@ -87,7 +75,7 @@ public class SqlAlterAdaptersDrop extends SqlAlter {
     @Override
     public void execute( Context context, Statement statement ) {
         try {
-            DdlManager.getInstance().dropAdapter( uniqueName.toString(), statement.getRouter(), statement.getQueryProcessor() );
+            DdlManager.getInstance().dropAdapter( uniqueName.toString(), statement );
         } catch ( UnknownAdapterException e ) {
             throw SqlUtil.newContextException( uniqueName.getParserPosition(), RESOURCE.unknownAdapter( e.getAdapterName() ) );
         } catch ( Exception e ) {

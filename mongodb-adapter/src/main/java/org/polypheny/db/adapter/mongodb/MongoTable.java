@@ -213,7 +213,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             List<String> updateColumnList,
             List<RexNode> sourceExpressionList,
             boolean flattened ) {
-        mongoSchema.getConvention().register( cluster.getPlanner() );
+        //mongoSchema.getConvention().register( cluster.getPlanner() );
         return new LogicalTableModify(
                 cluster,
                 cluster.traitSetOf( Convention.NONE ),

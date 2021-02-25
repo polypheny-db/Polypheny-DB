@@ -66,5 +66,6 @@ public class MongoToEnumerableConverterRule extends ConverterRule {
         RelTraitSet newTraitSet = rel.getTraitSet().replace( getOutConvention() );
         return new MongoToEnumerableConverter( rel.getCluster(), newTraitSet, rel );
     }
+
 }
 

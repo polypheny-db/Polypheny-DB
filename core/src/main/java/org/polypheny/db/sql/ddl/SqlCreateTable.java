@@ -138,6 +138,7 @@ public class SqlCreateTable extends SqlCreate implements SqlExecutableStatement 
         long schemaId;
 
         try {
+            // cannot use getTable here, as table does not yet exist
             if ( name.names.size() == 3 ) { // DatabaseName.SchemaName.TableName
                 schemaId = catalog.getSchema( name.names.get( 0 ), name.names.get( 1 ) ).id;
                 tableName = name.names.get( 2 );

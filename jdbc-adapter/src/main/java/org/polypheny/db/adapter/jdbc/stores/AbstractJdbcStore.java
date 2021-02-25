@@ -61,7 +61,7 @@ public abstract class AbstractJdbcStore extends DataStore {
         super( storeId, uniqueName, settings, persistent );
         this.connectionFactory = connectionFactory;
         this.dialect = dialect;
-        // Register the JDBC Pool Size as information in the information manager
+        // Register the JDBC Pool Size as information in the information manager and enable it
         registerJdbcInformation();
     }
 

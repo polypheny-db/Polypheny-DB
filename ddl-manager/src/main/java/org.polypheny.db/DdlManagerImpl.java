@@ -75,7 +75,6 @@ import org.polypheny.db.ddl.exception.IndexExistsException;
 import org.polypheny.db.ddl.exception.IndexPreventsRemovalException;
 import org.polypheny.db.ddl.exception.LastPlacementException;
 import org.polypheny.db.ddl.exception.MissingColumnPlacementException;
-import org.polypheny.db.ddl.exception.NoColumnsException;
 import org.polypheny.db.ddl.exception.NotNullAndDefaultValueException;
 import org.polypheny.db.ddl.exception.PlacementAlreadyExistsException;
 import org.polypheny.db.ddl.exception.PlacementIsPrimaryException;
@@ -83,8 +82,6 @@ import org.polypheny.db.ddl.exception.PlacementNotExistsException;
 import org.polypheny.db.ddl.exception.SchemaNotExistException;
 import org.polypheny.db.ddl.exception.UnknownIndexMethodException;
 import org.polypheny.db.processing.DataMigrator;
-import org.polypheny.db.processing.QueryProcessor;
-import org.polypheny.db.routing.Router;
 import org.polypheny.db.runtime.PolyphenyDbContextException;
 import org.polypheny.db.runtime.PolyphenyDbException;
 import org.polypheny.db.sql.SqlDataTypeSpec;
@@ -225,7 +222,7 @@ public class DdlManagerImpl extends DdlManager {
 
 
     @Override
-    public void dropAdapter( String name, Router router, QueryProcessor processor ) throws UnknownAdapterException {
+    public void dropAdapter( String name, Statement statement ) throws UnknownAdapterException {
         if ( name.startsWith( "'" ) ) {
             name = name.substring( 1 );
         }
@@ -253,7 +250,7 @@ public class DdlManagerImpl extends DdlManager {
                 }
 
                 // Inform routing
-                router.dropPlacements( catalog.getColumnPlacementsOnAdapter( catalogAdapter.id, table.id ) );
+                statement.getRouter().dropPlacements( catalog.getColumnPlacementsOnAdapter( catalogAdapter.id, table.id ) );
                 // Delete column placement in catalog
                 for ( Long columnId : table.columnIds ) {
                     if ( catalog.checkIfExistsColumnPlacement( catalogAdapter.id, columnId ) ) {
@@ -279,7 +276,7 @@ public class DdlManagerImpl extends DdlManager {
             }
 
             // Rest plan cache and implementation cache
-            processor.resetCaches();
+            statement.getQueryProcessor().resetCaches();
         }
         AdapterManager.getInstance().removeAdapter( catalogAdapter.id );
     }
@@ -1086,7 +1083,7 @@ public class DdlManagerImpl extends DdlManager {
 
 
     @Override
-    public void createTable( long schemaId, String tableName, List<ColumnInformation> columns, List<ConstraintInformation> constraints, boolean ifNotExists, List<DataStore> stores, PlacementType placementType, Statement statement ) throws TableAlreadyExistsException, NoColumnsException {
+    public void createTable( long schemaId, String tableName, List<ColumnInformation> columns, List<ConstraintInformation> constraints, boolean ifNotExists, List<DataStore> stores, PlacementType placementType, Statement statement ) throws TableAlreadyExistsException {
         try {
             // Check if there is already a table with this name
             if ( catalog.checkIfExistsTable( schemaId, tableName ) ) {

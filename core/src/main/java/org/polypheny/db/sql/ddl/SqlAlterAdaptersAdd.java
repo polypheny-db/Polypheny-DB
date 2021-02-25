@@ -18,21 +18,11 @@ package org.polypheny.db.sql.ddl;
 
 
 import com.google.gson.Gson;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.polypheny.db.adapter.Adapter;
-import org.polypheny.db.adapter.AdapterManager;
-import org.polypheny.db.adapter.DataSource;
-import org.polypheny.db.adapter.DataSource.ExportedColumn;
-import org.polypheny.db.catalog.Catalog;
-import org.polypheny.db.catalog.Catalog.Collation;
-import org.polypheny.db.catalog.Catalog.PlacementType;
-import org.polypheny.db.catalog.Catalog.TableType;
-import org.polypheny.db.catalog.exceptions.GenericCatalogException;
 import org.polypheny.db.ddl.DdlManager;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.sql.SqlAlter;

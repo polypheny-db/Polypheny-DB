@@ -65,7 +65,7 @@ public abstract class AbstractJdbcSource extends DataSource {
         super( storeId, uniqueName, settings, readOnly );
         this.connectionFactory = createConnectionFactory( settings, MysqlSqlDialect.DEFAULT, diverClass );
         this.dialect = dialect;
-        // Register the JDBC Pool Size as information in the information manager
+        // Register the JDBC Pool Size as information in the information manager and enable it
         registerInformationPage();
     }
 

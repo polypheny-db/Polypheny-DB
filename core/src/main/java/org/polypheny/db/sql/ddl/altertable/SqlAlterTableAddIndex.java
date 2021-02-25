@@ -19,17 +19,10 @@ package org.polypheny.db.sql.ddl.altertable;
 
 import static org.polypheny.db.util.Static.RESOURCE;
 
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.polypheny.db.adapter.DataStore;
-import org.polypheny.db.adapter.DataStore.AvailableIndexMethod;
-import org.polypheny.db.adapter.index.IndexManager;
-import org.polypheny.db.catalog.Catalog;
-import org.polypheny.db.catalog.Catalog.IndexType;
-import org.polypheny.db.catalog.Catalog.TableType;
-import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.catalog.exceptions.GenericCatalogException;
 import org.polypheny.db.catalog.exceptions.UnknownColumnException;
@@ -160,7 +153,7 @@ public class SqlAlterTableAddIndex extends SqlAlterTable {
         } catch ( GenericCatalogException | UnknownKeyException | UnknownUserException | UnknownDatabaseException | TransactionException e ) {
             throw new RuntimeException( e );
         }
-    } // TODO DL: reevaluate this
+    }
 
 }
 

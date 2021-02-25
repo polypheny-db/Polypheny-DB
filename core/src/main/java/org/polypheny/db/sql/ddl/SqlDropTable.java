@@ -36,7 +36,6 @@ package org.polypheny.db.sql.ddl;
 
 import static org.polypheny.db.util.Static.RESOURCE;
 
-import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.ddl.DdlManager;
 import org.polypheny.db.ddl.exception.DdlOnSourceException;
@@ -69,9 +68,8 @@ public class SqlDropTable extends SqlDropObject {
 
     @Override
     public void execute( Context context, Statement statement ) {
-        // Get table
         final CatalogTable table;
-        Catalog catalog = Catalog.getInstance();
+
         try {
             table = getCatalogTable( context, name );
         } catch ( PolyphenyDbContextException e ) {

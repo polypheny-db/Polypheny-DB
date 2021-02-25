@@ -220,5 +220,6 @@ public class SqlSetOption extends SqlAlter {
     public void execute( Context context, Statement statement ) {
         DdlManager.getInstance().setOption();
     }
+
 }
 

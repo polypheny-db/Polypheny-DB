@@ -64,5 +64,6 @@ public class SqlDropFunction extends SqlDropObject {
     public void execute( Context context, Statement statement ) {
         DdlManager.getInstance().dropFunction();
     }
+
 }
 

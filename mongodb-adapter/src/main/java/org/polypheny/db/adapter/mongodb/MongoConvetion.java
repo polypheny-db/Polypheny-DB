@@ -22,6 +22,9 @@ import org.polypheny.db.plan.RelOptRule;
 
 public class MongoConvetion extends Convention.Impl {
 
+    public static final MongoConvetion INSTANCE = new MongoConvetion();
+
+
     public MongoConvetion() {
         super( "Mongo", MongoRel.class );
     }

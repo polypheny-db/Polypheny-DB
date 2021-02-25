@@ -74,7 +74,7 @@ public class SqlAlterTableRenameColumn extends SqlAlterTable {
         CatalogTable catalogTable = getCatalogTable( context, table );
         CatalogColumn catalogColumn = getCatalogColumn( catalogTable.id, columnOldName );
 
-        DdlManager.getInstance().renameColumn( catalogColumn, columnNewName.getSimple(), statement);
+        DdlManager.getInstance().renameColumn( catalogColumn, columnNewName.getSimple(), statement );
     }
 
 }

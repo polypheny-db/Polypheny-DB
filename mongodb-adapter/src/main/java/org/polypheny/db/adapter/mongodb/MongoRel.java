@@ -54,7 +54,6 @@ public interface MongoRel extends RelNode {
      */
     Convention CONVENTION = new Convention.Impl( "MONGO", MongoRel.class );
 
-
     /**
      * Callback for the implementation process that converts a tree of {@link MongoRel} nodes into a MongoDB query.
      */

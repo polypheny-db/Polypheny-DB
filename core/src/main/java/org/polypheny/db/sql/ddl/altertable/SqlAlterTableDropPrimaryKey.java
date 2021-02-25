@@ -21,10 +21,7 @@ import static org.polypheny.db.util.Static.RESOURCE;
 
 import java.util.List;
 import java.util.Objects;
-import org.polypheny.db.catalog.Catalog;
-import org.polypheny.db.catalog.Catalog.TableType;
 import org.polypheny.db.catalog.entity.CatalogTable;
-import org.polypheny.db.catalog.exceptions.GenericCatalogException;
 import org.polypheny.db.ddl.DdlManager;
 import org.polypheny.db.ddl.exception.DdlOnSourceException;
 import org.polypheny.db.jdbc.Context;
@@ -74,7 +71,7 @@ public class SqlAlterTableDropPrimaryKey extends SqlAlterTable {
         CatalogTable catalogTable = getCatalogTable( context, table );
 
         try {
-            DdlManager.getInstance().alterTableDropPrimaryKey(catalogTable);
+            DdlManager.getInstance().alterTableDropPrimaryKey( catalogTable );
         } catch ( DdlOnSourceException e ) {
             throw SqlUtil.newContextException( table.getParserPosition(), RESOURCE.ddlOnSourceTable() );
         }
