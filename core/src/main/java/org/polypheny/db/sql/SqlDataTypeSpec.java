@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 The Polypheny Project
+ * Copyright 2019-2021 The Polypheny Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,6 @@ package org.polypheny.db.sql;
 import java.nio.charset.Charset;
 import java.util.Objects;
 import java.util.TimeZone;
-import org.polypheny.db.catalog.Catalog.Collation;
 import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.rel.type.RelDataTypeFactory;
 import org.polypheny.db.sql.parser.SqlParserPos;
@@ -46,7 +45,6 @@ import org.polypheny.db.sql.validate.SqlMonotonicity;
 import org.polypheny.db.sql.validate.SqlValidator;
 import org.polypheny.db.sql.validate.SqlValidatorScope;
 import org.polypheny.db.type.PolyType;
-import org.polypheny.db.type.PolyTypeFamily;
 import org.polypheny.db.type.PolyTypeUtil;
 import org.polypheny.db.util.Litmus;
 import org.polypheny.db.util.Static;
@@ -205,9 +203,8 @@ public class SqlDataTypeSpec extends SqlNode {
      * @return the parsed type
      */
     public PolyType getType() {
-        return typeName == null ? null: PolyType.get( typeName.getSimple() );
+        return typeName == null ? null : PolyType.get( typeName.getSimple() );
     }
-
 
 
     public int getScale() {

@@ -16,15 +16,22 @@
 
 package org.polypheny.db.ddl.exception;
 
-import lombok.Getter;
+import org.polypheny.db.catalog.Catalog;
 
-public class MissingColumnPlacementException extends Exception {
+public class ColumnNotExistsException extends Exception {
 
-    @Getter
-    private final String columnName;
+    public final String tableName;
+    public final String columnName;
 
 
-    public MissingColumnPlacementException( String columnName ) {
+    public ColumnNotExistsException( String tableName, String columnName ) {
+        this.tableName = tableName;
+        this.columnName = columnName;
+    }
+
+
+    public ColumnNotExistsException( long tableId, String columnName ) {
+        this.tableName = Catalog.getInstance().getTable( tableId ).name;
         this.columnName = columnName;
     }
 

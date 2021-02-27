@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 The Polypheny Project
+ * Copyright 2019-2021 The Polypheny Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ public class SqlColumnDeclaration extends SqlCall {
     @Getter
     final SqlNode expression;
     final ColumnStrategy strategy;
-    public final String collation;
+    final String collation;
 
 
     /**
@@ -85,7 +85,8 @@ public class SqlColumnDeclaration extends SqlCall {
 
 
     /**
-     * Parses the collation from string format to an collation object
+     * Parses the collation string and returns the corresponding enum.
+     * Throws an exception if the collation is unknown.
      *
      * @return the parsed collation
      */
@@ -101,7 +102,7 @@ public class SqlColumnDeclaration extends SqlCall {
             return null;
 
         } catch ( UnknownCollationException e ) {
-            throw new RuntimeException(e);
+            throw new RuntimeException( e );
         }
     }
 
@@ -159,4 +160,3 @@ public class SqlColumnDeclaration extends SqlCall {
     }
 
 }
-

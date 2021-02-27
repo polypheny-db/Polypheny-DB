@@ -178,7 +178,6 @@ public abstract class Adapter {
      * Builds and adds an new information group, observing physical naming of columns, to the provided information objects
      */
     public void addInformationPhysicalNames() {
-
         InformationGroup group = new InformationGroup( informationPage, "Physical Names" );
         InformationTable physicalColumnNames = new InformationTable(
                 group,
@@ -189,7 +188,10 @@ public abstract class Adapter {
         group.setRefreshFunction( () -> {
             physicalColumnNames.reset();
             Catalog.getInstance().getColumnPlacementsOnAdapter( adapterId ).forEach( placement -> {
-                physicalColumnNames.addRow( placement.columnId, Catalog.getInstance().getColumn( placement.columnId ).name, placement.physicalSchemaName + "." + placement.physicalTableName + "." + placement.physicalColumnName );
+                physicalColumnNames.addRow(
+                        placement.columnId,
+                        Catalog.getInstance().getColumn( placement.columnId ).name,
+                        placement.physicalSchemaName + "." + placement.physicalTableName + "." + placement.physicalColumnName );
             } );
         } );
 
@@ -236,6 +238,7 @@ public abstract class Adapter {
         }
 
 
+        @Override
         public String getValue() {
             return defaultValue.toString();
         }
@@ -255,6 +258,7 @@ public abstract class Adapter {
         }
 
 
+        @Override
         public String getValue() {
             return defaultValue;
         }
@@ -274,6 +278,7 @@ public abstract class Adapter {
         }
 
 
+        @Override
         public String getValue() {
             return Boolean.toString( defaultValue );
         }
@@ -299,6 +304,7 @@ public abstract class Adapter {
         }
 
 
+        @Override
         public String getValue() {
             return defaultValue;
         }
@@ -326,6 +332,7 @@ public abstract class Adapter {
         }
 
 
+        @Override
         public String getValue() {
             return directory;
         }
@@ -336,6 +343,7 @@ public abstract class Adapter {
     //see https://stackoverflow.com/questions/19588020/gson-serialize-a-list-of-polymorphic-objects/22081826#22081826
     public static class AdapterSettingDeserializer implements JsonDeserializer<AdapterSetting> {
 
+        @Override
         public AdapterSetting deserialize( JsonElement json, Type typeOfT, JsonDeserializationContext context ) throws JsonParseException {
             JsonObject jsonObject = json.getAsJsonObject();
             String type = jsonObject.get( "type" ).getAsString();

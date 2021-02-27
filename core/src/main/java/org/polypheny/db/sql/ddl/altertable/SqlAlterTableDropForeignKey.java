@@ -72,9 +72,8 @@ public class SqlAlterTableDropForeignKey extends SqlAlterTable {
     @Override
     public void execute( Context context, Statement statement ) {
         CatalogTable catalogTable = getCatalogTable( context, table );
-
         try {
-            DdlManager.getInstance().alterTableDropForeignKey( catalogTable, foreignKeyName.getSimple() );
+            DdlManager.getInstance().dropForeignKey( catalogTable, foreignKeyName.getSimple() );
         } catch ( DdlOnSourceException e ) {
             throw SqlUtil.newContextException( table.getParserPosition(), RESOURCE.ddlOnSourceTable() );
         }

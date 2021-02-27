@@ -18,7 +18,7 @@ package org.polypheny.db.ddl.exception;
 
 import lombok.Getter;
 
-public class IndexPreventsRemovalException extends Exception{
+public class IndexPreventsRemovalException extends Exception {
 
     @Getter
     private final String columnName;

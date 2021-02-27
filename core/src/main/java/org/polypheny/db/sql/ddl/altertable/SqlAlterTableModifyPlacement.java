@@ -50,7 +50,11 @@ public class SqlAlterTableModifyPlacement extends SqlAlterTable {
     private final SqlIdentifier storeName;
 
 
-    public SqlAlterTableModifyPlacement( SqlParserPos pos, SqlIdentifier table, SqlNodeList columnList, SqlIdentifier storeName ) {
+    public SqlAlterTableModifyPlacement(
+            SqlParserPos pos,
+            SqlIdentifier table,
+            SqlNodeList columnList,
+            SqlIdentifier storeName ) {
         super( pos );
         this.table = Objects.requireNonNull( table );
         this.columnList = Objects.requireNonNull( columnList );
@@ -84,7 +88,7 @@ public class SqlAlterTableModifyPlacement extends SqlAlterTable {
         DataStore storeInstance = getDataStoreInstance( storeName );
 
         try {
-            DdlManager.getInstance().alterTableModifyPlacement(
+            DdlManager.getInstance().modifyColumnPlacement(
                     catalogTable,
                     columnList.getList().stream().map( c -> getCatalogColumn( catalogTable.id, (SqlIdentifier) c ).id ).collect( Collectors.toList() ),
                     storeInstance,
@@ -98,7 +102,9 @@ public class SqlAlterTableModifyPlacement extends SqlAlterTable {
                     storeName.getParserPosition(),
                     RESOURCE.indexPreventsRemovalOfPlacement( e.getIndexName(), e.getColumnName() ) );
         } catch ( LastPlacementException e ) {
-            throw SqlUtil.newContextException( storeName.getParserPosition(), RESOURCE.onlyOnePlacementLeft() );
+            throw SqlUtil.newContextException(
+                    storeName.getParserPosition(),
+                    RESOURCE.onlyOnePlacementLeft() );
         }
     }
 

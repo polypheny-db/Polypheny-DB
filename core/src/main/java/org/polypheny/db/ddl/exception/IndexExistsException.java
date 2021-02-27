@@ -16,6 +16,6 @@
 
 package org.polypheny.db.ddl.exception;
 
-public class IndexExistsException extends Exception{
+public class IndexExistsException extends Exception {
 
 }

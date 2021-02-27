@@ -78,11 +78,15 @@ public class SqlAlterTableDropPlacement extends SqlAlterTable {
         DataStore storeInstance = getDataStoreInstance( storeName );
 
         try {
-            DdlManager.getInstance().alterTableDropPlacement( catalogTable, storeInstance, statement );
+            DdlManager.getInstance().dropPlacement( catalogTable, storeInstance, statement );
         } catch ( PlacementNotExistsException e ) {
-            throw SqlUtil.newContextException( storeName.getParserPosition(), RESOURCE.placementDoesNotExist( catalogTable.name, storeName.getSimple() ) );
+            throw SqlUtil.newContextException(
+                    storeName.getParserPosition(),
+                    RESOURCE.placementDoesNotExist( catalogTable.name, storeName.getSimple() ) );
         } catch ( LastPlacementException e ) {
-            throw SqlUtil.newContextException( storeName.getParserPosition(), RESOURCE.onlyOnePlacementLeft() );
+            throw SqlUtil.newContextException(
+                    storeName.getParserPosition(),
+                    RESOURCE.onlyOnePlacementLeft() );
         }
     }
 

@@ -16,6 +16,6 @@
 
 package org.polypheny.db.ddl.exception;
 
-public class AlterSourceException extends Exception{
+public class AlterSourceException extends Exception {
 
 }

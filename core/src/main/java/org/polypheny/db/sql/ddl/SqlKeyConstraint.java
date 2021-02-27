@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 The Polypheny Project
+ * Copyright 2019-2021 The Polypheny Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,6 @@ package org.polypheny.db.sql.ddl;
 import java.util.List;
 import lombok.Getter;
 import org.polypheny.db.catalog.Catalog.ConstraintType;
-import org.polypheny.db.catalog.entity.CatalogConstraint;
 import org.polypheny.db.sql.SqlCall;
 import org.polypheny.db.sql.SqlIdentifier;
 import org.polypheny.db.sql.SqlKind;
@@ -59,7 +58,7 @@ public class SqlKeyConstraint extends SqlCall {
 
     public static final SqlSpecialOperator UNIQUE = new SqlSpecialOperator( "UNIQUE", SqlKind.UNIQUE );
 
-    public static final SqlSpecialOperator PRIMARY = new SqlSpecialOperator( "PRIMARY KEY", SqlKind.PRIMARY_KEY );
+    protected static final SqlSpecialOperator PRIMARY = new SqlSpecialOperator( "PRIMARY KEY", SqlKind.PRIMARY_KEY );
 
     @Getter
     private final SqlIdentifier name;
@@ -100,9 +99,9 @@ public class SqlKeyConstraint extends SqlCall {
 
 
     public ConstraintType getConstraintType() {
-        if( getOperator() == PRIMARY ) {
+        if ( getOperator() == PRIMARY ) {
             return ConstraintType.PRIMARY;
-        }else {
+        } else {
             return ConstraintType.UNIQUE;
         }
     }

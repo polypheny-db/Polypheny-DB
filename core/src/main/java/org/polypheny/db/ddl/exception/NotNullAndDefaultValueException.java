@@ -16,6 +16,6 @@
 
 package org.polypheny.db.ddl.exception;
 
-public class NotNullAndDefaultValueException extends Exception{
+public class NotNullAndDefaultValueException extends Exception {
 
 }

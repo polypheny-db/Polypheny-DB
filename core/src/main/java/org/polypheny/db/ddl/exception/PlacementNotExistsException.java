@@ -16,6 +16,6 @@
 
 package org.polypheny.db.ddl.exception;
 
-public class PlacementNotExistsException extends Exception{
+public class PlacementNotExistsException extends Exception {
 
 }

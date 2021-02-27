@@ -22,10 +22,10 @@ import static org.polypheny.db.util.Static.RESOURCE;
 import java.util.List;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
-import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.catalog.exceptions.ColumnAlreadyExistsException;
 import org.polypheny.db.ddl.DdlManager;
+import org.polypheny.db.ddl.exception.ColumnNotExistsException;
 import org.polypheny.db.ddl.exception.DdlOnSourceException;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.sql.SqlIdentifier;
@@ -108,23 +108,23 @@ public class SqlAlterSourceTableAddColumn extends SqlAlterTable {
             throw new RuntimeException( "No FQDN allowed here: " + columnLogical.toString() );
         }
 
-        CatalogColumn beforeColumn = null;
-        if ( beforeColumnName != null ) {
-            beforeColumn = getCatalogColumn( catalogTable.id, beforeColumnName );
-        }
-        CatalogColumn afterColumn = null;
-        if ( afterColumnName != null ) {
-            afterColumn = getCatalogColumn( catalogTable.id, afterColumnName );
-        }
-
         String defaultValue = this.defaultValue == null ? null : this.defaultValue.toString();
 
         try {
-            DdlManager.getInstance().alterSourceTableAddColumn( catalogTable, columnPhysical.getSimple(), columnLogical.getSimple(), beforeColumn, afterColumn, defaultValue, statement );
+            DdlManager.getInstance().addColumnToSourceTable(
+                    catalogTable,
+                    columnPhysical.getSimple(),
+                    columnLogical.getSimple(),
+                    beforeColumnName == null ? null : beforeColumnName.getSimple(),
+                    afterColumnName == null ? null : afterColumnName.getSimple(),
+                    defaultValue,
+                    statement );
         } catch ( ColumnAlreadyExistsException e ) {
             throw SqlUtil.newContextException( columnLogical.getParserPosition(), RESOURCE.columnExists( columnLogical.getSimple() ) );
         } catch ( DdlOnSourceException e ) {
             throw SqlUtil.newContextException( table.getParserPosition(), RESOURCE.ddlOnSourceTable() );
+        } catch ( ColumnNotExistsException e ) {
+            throw SqlUtil.newContextException( table.getParserPosition(), RESOURCE.columnNotFoundInTable( e.columnName, e.tableName ) );
         }
 
     }
