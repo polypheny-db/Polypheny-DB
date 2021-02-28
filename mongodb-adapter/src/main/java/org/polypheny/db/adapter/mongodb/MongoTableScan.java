@@ -100,7 +100,6 @@ public class MongoTableScan extends TableScan implements MongoRel {
 
     @Override
     public void register( RelOptPlanner planner ) {
-        planner.addRule( MongoToEnumerableConverterRule.INSTANCE );
         for ( RelOptRule rule : MongoRules.RULES ) {
             planner.addRule( rule );
         }
