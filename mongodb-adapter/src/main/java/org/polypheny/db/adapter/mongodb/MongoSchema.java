@@ -61,6 +61,7 @@ import org.polypheny.db.type.PolyTypeFactoryImpl;
  */
 public class MongoSchema extends AbstractSchema {
 
+    @Getter
     final MongoDatabase mongoDb;
 
     @Getter

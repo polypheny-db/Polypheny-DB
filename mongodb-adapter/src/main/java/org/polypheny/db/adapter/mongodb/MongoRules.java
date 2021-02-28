@@ -34,31 +34,39 @@
 package org.polypheny.db.adapter.mongodb;
 
 
+import com.google.common.collect.ImmutableList;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.Getter;
+import org.bson.Document;
 import org.polypheny.db.adapter.enumerable.RexImpTable;
 import org.polypheny.db.adapter.enumerable.RexToLixTranslator;
 import org.polypheny.db.adapter.java.JavaTypeFactory;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptCluster;
+import org.polypheny.db.plan.RelOptCost;
+import org.polypheny.db.plan.RelOptPlanner;
 import org.polypheny.db.plan.RelOptRule;
 import org.polypheny.db.plan.RelOptTable;
 import org.polypheny.db.plan.RelTrait;
 import org.polypheny.db.plan.RelTraitSet;
 import org.polypheny.db.prepare.Prepare.CatalogReader;
+import org.polypheny.db.prepare.RelOptTableImpl;
+import org.polypheny.db.rel.AbstractRelNode;
 import org.polypheny.db.rel.InvalidRelException;
 import org.polypheny.db.rel.RelCollations;
 import org.polypheny.db.rel.RelNode;
 import org.polypheny.db.rel.convert.ConverterRule;
 import org.polypheny.db.rel.core.Sort;
 import org.polypheny.db.rel.core.TableModify;
+import org.polypheny.db.rel.core.Values;
 import org.polypheny.db.rel.logical.LogicalAggregate;
 import org.polypheny.db.rel.logical.LogicalFilter;
 import org.polypheny.db.rel.logical.LogicalProject;
+import org.polypheny.db.rel.metadata.RelMetadataQuery;
 import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.rex.RexCall;
 import org.polypheny.db.rex.RexInputRef;
@@ -71,6 +79,7 @@ import org.polypheny.db.sql.SqlOperator;
 import org.polypheny.db.sql.fun.SqlStdOperatorTable;
 import org.polypheny.db.sql.validate.SqlValidatorUtil;
 import org.polypheny.db.type.PolyType;
+import org.polypheny.db.type.PolyTypeFamily;
 import org.polypheny.db.util.Bug;
 import org.polypheny.db.util.Util;
 import org.polypheny.db.util.trace.PolyphenyDbTrace;
@@ -90,6 +99,8 @@ public class MongoRules {
 
     @Getter
     public static final RelOptRule[] RULES = {
+            MongoToEnumerableConverterRule.INSTANCE,
+            MongoValuesRule.INSTANCE,
             MongoSortRule.INSTANCE,
             MongoFilterRule.INSTANCE,
             MongoProjectRule.INSTANCE,
@@ -370,13 +381,47 @@ public class MongoRules {
     }
 
 
+    public static class MongoValuesRule extends MongoConverterRule {
+
+        private static final MongoValuesRule INSTANCE = new MongoValuesRule();
+
+
+        private MongoValuesRule() {
+            super( Values.class, Convention.NONE, MongoRel.CONVENTION, "MongoValuesRule." + MongoRel.CONVENTION );
+        }
+
+
+        @Override
+        public RelNode convert( RelNode rel ) {
+            Values values = (Values) rel;
+            return new MongoValues( values.getCluster(), values.getRowType(), values.getTuples(), values.getTraitSet().replace( out ) );
+        }
+
+    }
+
+
+    public static class MongoValues extends Values implements MongoRel {
+
+        MongoValues( RelOptCluster cluster, RelDataType rowType, ImmutableList<ImmutableList<RexLiteral>> tuples, RelTraitSet traitSet ) {
+            super( cluster, rowType, tuples, traitSet );
+        }
+
+
+        @Override
+        public void implement( Implementor implementor ) {
+            return;
+        }
+
+    }
+
+
     private static class MongoTableModificationRule extends MongoConverterRule {
 
         private static final MongoTableModificationRule INSTANCE = new MongoTableModificationRule();
 
 
         MongoTableModificationRule() {
-            super( TableModify.class, Convention.NONE, MongoRel.CONVENTION, "JdbcTableModificationRule." + MongoRel.CONVENTION );
+            super( TableModify.class, Convention.NONE, MongoRel.CONVENTION, "MongoTableModificationRule." + MongoRel.CONVENTION );
         }
 
 
@@ -412,8 +457,53 @@ public class MongoRules {
 
 
         @Override
-        public void implement( Implementor implementor ) {
+        public RelOptCost computeSelfCost( RelOptPlanner planner, RelMetadataQuery mq ) {
+            return super.computeSelfCost( planner, mq ).multiplyBy( .1 );
+        }
 
+
+        @Override
+        public RelNode copy( RelTraitSet traitSet, List<RelNode> inputs ) {
+            return new MongoTableModify(
+                    getCluster(),
+                    traitSet,
+                    getTable(),
+                    getCatalogReader(),
+                    AbstractRelNode.sole( inputs ),
+                    getOperation(),
+                    getUpdateColumnList(),
+                    getSourceExpressionList(),
+                    isFlattened() );
+        }
+
+
+        @Override
+        public void implement( Implementor implementor ) {
+            implementor.mongoTable = (MongoTable) ((RelOptTableImpl) table).getTable();
+            implementor.table = table;
+
+            MongoValues values = ((MongoValues) input);
+
+            List<Document> docs = new ArrayList<>();
+            for ( ImmutableList<RexLiteral> literals : values.tuples ) {
+                Document doc = new Document();
+                int pos = 0;
+                for ( RexLiteral literal : literals ) {
+                    if ( literal.getValue() != null ) {
+                        Comparable value;
+                        if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
+                            value = RexLiteral.stringValue( literal );
+                        } else {
+                            value = RexLiteral.value( literal ).toString();
+                        }
+                        doc.append( values.getRowType().getFieldNames().get( pos ), value );
+                    }
+                    pos++;
+                }
+                docs.add( doc );
+                implementor.add( "modify", "{\"$project\": {\"col\": 1}}" );
+            }
+            implementor.mongoTable.getMongoSchema().mongoDb.getCollection( implementor.mongoTable.getCollectionName() ).insertMany( docs );
         }
 
     }

@@ -20,19 +20,20 @@ import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptPlanner;
 import org.polypheny.db.plan.RelOptRule;
 
-public class MongoConvetion extends Convention.Impl {
+public class MongoConvention extends Convention.Impl {
 
-    public static final MongoConvetion INSTANCE = new MongoConvetion();
+    public static final double COST_MULTIPLIER = 0.8d;
+
+    public static final MongoConvention INSTANCE = new MongoConvention();
 
 
-    public MongoConvetion() {
-        super( "Mongo", MongoRel.class );
+    public MongoConvention() {
+        super( "MONGO", MongoRel.class );
     }
 
 
     @Override
     public void register( RelOptPlanner planner ) {
-        planner.addRule( MongoToEnumerableConverterRule.INSTANCE );
         for ( RelOptRule rule : MongoRules.RULES ) {
             planner.addRule( rule );
         }

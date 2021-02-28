@@ -52,6 +52,7 @@ import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptCost;
 import org.polypheny.db.plan.RelOptPlanner;
 import org.polypheny.db.plan.RelTraitSet;
+import org.polypheny.db.rel.AbstractRelNode;
 import org.polypheny.db.rel.RelNode;
 import org.polypheny.db.rel.convert.ConverterImpl;
 import org.polypheny.db.rel.metadata.RelMetadataQuery;
@@ -73,7 +74,7 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
 
     @Override
     public RelNode copy( RelTraitSet traitSet, List<RelNode> inputs ) {
-        return new MongoToEnumerableConverter( getCluster(), traitSet, sole( inputs ) );
+        return new MongoToEnumerableConverter( getCluster(), traitSet, AbstractRelNode.sole( inputs ) );
     }
 
 
@@ -98,7 +99,7 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         final BlockBuilder list = new BlockBuilder();
         final MongoRel.Implementor mongoImplementor = new MongoRel.Implementor();
         mongoImplementor.visitChild( 0, getInput() );
-        int aggCount = 0;
+        int aggCount = 0; // TODO DL: check whats the idea behind this
         int findCount = 0;
         String project = null;
         String filter = null;

@@ -3373,13 +3373,15 @@ public class Crud implements InformationObserver {
                 while ( iterator.hasNext() ) {
                     object = iterator.next();
                     int num;
+
                     if ( object != null && object.getClass().isArray() ) {
                         Object[] o = (Object[]) object;
                         num = ((Number) o[0]).intValue();
                     } else if ( object != null ) {
                         num = ((Number) object).intValue();
                     } else {
-                        throw new QueryExecutionException( "Result is null" );
+                        //throw new QueryExecutionException( "Result is null" ); // TODO DL: change
+                        num = 1;
                     }
                     // Check if num is equal for all adapters
                     if ( rowsChanged != -1 && rowsChanged != num ) {

@@ -42,6 +42,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import lombok.Getter;
 import org.apache.calcite.linq4j.AbstractEnumerable;
 import org.apache.calcite.linq4j.Enumerable;
 import org.apache.calcite.linq4j.Enumerator;
@@ -76,10 +77,12 @@ import org.polypheny.db.util.Util;
  */
 public class MongoTable extends AbstractQueryableTable implements TranslatableTable, ModifiableTable {
 
+    @Getter
     private final String collectionName;
 
     private final RelProtoDataType protoRowType;
-    private MongoSchema mongoSchema;
+    @Getter
+    private final MongoSchema mongoSchema;
 
 
     /**
@@ -213,7 +216,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             List<String> updateColumnList,
             List<RexNode> sourceExpressionList,
             boolean flattened ) {
-        //mongoSchema.getConvention().register( cluster.getPlanner() );
+        mongoSchema.getConvention().register( cluster.getPlanner() );
         return new LogicalTableModify(
                 cluster,
                 cluster.traitSetOf( Convention.NONE ),
