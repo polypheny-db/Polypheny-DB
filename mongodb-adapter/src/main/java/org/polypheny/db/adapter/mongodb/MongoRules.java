@@ -493,15 +493,17 @@ public class MongoRules {
                         Comparable value;
                         if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
                             value = RexLiteral.stringValue( literal );
+                        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.NUMERIC ) {
+                            value = RexLiteral.intValue( literal );
                         } else {
-                            value = RexLiteral.value( literal ).toString();
+                            value = RexLiteral.value( literal );
                         }
                         doc.append( values.getRowType().getFieldNames().get( pos ), value );
                     }
                     pos++;
                 }
                 docs.add( doc );
-                implementor.add( "modify", "{\"$project\": {\"col\": 1}}" );
+                implementor.add( "modify", "{$project:{col:1}}" );
             }
             implementor.mongoTable.getMongoSchema().mongoDb.getCollection( implementor.mongoTable.getCollectionName() ).insertMany( docs );
         }

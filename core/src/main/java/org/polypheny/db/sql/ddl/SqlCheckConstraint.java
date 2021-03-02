@@ -95,5 +95,7 @@ public class SqlCheckConstraint extends SqlCall {
             expression.unparse( writer, 0, 0 );
             writer.sep( ")" );
         }
+
     }
+
 }

@@ -19,8 +19,6 @@ package org.polypheny.db.webui.models;
 
 import lombok.Getter;
 import org.polypheny.db.catalog.Catalog.SchemaType;
-import org.polypheny.db.catalog.Catalog.SchemaType;
-import org.polypheny.db.catalog.exceptions.UnknownSchemaTypeException;
 
 
 /**
@@ -51,4 +49,5 @@ public class Schema {
         this.name = name;
         this.type = type;
     }
+
 }

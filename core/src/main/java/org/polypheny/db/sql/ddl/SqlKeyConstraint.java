@@ -58,7 +58,7 @@ public class SqlKeyConstraint extends SqlCall {
 
     public static final SqlSpecialOperator UNIQUE = new SqlSpecialOperator( "UNIQUE", SqlKind.UNIQUE );
 
-    protected static final SqlSpecialOperator PRIMARY = new SqlSpecialOperator( "PRIMARY KEY", SqlKind.PRIMARY_KEY );
+    public static final SqlSpecialOperator PRIMARY = new SqlSpecialOperator( "PRIMARY KEY", SqlKind.PRIMARY_KEY );
 
     @Getter
     private final SqlIdentifier name;

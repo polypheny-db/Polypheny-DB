@@ -57,9 +57,9 @@ public abstract class Adapter {
 
     protected final Map<String, String> settings;
 
-    public InformationPage informationPage;
-    public List<InformationGroup> informationGroups;
-    public List<Information> informationElements;
+    protected final InformationPage informationPage;
+    protected final List<InformationGroup> informationGroups;
+    protected final List<Information> informationElements;
 
 
     public Adapter( int adapterId, String uniqueName, Map<String, String> settings ) {

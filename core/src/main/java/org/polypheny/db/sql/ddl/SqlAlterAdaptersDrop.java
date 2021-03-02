@@ -48,9 +48,6 @@ public class SqlAlterAdaptersDrop extends SqlAlter {
     private final SqlNode uniqueName;
 
 
-    /**
-     * Creates a SqlAlterSchemaOwner.
-     */
     public SqlAlterAdaptersDrop( SqlParserPos pos, SqlNode uniqueName ) {
         super( OPERATOR, pos );
         this.uniqueName = Objects.requireNonNull( uniqueName );
@@ -79,7 +76,7 @@ public class SqlAlterAdaptersDrop extends SqlAlter {
         } catch ( UnknownAdapterException e ) {
             throw SqlUtil.newContextException( uniqueName.getParserPosition(), RESOURCE.unknownAdapter( e.getAdapterName() ) );
         } catch ( Exception e ) {
-            throw new RuntimeException( "Could not remove data source from the adapter with the unique name '" + uniqueName.toString() + "'!", e );
+            throw new RuntimeException( "Could not remove the adapter with the unique name '" + uniqueName.toString() + "' for the following reason: " + e.getMessage(), e );
         }
 
     }

@@ -122,6 +122,8 @@ public class SqlAlterTableAddColumn extends SqlAlterTable {
             getDataStoreInstance( storeId );
         }
 
+        String defaultValue = this.defaultValue == null ? null : this.defaultValue.toString();
+
         try {
             DdlManager.getInstance().addColumn(
                     column.getSimple(),
@@ -130,7 +132,7 @@ public class SqlAlterTableAddColumn extends SqlAlterTable {
                     afterColumnName == null ? null : afterColumnName.getSimple(),
                     ColumnTypeInformation.fromSqlDataTypeSpec( type ),
                     nullable,
-                    defaultValue == null ? null : this.defaultValue.toString(),
+                    defaultValue,
                     statement );
         } catch ( NotNullAndDefaultValueException e ) {
             throw SqlUtil.newContextException( column.getParserPosition(), RESOURCE.notNullAndNoDefaultValue( column.getSimple() ) );
