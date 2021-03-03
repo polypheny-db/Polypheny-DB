@@ -503,7 +503,11 @@ public class MongoRules {
                     pos++;
                 }
                 docs.add( doc );
-                implementor.add( "modify", "{$project:{col:1}}" );
+
+                // hacky way to satisfy enumerate after dml in crud, _id: null returns 1
+                // $count sets name to ROWCOUNT
+                implementor.add( null, "{$group: {_id: null}}" );
+                implementor.add( null, "{$count: \"ROWCOUNT\"}" );
             }
             implementor.mongoTable.getMongoSchema().mongoDb.getCollection( implementor.mongoTable.getCollectionName() ).insertMany( docs );
         }

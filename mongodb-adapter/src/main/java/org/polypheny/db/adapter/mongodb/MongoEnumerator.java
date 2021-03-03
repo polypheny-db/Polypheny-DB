@@ -65,6 +65,12 @@ class MongoEnumerator implements Enumerator<Object> {
     MongoEnumerator( Iterator<Document> cursor, Function1<Document, Object> getter ) {
         this.cursor = cursor;
         this.getter = getter;
+
+        // current is null
+        /*if ( cursor.hasNext() ){
+            Document map = cursor.next();
+            this.current = getter.apply( map );
+        }*/
     }
 
 

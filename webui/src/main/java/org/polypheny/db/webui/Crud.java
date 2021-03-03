@@ -3608,8 +3608,7 @@ public class Crud implements InformationObserver {
                     } else if ( object != null ) {
                         num = ((Number) object).intValue();
                     } else {
-                        //throw new QueryExecutionException( "Result is null" ); // TODO DL: change
-                        num = 1;
+                        throw new QueryExecutionException( "Result is null" ); // TODO DL: change
                     }
                     // Check if num is equal for all adapters
                     if ( rowsChanged != -1 && rowsChanged != num ) {
