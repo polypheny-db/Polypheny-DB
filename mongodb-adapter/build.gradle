@@ -24,16 +24,14 @@ dependencies {
 
     implementation group: "org.mongodb", name: "mongo-java-driver", version: mongo_java_driver_version  // Apache 2.0
 
-
+    // https://github.com/docker-java/docker-java
+    implementation group: 'com.github.docker-java', name: 'docker-java', version: java_docker_version // Apache 2.0
+    implementation group: 'com.github.docker-java', name: 'docker-java-transport-httpclient5', version: java_docker_version //TODO: should probably be independent version in future
 
     // --- Test Compile ---
     testImplementation project(path: ":core", configuration: "testClasses")
 
     testImplementation group: "junit", name: "junit", version: junit_version
-
-    // https://github.com/docker-java/docker-java
-    compile group: 'com.github.docker-java', name: 'docker-java', version: java_docker_version // Apache 2.0
-    compile group: 'com.github.docker-java', name: 'docker-java-transport-httpclient5', version: java_docker_version //TODO: should probably be independent version in future
 
     testImplementation group: "com.github.fakemongo", name: "fongo", version: fongo_version  // Apache 2.0
     testImplementation group: "net.hydromatic", name: "foodmart-data-json", version: foodmart_data_json_version  // Apache 2.0

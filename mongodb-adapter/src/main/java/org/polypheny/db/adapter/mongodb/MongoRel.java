@@ -76,6 +76,5 @@ public interface MongoRel extends RelNode {
         }
     }
 
-
 }
 
