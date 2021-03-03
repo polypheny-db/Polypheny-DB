@@ -28,6 +28,7 @@ import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import com.github.dockerjava.transport.DockerHttpClient;
 import com.google.common.collect.ImmutableList;
+import com.mongodb.MongoClient;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +59,7 @@ public class MongoStore extends DataStore {
             new AdapterSettingString( "host", false, true, false, "localhost" ),
             new AdapterSettingInteger( "port", false, true, false, 27017 )
     );
+    private final MongoClient connection;
 
     private DockerClient client;
     private MongoSchema currentSchema;
@@ -99,6 +101,8 @@ public class MongoStore extends DataStore {
 
         addInformationPhysicalNames();
         enableInformationPage();
+
+        this.connection = new MongoClient( "localhost", Integer.parseInt( settings.get( "port" ) ) );
     }
 
 
@@ -132,8 +136,8 @@ public class MongoStore extends DataStore {
     public void createNewSchema( SchemaPlus rootSchema, String name ) {
         String[] splits = name.split( "_" );
         String database = splits[0] + "_" + splits[1];
-        // TODO DL: physical schema name is null here
-        currentSchema = new MongoSchema( "localhost", Integer.parseInt( settings.get( "port" ) ), database );
+        // TODO DL: physical schema name is null here, when no placement exists yet so we cut it
+        currentSchema = new MongoSchema( database, this.connection );
     }
 
 
@@ -197,7 +201,7 @@ public class MongoStore extends DataStore {
     @Override
     public void createTable( Context context, CatalogTable catalogTable ) {
         Catalog catalog = Catalog.getInstance();
-        this.currentSchema.mongoDb.createCollection( catalogTable.name );
+        this.currentSchema.database.createCollection( catalogTable.name );
 
         for ( CatalogColumnPlacement placement : catalog.getColumnPlacementsOnAdapter( getAdapterId(), catalogTable.id ) ) {
             catalog.updateColumnPlacementPhysicalNames(
@@ -213,7 +217,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void dropTable( Context context, CatalogTable combinedTable ) {
-        this.currentSchema.mongoDb.getCollection( combinedTable.name ).drop();
+        this.currentSchema.database.getCollection( combinedTable.name ).drop();
     }
 
 

@@ -104,7 +104,8 @@ public class PolySchemaBuilder implements PropertyChangeListener {
                         catalogTable.name,
                         columnIds,
                         columnNames,
-                        RelDataTypeImpl.proto( fieldInfo.build() ) );
+                        RelDataTypeImpl.proto( fieldInfo.build() ),
+                        catalogSchema.schemaType );
                 s.add( catalogTable.name, table );
                 tableMap.put( catalogTable.name, table );
 

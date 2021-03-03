@@ -251,7 +251,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
 
         private MongoDatabase getMongoDb() {
-            return schema.unwrap( MongoSchema.class ).mongoDb;
+            return schema.unwrap( MongoSchema.class ).database;
         }
 
 

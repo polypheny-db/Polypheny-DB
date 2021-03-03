@@ -41,6 +41,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.Getter;
+import org.apache.commons.lang3.StringUtils;
+import org.bson.BsonDocument;
 import org.bson.Document;
 import org.polypheny.db.adapter.enumerable.RexImpTable;
 import org.polypheny.db.adapter.enumerable.RexToLixTranslator;
@@ -81,6 +83,7 @@ import org.polypheny.db.sql.validate.SqlValidatorUtil;
 import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeFamily;
 import org.polypheny.db.util.Bug;
+import org.polypheny.db.util.Pair;
 import org.polypheny.db.util.Util;
 import org.polypheny.db.util.trace.PolyphenyDbTrace;
 import org.slf4j.Logger;
@@ -482,37 +485,64 @@ public class MongoRules {
             implementor.mongoTable = (MongoTable) ((RelOptTableImpl) table).getTable();
             implementor.table = table;
 
-            MongoValues values = ((MongoValues) input);
+            switch ( this.getOperation() ) {
+                case INSERT: {
+                    MongoValues values = ((MongoValues) input);
 
-            List<Document> docs = new ArrayList<>();
-            for ( ImmutableList<RexLiteral> literals : values.tuples ) {
-                Document doc = new Document();
-                int pos = 0;
-                for ( RexLiteral literal : literals ) {
-                    if ( literal.getValue() != null ) {
-                        Comparable value;
-                        if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
-                            value = RexLiteral.stringValue( literal );
-                        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.NUMERIC ) {
-                            value = RexLiteral.intValue( literal );
-                        } else {
-                            value = RexLiteral.value( literal );
+                    List<Document> docs = new ArrayList<>();
+                    for ( ImmutableList<RexLiteral> literals : values.tuples ) {
+                        Document doc = new Document();
+                        int pos = 0;
+                        for ( RexLiteral literal : literals ) {
+                            if ( literal.getValue() != null ) {
+                                Comparable value;
+                                if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
+                                    value = RexLiteral.stringValue( literal );
+                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.NUMERIC ) {
+                                    value = RexLiteral.intValue( literal );
+                                } else {
+                                    value = RexLiteral.value( literal );
+                                }
+                                doc.append( values.getRowType().getFieldNames().get( pos ), value );
+                            }
+                            pos++;
                         }
-                        doc.append( values.getRowType().getFieldNames().get( pos ), value );
-                    }
-                    pos++;
-                }
-                docs.add( doc );
+                        docs.add( doc );
 
-                // hacky way to satisfy enumerate after dml in crud, _id: null returns 1
-                // $count sets name to ROWCOUNT
-                implementor.add( null, "{$group: {_id: null}}" );
-                implementor.add( null, "{$count: \"ROWCOUNT\"}" );
+                        // hacky way to satisfy enumerate after dml in crud, _id: null returns 1
+                        // $count sets name to ROWCOUNT
+                        implementor.add( null, "{$group: {_id: null}}" );
+                        implementor.add( null, "{$count: \"ROWCOUNT\"}" );
+                    }
+                    implementor.mongoTable.getMongoSchema().database.getCollection( implementor.mongoTable.getCollectionName() ).insertMany( docs );
+                }
+                case UPDATE:
+
+                case MERGE:
+                    break;
+                case DELETE: {
+                    MongoRel.Implementor filterCollector = new Implementor();
+                    ((MongoRel) input).implement( filterCollector );
+                    List<String> docs = new ArrayList<>();
+                    for ( Pair<String, String> el : filterCollector.list ) {
+                        if ( el.right.contains( "$match" ) ) {
+                            docs.add( StringUtils.substringBetween( el.right.replace( " ", "" ), "$match\":{", "}" ) );
+                        }
+                    }
+                    String docString = "{" + String.join( ",", docs ) + "}";
+                    implementor.mongoTable.getMongoSchema().database.getCollection( implementor.mongoTable.getCollectionName() ).deleteMany( BsonDocument.parse( docString ) );
+
+                    implementor.add( null, "{$group: {_id: null}}" );
+                    implementor.add( null, "{$count: \"ROWCOUNT\"}" );
+                }
+
             }
-            implementor.mongoTable.getMongoSchema().mongoDb.getCollection( implementor.mongoTable.getCollectionName() ).insertMany( docs );
+
         }
 
     }
+
+
 
 /*
 

@@ -40,7 +40,6 @@ import com.mongodb.client.MongoDatabase;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import lombok.Getter;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
@@ -62,37 +61,27 @@ import org.polypheny.db.type.PolyTypeFactoryImpl;
 public class MongoSchema extends AbstractSchema {
 
     @Getter
-    final MongoDatabase mongoDb;
+    final MongoDatabase database;
 
     @Getter
     private final Convention convention = MongoRel.CONVENTION;
 
     private final Map<String, Table> tableMap;
+    private final MongoClient connection;
 
 
     /**
      * Creates a MongoDB schema.
      *
-     * @param host Mongo host, e.g. "localhost"
      * @param database Mongo database name, e.g. "foodmart"
      * @param tableMap
      */
     //public MongoSchema( String host, String database, List<MongoCredential> credentialsList, MongoClientOptions options ) { // TODO DL: evaluate what options are needed in the end
-    public MongoSchema( final String host, final int port, String database, Map<String, Table> tableMap ) {
+    public MongoSchema( String database, Map<String, Table> tableMap, MongoClient connection ) {
         super();
         this.tableMap = tableMap;
-
-        try {
-            final MongoClient mongo = new MongoClient( host, port );
-            this.mongoDb = mongo.getDatabase( database );
-        } catch ( Exception e ) {
-            throw new RuntimeException( e );
-        }
-    }
-
-
-    public MongoSchema( final String host, final int port, String database ) {
-        this( host, port, database, new HashMap<>() );
+        this.connection = connection;
+        this.database = this.connection.getDatabase( database );
     }
 
 
@@ -100,12 +89,19 @@ public class MongoSchema extends AbstractSchema {
      * Allows tests to inject their instance of the database.
      *
      * @param mongoDb existing mongo database instance
+     * @param connection
      */
     @VisibleForTesting
-    MongoSchema( MongoDatabase mongoDb ) {
+    MongoSchema( String database, MongoClient connection ) {
         super();
         this.tableMap = new HashMap<>();
-        this.mongoDb = Objects.requireNonNull( mongoDb, "mongoDb" );
+        this.connection = connection;
+        this.database = this.connection.getDatabase( database );
+    }
+
+
+    private String buildDatabaseName( CatalogColumn column ) {
+        return column.getDatabaseName() + "_" + column.getSchemaName() + "_" + column.name;
     }
 
 
