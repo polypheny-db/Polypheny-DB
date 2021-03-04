@@ -36,6 +36,8 @@ package org.polypheny.db.adapter.mongodb;
 
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptTable;
 import org.polypheny.db.rel.RelNode;
@@ -54,6 +56,7 @@ public interface MongoRel extends RelNode {
      */
     Convention CONVENTION = MongoConvention.INSTANCE;//new Convention.Impl( "MONGO", MongoRel.class );
 
+
     /**
      * Callback for the implementation process that converts a tree of {@link MongoRel} nodes into a MongoDB query.
      */
@@ -63,6 +66,21 @@ public interface MongoRel extends RelNode {
 
         RelOptTable table;
         MongoTable mongoTable;
+        @Setter
+        boolean isDDL;
+        @Getter
+        @Setter
+        List<Object> results;
+
+
+        public Implementor() {
+            isDDL = false;
+        }
+
+
+        public Implementor( boolean isDDL ) {
+            this.isDDL = isDDL;
+        }
 
 
         public void add( String findOp, String aggOp ) {

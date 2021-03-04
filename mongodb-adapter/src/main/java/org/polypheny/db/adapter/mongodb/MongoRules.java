@@ -35,13 +35,14 @@ package org.polypheny.db.adapter.mongodb;
 
 
 import com.google.common.collect.ImmutableList;
+import com.mongodb.client.result.DeleteResult;
 import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.Getter;
-import org.apache.commons.lang3.StringUtils;
 import org.bson.BsonDocument;
 import org.bson.Document;
 import org.polypheny.db.adapter.enumerable.RexImpTable;
@@ -485,9 +486,17 @@ public class MongoRules {
             implementor.mongoTable = (MongoTable) ((RelOptTableImpl) table).getTable();
             implementor.table = table;
 
+            implementor.isDDL = true;
+            implementor.results = new ArrayList<>();
+
             switch ( this.getOperation() ) {
                 case INSERT: {
-                    MongoValues values = ((MongoValues) input);
+                    MongoValues values = null;
+                    if ( input instanceof MongoValues ) {
+                        values = ((MongoValues) input);
+                    } else {
+                        return;
+                    }
 
                     List<Document> docs = new ArrayList<>();
                     for ( ImmutableList<RexLiteral> literals : values.tuples ) {
@@ -509,31 +518,31 @@ public class MongoRules {
                         }
                         docs.add( doc );
 
-                        // hacky way to satisfy enumerate after dml in crud, _id: null returns 1
-                        // $count sets name to ROWCOUNT
-                        implementor.add( null, "{$group: {_id: null}}" );
-                        implementor.add( null, "{$count: \"ROWCOUNT\"}" );
                     }
-                    implementor.mongoTable.getMongoSchema().database.getCollection( implementor.mongoTable.getCollectionName() ).insertMany( docs );
+                    implementor.mongoTable.getCollection().insertMany( docs );
+                    implementor.results = Collections.singletonList( docs.size() );
                 }
                 case UPDATE:
 
                 case MERGE:
                     break;
                 case DELETE: {
-                    MongoRel.Implementor filterCollector = new Implementor();
+                    MongoRel.Implementor filterCollector = new Implementor( true );
                     ((MongoRel) input).implement( filterCollector );
                     List<String> docs = new ArrayList<>();
                     for ( Pair<String, String> el : filterCollector.list ) {
-                        if ( el.right.contains( "$match" ) ) {
-                            docs.add( StringUtils.substringBetween( el.right.replace( " ", "" ), "$match\":{", "}" ) );
-                        }
+                        docs.add( el.right );
                     }
-                    String docString = "{" + String.join( ",", docs ) + "}";
-                    implementor.mongoTable.getMongoSchema().database.getCollection( implementor.mongoTable.getCollectionName() ).deleteMany( BsonDocument.parse( docString ) );
+                    String docString = "";
+                    if ( docs.size() == 1 ) {
+                        docString = docs.get( 0 );
+                    } else {
+                        // TODO DL: evaluate if this is even possible
+                    }
+                    DeleteResult result = implementor.mongoTable.getCollection().deleteMany( BsonDocument.parse( docString ) );
 
-                    implementor.add( null, "{$group: {_id: null}}" );
-                    implementor.add( null, "{$count: \"ROWCOUNT\"}" );
+                    implementor.isDDL = true;
+                    implementor.results = Collections.singletonList( result.getDeletedCount() );
                 }
 
             }

@@ -41,6 +41,7 @@ import org.apache.calcite.linq4j.tree.BlockBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.Expressions;
 import org.apache.calcite.linq4j.tree.MethodCallExpression;
+import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.enumerable.EnumerableRel;
 import org.polypheny.db.adapter.enumerable.EnumerableRelImplementor;
 import org.polypheny.db.adapter.enumerable.JavaRowFormat;
@@ -139,7 +140,20 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         final Expression table = list.append( "table", mongoImplementor.table.getExpression( MongoTable.MongoQueryable.class ) );
         List<String> opList = Pair.right( mongoImplementor.list );
         final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );
-        Expression enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, ops ) );
+        Expression enumerable = null;
+        if ( !mongoImplementor.isDDL ) {
+            enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, ops ) );
+        } else {
+
+            if ( mongoImplementor.list.size() == 0 && mongoImplementor.results.size() == 0 ) {
+                Expression data = list.append( "data", DataContext.ROOT );
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_WRAPPER.method, data ) );
+            } else {
+                Expression results = list.append( "results", constantArrayList( mongoImplementor.getResults(), Object.class ) );
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_GET_RESULT.method, results ) );
+            }
+        }
+
         if ( RuntimeConfig.DEBUG.getBoolean() ) {
             System.out.println( "Mongo: " + opList );
         }
@@ -167,5 +181,6 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
     private static <T> List<Expression> constantList( List<T> values ) {
         return Lists.transform( values, Expressions::constant );
     }
+
 }
 

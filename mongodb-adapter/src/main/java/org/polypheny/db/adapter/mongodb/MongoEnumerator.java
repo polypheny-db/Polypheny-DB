@@ -65,12 +65,6 @@ class MongoEnumerator implements Enumerator<Object> {
     MongoEnumerator( Iterator<Document> cursor, Function1<Document, Object> getter ) {
         this.cursor = cursor;
         this.getter = getter;
-
-        // current is null
-        /*if ( cursor.hasNext() ){
-            Document map = cursor.next();
-            this.current = getter.apply( map );
-        }*/
     }
 
 
@@ -169,5 +163,50 @@ class MongoEnumerator implements Enumerator<Object> {
         }
         return o;
     }
+
+
+    public static class IterWrapper implements Enumerator<Object> {
+
+        private final Iterator<Object> iterator;
+        Object current;
+
+
+        public IterWrapper( Iterator<Object> iterator ) {
+            this.iterator = iterator;
+        }
+
+
+        @Override
+        public Object current() {
+            return current;
+        }
+
+
+        @Override
+        public boolean moveNext() {
+
+            if ( iterator.hasNext() ) {
+                current = iterator.next();
+                return true;
+            } else {
+                current = null;
+                return false;
+            }
+        }
+
+
+        @Override
+        public void reset() {
+            throw new UnsupportedOperationException();
+        }
+
+
+        @Override
+        public void close() {
+            throw new UnsupportedOperationException();
+        }
+
+    }
+
 }
 

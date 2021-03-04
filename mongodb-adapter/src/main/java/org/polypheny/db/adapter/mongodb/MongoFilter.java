@@ -86,7 +86,7 @@ public class MongoFilter extends Filter implements MongoRel {
     public void implement( Implementor implementor ) {
         implementor.visitChild( 0, getInput() );
         Translator translator = new Translator( MongoRules.mongoFieldNames( getRowType() ) );
-        String match = translator.translateMatch( condition );
+        String match = translator.translateMatch( condition, implementor.isDDL );
         implementor.add( null, match );
     }
 
@@ -107,10 +107,15 @@ public class MongoFilter extends Filter implements MongoRel {
         }
 
 
-        private String translateMatch( RexNode condition ) {
-            Map<String, Object> map = builder.map();
-            map.put( "$match", translateOr( condition ) );
-            return builder.toJsonString( map );
+        private String translateMatch( RexNode condition, boolean isDDL ) {
+            if ( !isDDL ) {
+                Map<String, Object> map = builder.map();
+                map.put( "$match", translateOr( condition ) );
+                return builder.toJsonString( map );
+            } else {
+                // TODO DL: kinda hacky maybe need to implement cleaner in the future
+                return builder.toJsonString( translateOr( condition ) );
+            }
         }
 
 
@@ -268,6 +273,8 @@ public class MongoFilter extends Filter implements MongoRel {
                 multimap.put( name, Pair.of( op, right ) );
             }
         }
+
     }
+
 }
 

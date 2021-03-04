@@ -39,6 +39,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +54,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.java.AbstractQueryableTable;
+import org.polypheny.db.adapter.mongodb.MongoEnumerator.IterWrapper;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptTable;
@@ -63,6 +65,7 @@ import org.polypheny.db.rel.core.TableModify.Operation;
 import org.polypheny.db.rel.logical.LogicalTableModify;
 import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.rel.type.RelDataTypeFactory;
+import org.polypheny.db.rel.type.RelDataTypeField;
 import org.polypheny.db.rel.type.RelProtoDataType;
 import org.polypheny.db.rex.RexNode;
 import org.polypheny.db.schema.ModifiableTable;
@@ -83,6 +86,8 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
     private final RelProtoDataType protoRowType;
     @Getter
     private final MongoSchema mongoSchema;
+    @Getter
+    private final MongoCollection<Document> collection;
 
 
     /**
@@ -93,6 +98,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
         this.collectionName = collectionName;
         this.protoRowType = proto;
         this.mongoSchema = schema;
+        this.collection = schema.database.getCollection( collectionName );
     }
 
 
@@ -283,6 +289,49 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
         @SuppressWarnings("UnusedDeclaration")
         public Enumerable<Object> find( String filterJson, String projectJson, List<Map.Entry<String, Class>> fields ) {
             return getTable().find( getMongoDb(), filterJson, projectJson, fields );
+        }
+
+
+        @SuppressWarnings("UnusedDeclaration")
+        public Enumerable<Object> getResults( List<Object> results ) {
+            return new AbstractEnumerable<Object>() {
+                @Override
+                public Enumerator<Object> enumerator() {
+
+                    return new IterWrapper( results.iterator() );
+                }
+            };
+        }
+
+
+        /**
+         * This methods handles prepared dmls in Mongodb for now TODO DL: reevaluate
+         *
+         * @param context
+         * @return
+         */
+        @SuppressWarnings("UnusedDeclaration")
+        public Enumerable<Object> preparedWrapper( DataContext context ) {
+            MongoTable mongoTable = (MongoTable) table;
+            List<Document> docs = new ArrayList<>();
+            List<RelDataTypeField> rowType = mongoTable.getRowType( context.getTypeFactory() ).getFieldList();
+            for ( Map<Long, Object> values : context.getParameterValues() ) {
+                Document doc = new Document();
+                int i = 0;
+                for ( Map.Entry<Long, Object> value : values.entrySet() ) {
+                    doc.append( rowType.get( i ).getName(), value.getValue() );
+                    i++;
+                }
+                docs.add( doc );
+            }
+            mongoTable.getCollection().insertMany( docs );
+            return new AbstractEnumerable<Object>() {
+                @Override
+                public Enumerator<Object> enumerator() {
+
+                    return new IterWrapper( Collections.emptyIterator() );
+                }
+            };
         }
 
     }
