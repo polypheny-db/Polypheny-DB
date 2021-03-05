@@ -203,7 +203,8 @@ class MongoEnumerator implements Enumerator<Object> {
 
         @Override
         public void close() {
-            throw new UnsupportedOperationException();
+            // do nothing
+            //throw new UnsupportedOperationException();
         }
 
     }

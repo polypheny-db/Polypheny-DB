@@ -81,7 +81,8 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
 
     @Override
     public RelOptCost computeSelfCost( RelOptPlanner planner, RelMetadataQuery mq ) {
-        return super.computeSelfCost( planner, mq ).multiplyBy( .1 );
+        // TODO DL: on mixed placements this enumerable is us used for wrong tables if cost is not adjusted
+        return super.computeSelfCost( planner, mq ).multiplyBy( .15 );
     }
 
 
@@ -120,6 +121,11 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         final RelDataType rowType = getRowType();
         final PhysType physType =
                 PhysTypeImpl.of( implementor.getTypeFactory(), rowType, pref.prefer( JavaRowFormat.ARRAY ) );
+
+        if ( mongoImplementor.table == null ) {
+            return implementor.result( physType, new BlockBuilder().toBlock() );
+        }
+
         final Expression fields =
                 list.append( "fields",
                         constantArrayList(

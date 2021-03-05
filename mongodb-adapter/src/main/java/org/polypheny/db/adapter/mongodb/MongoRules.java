@@ -77,6 +77,7 @@ import org.polypheny.db.rex.RexLiteral;
 import org.polypheny.db.rex.RexNode;
 import org.polypheny.db.rex.RexVisitorImpl;
 import org.polypheny.db.schema.ModifiableTable;
+import org.polypheny.db.schema.Table;
 import org.polypheny.db.sql.SqlKind;
 import org.polypheny.db.sql.SqlOperator;
 import org.polypheny.db.sql.fun.SqlStdOperatorTable;
@@ -483,11 +484,16 @@ public class MongoRules {
 
         @Override
         public void implement( Implementor implementor ) {
-            implementor.mongoTable = (MongoTable) ((RelOptTableImpl) table).getTable();
-            implementor.table = table;
-
             implementor.isDDL = true;
             implementor.results = new ArrayList<>();
+
+            Table preTable = ((RelOptTableImpl) table).getTable();
+
+            if ( !(preTable instanceof MongoTable) ) {
+                throw new RuntimeException( "There seems to be a problem with the correct costs for one of stores." );
+            }
+            implementor.mongoTable = (MongoTable) preTable;
+            implementor.table = table;
 
             switch ( this.getOperation() ) {
                 case INSERT: {

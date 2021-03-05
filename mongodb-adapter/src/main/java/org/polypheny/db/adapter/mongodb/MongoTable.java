@@ -40,6 +40,7 @@ import com.mongodb.client.MongoDatabase;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +56,7 @@ import org.bson.conversions.Bson;
 import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.java.AbstractQueryableTable;
 import org.polypheny.db.adapter.mongodb.MongoEnumerator.IterWrapper;
+import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptTable;
@@ -65,7 +67,6 @@ import org.polypheny.db.rel.core.TableModify.Operation;
 import org.polypheny.db.rel.logical.LogicalTableModify;
 import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.rel.type.RelDataTypeFactory;
-import org.polypheny.db.rel.type.RelDataTypeField;
 import org.polypheny.db.rel.type.RelProtoDataType;
 import org.polypheny.db.rex.RexNode;
 import org.polypheny.db.schema.ModifiableTable;
@@ -305,7 +306,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
 
         /**
-         * This methods handles prepared dmls in Mongodb for now TODO DL: reevaluate
+         * This methods handles prepared DMLs in Mongodb for now TODO DL: reevaluate
          *
          * @param context
          * @return
@@ -314,22 +315,27 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
         public Enumerable<Object> preparedWrapper( DataContext context ) {
             MongoTable mongoTable = (MongoTable) table;
             List<Document> docs = new ArrayList<>();
-            List<RelDataTypeField> rowType = mongoTable.getRowType( context.getTypeFactory() ).getFieldList();
+            Map<Long, String> names = new HashMap<>();
+
             for ( Map<Long, Object> values : context.getParameterValues() ) {
                 Document doc = new Document();
-                int i = 0;
+
                 for ( Map.Entry<Long, Object> value : values.entrySet() ) {
-                    doc.append( rowType.get( i ).getName(), value.getValue() );
-                    i++;
+                    if ( !names.containsKey( value.getKey() ) ) {
+                        names.put( value.getKey(), Catalog.getInstance().getColumn( value.getKey() ).name );
+                    }
+                    doc.append( names.get( value.getKey() ), value.getValue() );
                 }
                 docs.add( doc );
             }
-            mongoTable.getCollection().insertMany( docs );
+            if ( docs.size() > 0 ) {
+                mongoTable.getCollection().insertMany( docs );
+            }
             return new AbstractEnumerable<Object>() {
                 @Override
                 public Enumerator<Object> enumerator() {
 
-                    return new IterWrapper( Collections.emptyIterator() );
+                    return new IterWrapper( Collections.singletonList( (Object) docs.size() ).iterator() );
                 }
             };
         }
