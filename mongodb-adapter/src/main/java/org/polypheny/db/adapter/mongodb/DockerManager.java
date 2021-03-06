@@ -51,6 +51,7 @@ public class DockerManager {
     private final DockerClient client;
     private static DockerManager INSTANCE;
     private final HashMap<String, Container> availableContainers = new HashMap<>();
+    private final List<Image> availableImages = new ArrayList<>();
     private final HashMap<Integer, List<String>> containersOnAdapter = new HashMap<>();
 
 
@@ -63,8 +64,18 @@ public class DockerManager {
 
 
     private DockerManager() {
-        // TODO: check if docker running or else do not show?
         client = this.generateClient();
+        client.listImagesCmd().exec().forEach( image -> {
+            for ( String tag : image.getRepoTags() ) {
+                String[] splits = tag.split( ":" );
+
+                if ( splits[0].equals( Image.MONGODB.getName() ) ) {
+                    availableImages.add( Image.MONGODB.setVersion( splits[1] ) );
+                }
+            }
+        } );
+
+        // TODO DL: add existing ports
     }
 
 
@@ -106,7 +117,7 @@ public class DockerManager {
     }
 
 
-    public Container createContainer( String uniqueName, int adapterId, ContainerImage image, int port ) {
+    public Container createContainer( String uniqueName, int adapterId, Image image, int port ) {
         Container container = new Container( adapterId, uniqueName, image, Collections.singletonMap( image.internalPort, port ) );
         registerIfAbsent( container );
         return container;
@@ -115,10 +126,6 @@ public class DockerManager {
 
     private void start( Container container ) {
         registerIfAbsent( container );
-
-        if ( container.status != ContainerStatus.PREPARED ) {
-            prepare( container );
-        }
 
         Ports bindings = new Ports();
 
@@ -139,19 +146,18 @@ public class DockerManager {
     }
 
 
-    private void prepare( Container container ) {
-
-        registerIfAbsent( container );
-
-        client.pullImageCmd( container.type.getFullName() ).exec( container.callback );
+    public void download( Image image ) {
+        PullImageResultCallback callback = new PullImageResultCallback();
+        client.pullImageCmd( image.getFullName() ).exec( callback );
 
         // TODO: blocking for now, maybe change or show warning?
         try {
-            container.callback.awaitCompletion();
+            callback.awaitCompletion();
         } catch ( InterruptedException e ) {
-            throw new RuntimeException( "The downloading of the image for  " + container.uniqueName + " failed." );
+            throw new RuntimeException( "The downloading of the image  " + image.getFullName() + " failed." );
         }
-        container.setStatus( ContainerStatus.PREPARED );
+
+        availableImages.add( image );
     }
 
 
@@ -167,15 +173,15 @@ public class DockerManager {
 
 
     /**
-     * This enum unifies the name building and providing for ContainerImages
+     * This enum unifies the name building and provides additional information of an image
      */
-    public enum ContainerImage {
+    public enum Image {
         MONGODB( "mongo", 27017 );
 
         @Getter
         private final String name;
         @Getter
-        private final String version;
+        private String version;
         @Getter
         private final int internalPort;
 
@@ -185,14 +191,20 @@ public class DockerManager {
         }
 
 
-        ContainerImage( String name, int internalPort, String version ) {
+        public Image setVersion( String version ) {
+            this.version = version;
+            return this;
+        }
+
+
+        Image( String name, String version, int internalPort ) {
             this.name = name;
             this.version = version;
             this.internalPort = internalPort;
         }
 
 
-        ContainerImage( String name, int internalPort ) {
+        Image( String name, int internalPort ) {
             this.name = name;
             this.version = "latest";
             this.internalPort = internalPort;
@@ -203,7 +215,6 @@ public class DockerManager {
 
     public enum ContainerStatus {
         INIT,
-        PREPARED,
         RUNNING,
         ERROR;
     }
@@ -215,7 +226,7 @@ public class DockerManager {
      */
     public static class Container {
 
-        private final ContainerImage type;
+        private final Image type;
         private final PullImageResultCallback callback;
         private final String uniqueName;
         private final Map<Integer, Integer> internalExternalPortMapping;
@@ -226,7 +237,7 @@ public class DockerManager {
         private Container(
                 int adapterId,
                 String uniqueName,
-                ContainerImage image,
+                Image image,
                 Map<Integer, Integer> internalExternalPortMapping
         ) {
             if ( !getInstance().checkIfUnique( uniqueName ) ) {
@@ -238,13 +249,6 @@ public class DockerManager {
             this.internalExternalPortMapping = internalExternalPortMapping;
             this.callback = new PullImageResultCallback();
             this.status = ContainerStatus.INIT;
-        }
-
-
-        public Container prepare() {
-            getInstance().prepare( this );
-
-            return this;
         }
 
 

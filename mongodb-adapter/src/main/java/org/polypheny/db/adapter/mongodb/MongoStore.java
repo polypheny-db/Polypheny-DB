@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.polypheny.db.adapter.DataStore;
-import org.polypheny.db.adapter.mongodb.DockerManager.ContainerImage;
+import org.polypheny.db.adapter.mongodb.DockerManager.Image;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
@@ -54,13 +54,14 @@ public class MongoStore extends DataStore {
 
     public MongoStore( int adapterId, String uniqueName, Map<String, String> settings ) {
         super( adapterId, uniqueName, settings, Boolean.parseBoolean( settings.get( "persistent" ) ) );
+
+        DockerManager.getInstance().download( Image.MONGODB );
         DockerManager.getInstance()
                 .createContainer(
                         getUniqueName(),
                         getAdapterId(),
-                        ContainerImage.MONGODB,
+                        Image.MONGODB,
                         Integer.parseInt( settings.get( "port" ) ) )
-                .prepare()
                 .start();
 
         addInformationPhysicalNames();
