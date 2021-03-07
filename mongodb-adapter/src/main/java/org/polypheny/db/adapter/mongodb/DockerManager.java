@@ -28,6 +28,7 @@ import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import com.github.dockerjava.transport.DockerHttpClient;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +36,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.Getter;
+import org.polypheny.db.docker.Exceptions.NameExistsException;
+import org.polypheny.db.docker.Exceptions.PortExistsException;
 
 // TODO DL: check if already existing containers in system etc.
 // and move to core
@@ -53,6 +56,11 @@ public class DockerManager {
     private final HashMap<String, Container> availableContainers = new HashMap<>();
     private final List<Image> availableImages = new ArrayList<>();
     private final HashMap<Integer, List<String>> containersOnAdapter = new HashMap<>();
+
+    // as Docker does not allow two containers with the same name or which expose the same port
+    // we have to track them, so we can return correct messages to the user
+    private final List<Integer> usedPorts = new ArrayList<>();
+    private final List<String> usedNames = new ArrayList<>();
 
 
     public static DockerManager getInstance() {
@@ -75,7 +83,12 @@ public class DockerManager {
             }
         } );
 
-        // TODO DL: add existing ports
+        client.listContainersCmd().withShowAll( true ).exec().forEach( container -> {
+            Arrays.stream( container.getPorts() ).forEach( containerPort -> {
+                usedPorts.add( containerPort.getPublicPort() );
+            } );
+            usedNames.addAll( Arrays.asList( container.getNames() ) );
+        } );
     }
 
 
@@ -130,7 +143,16 @@ public class DockerManager {
         Ports bindings = new Ports();
 
         for ( Map.Entry<Integer, Integer> mapping : container.internalExternalPortMapping.entrySet() ) {
+            // ExposedPort is exposed from container and Binding is port from outside
             bindings.bind( ExposedPort.tcp( mapping.getKey() ), Ports.Binding.bindPort( mapping.getValue() ) );
+            if ( usedPorts.contains( mapping.getValue() ) ) {
+                throw new PortExistsException();
+            }
+            usedPorts.add( mapping.getValue() );
+        }
+
+        if ( usedNames.contains( container.uniqueName ) ) {
+            throw new NameExistsException();
         }
 
         CreateContainerCmd cmd = client.createContainerCmd( container.type.getFullName() )
@@ -142,6 +164,7 @@ public class DockerManager {
 
         client.startContainerCmd( container.uniqueName ).exec();
 
+        usedNames.add( container.uniqueName );
         container.setStatus( ContainerStatus.RUNNING );
     }
 

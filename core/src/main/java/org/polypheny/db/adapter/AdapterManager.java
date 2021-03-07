@@ -17,6 +17,7 @@ import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogAdapter;
 import org.polypheny.db.catalog.entity.CatalogAdapter.AdapterType;
 import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
+import org.polypheny.db.docker.Exceptions.DockerException;
 import org.reflections.Reflections;
 
 public class AdapterManager {
@@ -169,7 +170,12 @@ public class AdapterManager {
         try {
             instance = (Adapter) ctor.newInstance( adapterId, uniqueName, settings );
         } catch ( Exception e ) {
-            removeAdapter( adapterId );
+            if ( e instanceof InvocationTargetException && ((InvocationTargetException) e).getTargetException() instanceof DockerException ) {
+                throw new RuntimeException( ((InvocationTargetException) e).getTargetException() );
+            } else {
+                removeAdapter( adapterId );
+            }
+
             throw new RuntimeException( "Something went wrong while adding a new adapter", e );
         }
         adapterByName.put( instance.getUniqueName(), instance );
