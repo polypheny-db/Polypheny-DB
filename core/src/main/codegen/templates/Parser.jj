@@ -6237,6 +6237,7 @@ SqlPostfixOperator PostfixRowOperator() :
 |   < DISCONNECT: "DISCONNECT" >
 |   < DISPATCH: "DISPATCH" >
 |   < DISTINCT: "DISTINCT" >
+|   < DOCUMENT: "DOCUMENT" >
 |   < DOMAIN: "DOMAIN" >
 |   < DOUBLE: "DOUBLE" >
 |   < DOW: "DOW" >

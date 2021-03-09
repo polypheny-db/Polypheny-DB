@@ -50,6 +50,9 @@ public final class CatalogColumn implements CatalogEntity, Comparable<CatalogCol
     public final boolean nullable;
     public final Collation collation;
     public final CatalogDefaultValue defaultValue;
+    @EqualsAndHashCode.Exclude
+    // lombok uses getter methods to compare objects
+    // and this method depends on the catalog, which can lead to nullpointers -> doNotUseGetters
     public SchemaType schemaType;
 
 
@@ -103,7 +106,6 @@ public final class CatalogColumn implements CatalogEntity, Comparable<CatalogCol
             return elementType;
         }
     }
-
 
     public SchemaType getSchemaType() {
         if ( schemaType == null ) {

@@ -49,7 +49,6 @@ data: {
             "JAR"
             "FILE"
             "ARCHIVE"
-            "DOCUMENT"
         ]
 
         # List of keywords from "keywords" section that are not reserved.

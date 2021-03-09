@@ -57,6 +57,7 @@ public class MongoToEnumerableConverterRule extends ConverterRule {
      * @param relBuilderFactory Builder for relational expressions
      */
     public MongoToEnumerableConverterRule( RelBuilderFactory relBuilderFactory ) {
+
         super(
                 RelNode.class,
                 (Predicate<RelNode>) r -> true,

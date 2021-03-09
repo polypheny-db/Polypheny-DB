@@ -34,6 +34,7 @@
 package org.polypheny.db.sql;
 
 
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import lombok.Setter;
 import org.polypheny.db.catalog.Catalog;
@@ -184,7 +185,16 @@ public class SqlInsert extends SqlCall {
 
     public SchemaType getSchemaType() {
         try {
-            return Catalog.getInstance().getSchema( "APP", ((SqlIdentifier) targetTable).names.get( 0 )).schemaType;
+            // here we use default value TODO DL: change
+            ImmutableList<String> names = ((SqlIdentifier) targetTable).names;
+            if ( names.size() == 1 ) {
+                return Catalog.getInstance().getSchema( "APP", "public" ).schemaType;
+            } else if ( names.size() == 2 ) {
+                return Catalog.getInstance().getSchema( "APP", names.get( 0 ) ).schemaType;
+            } else {
+                return Catalog.getInstance().getSchema( names.get( 0 ), names.get( 1 ) ).schemaType;
+            }
+
         } catch ( UnknownSchemaException | UnknownDatabaseException e ) {
             throw new RuntimeException( e );
         }
