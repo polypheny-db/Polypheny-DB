@@ -39,7 +39,6 @@ import org.mapdb.DB;
 import org.mapdb.DBException.SerializationError;
 import org.mapdb.DBMaker;
 import org.mapdb.HTreeMap;
-import org.mapdb.HTreeMap.KeySet;
 import org.mapdb.Serializer;
 import org.mapdb.serializer.SerializerArrayTuple;
 import org.polypheny.db.adapter.Adapter;
@@ -119,8 +118,6 @@ public class CatalogImpl extends Catalog {
     private static BTreeMap<Long, CatalogColumn> columns;
     private static BTreeMap<Object[], CatalogColumn> columnNames;
     private static BTreeMap<Object[], CatalogColumnPlacement> columnPlacements;
-
-    private static KeySet<Object[]> documentColumns;
 
     private static HTreeMap<Integer, CatalogAdapter> adapters;
     private static HTreeMap<String, CatalogAdapter> adapterNames;
@@ -509,8 +506,6 @@ public class CatalogImpl extends Catalog {
         columnNames = db.treeMap( "columnNames", new SerializerArrayTuple( Serializer.LONG, Serializer.LONG, Serializer.LONG, Serializer.STRING ), Serializer.JAVA ).createOrOpen();
         //noinspection unchecked
         columnPlacements = db.treeMap( "columnPlacement", new SerializerArrayTuple( Serializer.INTEGER, Serializer.LONG ), Serializer.JAVA ).createOrOpen();
-
-        documentColumns = db.hashSet( "documentColumns", new SerializerArrayTuple( Serializer.LONG, Serializer.STRING ) ).createOrOpen();
     }
 
 
