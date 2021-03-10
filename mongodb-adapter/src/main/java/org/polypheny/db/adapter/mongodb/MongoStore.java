@@ -22,12 +22,14 @@ import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.polypheny.db.adapter.DataStore;
-import org.polypheny.db.adapter.mongodb.DockerManager.Image;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
 import org.polypheny.db.catalog.entity.CatalogIndex;
 import org.polypheny.db.catalog.entity.CatalogTable;
+import org.polypheny.db.docker.DockerManager;
+import org.polypheny.db.docker.DockerManager.Image;
+import org.polypheny.db.docker.DockerManagerImpl;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.schema.Schema;
 import org.polypheny.db.schema.SchemaPlus;
@@ -130,7 +132,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void shutdown() {
-        DockerManager.getInstance().shutdownAll( getAdapterId() );
+        DockerManagerImpl.getInstance().shutdownAll( getAdapterId() );
 
         removeInformationPage();
     }

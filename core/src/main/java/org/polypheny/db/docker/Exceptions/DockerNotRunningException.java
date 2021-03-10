@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package org.polypheny.db.adapter.mongodb;
+package org.polypheny.db.docker.Exceptions;
 
-public class CertManager {
+public class DockerNotRunningException extends DockerException {
 
-    public CertManager() {
+    public DockerNotRunningException() {
+        super( "Docker is either not installed or not running at the moment." );
     }
-
 
 }
