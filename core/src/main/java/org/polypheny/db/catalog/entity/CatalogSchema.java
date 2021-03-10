@@ -39,6 +39,7 @@ public final class CatalogSchema implements CatalogEntity, Comparable<CatalogSch
     public final int ownerId;
     public final String ownerName;
     @Getter
+    @EqualsAndHashCode.Exclude
     public final SchemaType schemaType;
 
 

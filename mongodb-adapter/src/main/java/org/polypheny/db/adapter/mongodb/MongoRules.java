@@ -42,8 +42,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.Getter;
+import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
+import org.bson.BsonDouble;
+import org.bson.BsonInt32;
+import org.bson.BsonString;
+import org.bson.BsonValue;
 import org.bson.Document;
 import org.polypheny.db.adapter.enumerable.RexImpTable;
 import org.polypheny.db.adapter.enumerable.RexToLixTranslator;
@@ -510,13 +516,21 @@ public class MongoRules {
                         int pos = 0;
                         for ( RexLiteral literal : literals ) {
                             if ( literal.getValue() != null ) {
-                                Comparable value;
+                                BsonValue value;
+                                // might needs some adjustment later on TODO DL
+                                //http://mongodb.github.io/mongo-java-driver/3.4/bson/documents/#document
                                 if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
-                                    value = RexLiteral.stringValue( literal );
-                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.NUMERIC ) {
-                                    value = RexLiteral.intValue( literal );
+                                    value = new BsonString( Objects.requireNonNull( RexLiteral.stringValue( literal ) ) );
+                                } else if ( PolyType.INT_TYPES.contains( literal.getTypeName() ) ) {
+                                    value = new BsonInt32( RexLiteral.intValue( literal ) );
+                                } else if ( PolyType.NUMERIC_TYPES.contains( literal.getTypeName() ) ) {
+                                    value = new BsonDouble( literal.getValueAs( Double.class ) );
+                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.DATE ) {
+                                    value = new BsonInt32( (Integer) literal.getValue2() );
+                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BOOLEAN ) {
+                                    value = new BsonBoolean( (Boolean) literal.getValue2() );
                                 } else {
-                                    value = RexLiteral.value( literal );
+                                    value = new BsonString( RexLiteral.value( literal ).toString() );
                                 }
                                 doc.append( values.getRowType().getFieldNames().get( pos ), value );
                             }
@@ -528,8 +542,9 @@ public class MongoRules {
                     implementor.mongoTable.getCollection().insertMany( docs );
                     implementor.results = Collections.singletonList( docs.size() );
                 }
+                break;
                 case UPDATE:
-
+                    break;
                 case MERGE:
                     break;
                 case DELETE: {

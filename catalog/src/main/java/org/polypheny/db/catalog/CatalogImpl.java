@@ -607,13 +607,19 @@ public class CatalogImpl extends Catalog {
         // init adapters
         if ( adapterNames.size() == 0 ) {
             // Deploy default hsqldb store
-            Map<String, String> hsqldbSettings = new HashMap<>();
+            /*Map<String, String> hsqldbSettings = new HashMap<>();
             hsqldbSettings.put( "type", "Memory" );
             hsqldbSettings.put( "tableType", "Memory" );
             hsqldbSettings.put( "maxConnections", "25" );
             hsqldbSettings.put( "trxControlMode", "mvcc" );
             hsqldbSettings.put( "trxIsolationLevel", "read_committed" );
-            addAdapter( "hsqldb", "org.polypheny.db.adapter.jdbc.stores.HsqldbStore", AdapterType.STORE, hsqldbSettings );
+            addAdapter( "hsqldb", "org.polypheny.db.adapter.jdbc.stores.HsqldbStore", AdapterType.STORE, hsqldbSettings );*/
+            Map<String, String> mongoSettings = new HashMap<>();
+            mongoSettings.put( "persistent", "false" );
+            mongoSettings.put( "port", "27017" );
+            mongoSettings.put( "type", "mongo" );
+            mongoSettings.put( "host", "localhost" );
+            addAdapter( "hsqldb", "org.polypheny.db.adapter.mongodb.MongoStore", AdapterType.STORE, mongoSettings );
 
             // Deploy default CSV view
             Map<String, String> csvSettings = new HashMap<>();

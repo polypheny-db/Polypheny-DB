@@ -18,13 +18,25 @@ package org.polypheny.db.adapter.mongodb;
 
 import com.google.common.collect.ImmutableList;
 import com.mongodb.MongoClient;
+import com.mongodb.client.model.IndexOptions;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.BsonBoolean;
+import org.bson.BsonDouble;
+import org.bson.BsonInt32;
+import org.bson.BsonInt64;
+import org.bson.BsonString;
+import org.bson.BsonValue;
+import org.bson.Document;
 import org.polypheny.db.adapter.DataStore;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
+import org.polypheny.db.catalog.entity.CatalogDefaultValue;
 import org.polypheny.db.catalog.entity.CatalogIndex;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.docker.DockerManager;
@@ -35,6 +47,8 @@ import org.polypheny.db.schema.Schema;
 import org.polypheny.db.schema.SchemaPlus;
 import org.polypheny.db.schema.Table;
 import org.polypheny.db.transaction.PolyXid;
+import org.polypheny.db.type.PolyType;
+import org.polypheny.db.type.PolyTypeFamily;
 
 @Slf4j
 public class MongoStore extends DataStore {
@@ -169,43 +183,100 @@ public class MongoStore extends DataStore {
 
     @Override
     public void addColumn( Context context, CatalogTable catalogTable, CatalogColumn catalogColumn ) {
+        // updates all columns with this field if a default value is provided
+        Document field;
+        if ( catalogColumn.defaultValue != null ) {
+            CatalogDefaultValue defaultValue = catalogColumn.defaultValue;
+            BsonValue value;
+            if ( catalogColumn.type.getFamily() == PolyTypeFamily.CHARACTER ) {
+                value = new BsonString( defaultValue.value );
+            } else if ( PolyType.INT_TYPES.contains( catalogColumn.type ) ) {
+                value = new BsonInt32( Integer.parseInt( defaultValue.value ) );
+            } else if ( PolyType.NUMERIC_TYPES.contains( catalogColumn.type ) ) {
+                value = new BsonDouble( Double.parseDouble( defaultValue.value ) );
+            } else if ( catalogColumn.type.getFamily() == PolyTypeFamily.BOOLEAN ) {
+                value = new BsonBoolean( Boolean.parseBoolean( defaultValue.value ) );
+            } else if ( catalogColumn.type.getFamily() == PolyTypeFamily.DATE ) {
+                try {
+                    value = new BsonInt64( new SimpleDateFormat( "yyyy-MM-dd" ).parse( defaultValue.value ).getTime() );
+                } catch ( ParseException e ) {
+                    throw new RuntimeException( e );
+                }
+            } else {
+                value = new BsonString( defaultValue.value );
+            }
+
+            field = new Document().append( catalogColumn.name, value );
+        } else {
+            field = new Document().append( catalogColumn.name, null );
+        }
+        Document update = new Document().append( "$set", field );
+        this.currentSchema.database.getCollection( catalogTable.name ).updateMany( new Document(), update );
+
+        // Add physical name to placement
+        catalog.updateColumnPlacementPhysicalNames(
+                getAdapterId(),
+                catalogColumn.id,
+                currentSchema.getDatabase().getName(),
+                catalogTable.name,
+                catalogColumn.name,
+                false );
 
     }
 
 
     @Override
     public void dropColumn( Context context, CatalogColumnPlacement columnPlacement ) {
-
+        Document field = new Document().append( columnPlacement.physicalColumnName, 1 );
+        Document filter = new Document().append( "$unset", field );
+        this.currentSchema.database.getCollection( columnPlacement.getLogicalTableName() ).updateMany( new Document(), filter );
     }
 
 
     @Override
     public void addIndex( Context context, CatalogIndex catalogIndex ) {
+        if ( catalogIndex.method.equals( "multikey" ) ) {
+            Document doc = new Document();
+            for ( String name : catalogIndex.key.getColumnNames() ) {
+                doc.append( name, 1 );
+            }
 
+            this.currentSchema.database.getCollection( catalogIndex.key.getTableName() ).createIndex( doc, new IndexOptions().name( catalogIndex.name ) );
+        }
     }
 
 
     @Override
     public void dropIndex( Context context, CatalogIndex catalogIndex ) {
+        if ( catalogIndex.method.equals( "multikey" ) ) {
+            Document doc = new Document();
+            for ( String name : catalogIndex.key.getColumnNames() ) {
+                doc.append( name, 1 );
+            }
 
+            this.currentSchema.database.getCollection( catalogIndex.key.getTableName() ).dropIndex( catalogIndex.name );
+        }
     }
 
 
     @Override
     public void updateColumnType( Context context, CatalogColumnPlacement columnPlacement, CatalogColumn catalogColumn ) {
-
+        // this is not really possible in mongodb, only way would be to reinsert all date, which is not really performant, but could be a possibility
     }
 
 
     @Override
     public List<AvailableIndexMethod> getAvailableIndexMethods() {
-        return null;
+        List<AvailableIndexMethod> indexMethods = new ArrayList<>();
+        indexMethods.add( new AvailableIndexMethod( "multikey", "Multikey Index" ) );
+        return indexMethods;
     }
 
 
     @Override
     public AvailableIndexMethod getDefaultIndexMethod() {
-        return null;
+        // TODO DL: add more index types
+        return new AvailableIndexMethod( "multikey", "Multikey Index" );
     }
 
 
