@@ -99,7 +99,7 @@ public class JdbcDdlTest {
     @Test
     public void testTypes() throws SQLException {
         // Check if there are new types missing in this test
-        Assert.assertEquals( "Unexpected number of available types", PolyType.availableTypes().size(), 16 );
+        Assert.assertEquals( "Unexpected number of available types", PolyType.availableTypes().size(), 17 );
 
         try ( JdbcConnection polyphenyDbConnection = new JdbcConnection( true ) ) {
             Connection connection = polyphenyDbConnection.getConnection();
@@ -163,7 +163,7 @@ public class JdbcDdlTest {
     @Test
     public void nullTest() throws SQLException {
         // Check if there are new types missing in this test
-        Assert.assertEquals( "Unexpected number of available types", PolyType.availableTypes().size(), 16 );
+        Assert.assertEquals( "Unexpected number of available types", PolyType.availableTypes().size(), 17 );
 
         try ( JdbcConnection polyphenyDbConnection = new JdbcConnection( true ) ) {
             Connection connection = polyphenyDbConnection.getConnection();
