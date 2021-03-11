@@ -35,6 +35,7 @@ package org.polypheny.db.adapter.mongodb;
 
 
 import com.mongodb.client.MongoCursor;
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -161,6 +162,12 @@ class MongoEnumerator implements Enumerator<Object> {
         if ( o instanceof Number && primitive != null ) {
             return primitive.number( (Number) o );
         }
+
+        if ( clazz.getName().equals( BigDecimal.class.getName() ) ) {
+            assert o instanceof Double;
+            return BigDecimal.valueOf( (Double) o );
+        }
+
         return o;
     }
 

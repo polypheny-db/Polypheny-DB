@@ -19,12 +19,15 @@ package org.polypheny.db.adapter.mongodb;
 import com.google.common.collect.ImmutableList;
 import com.mongodb.MongoClient;
 import com.mongodb.client.model.IndexOptions;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.calcite.avatica.util.ByteString;
 import org.bson.BsonBoolean;
 import org.bson.BsonDouble;
 import org.bson.BsonInt32;
@@ -192,7 +195,7 @@ public class MongoStore extends DataStore {
                 value = new BsonString( defaultValue.value );
             } else if ( PolyType.INT_TYPES.contains( catalogColumn.type ) ) {
                 value = new BsonInt32( Integer.parseInt( defaultValue.value ) );
-            } else if ( PolyType.NUMERIC_TYPES.contains( catalogColumn.type ) ) {
+            } else if ( PolyType.FRACTIONAL_TYPES.contains( catalogColumn.type ) ) {
                 value = new BsonDouble( Double.parseDouble( defaultValue.value ) );
             } else if ( catalogColumn.type.getFamily() == PolyTypeFamily.BOOLEAN ) {
                 value = new BsonBoolean( Boolean.parseBoolean( defaultValue.value ) );
@@ -202,6 +205,12 @@ public class MongoStore extends DataStore {
                 } catch ( ParseException e ) {
                     throw new RuntimeException( e );
                 }
+            } else if ( catalogColumn.type.getFamily() == PolyTypeFamily.TIME ) {
+                value = new BsonInt32( (int) Time.valueOf( defaultValue.value ).getTime() );
+            } else if ( catalogColumn.type.getFamily() == PolyTypeFamily.TIMESTAMP ) {
+                value = new BsonInt64( Timestamp.valueOf( defaultValue.value ).getTime() );
+            } else if ( catalogColumn.type.getFamily() == PolyTypeFamily.BINARY ) {
+                value = new BsonString( ByteString.toString( ByteString.parseBase64( defaultValue.value ), 64 ) );
             } else {
                 value = new BsonString( defaultValue.value );
             }

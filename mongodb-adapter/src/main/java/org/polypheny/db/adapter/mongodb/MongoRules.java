@@ -44,10 +44,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lombok.Getter;
+import org.apache.calcite.avatica.util.ByteString;
 import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
 import org.bson.BsonDouble;
 import org.bson.BsonInt32;
+import org.bson.BsonInt64;
 import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.bson.Document;
@@ -521,14 +523,18 @@ public class MongoRules {
                                 //http://mongodb.github.io/mongo-java-driver/3.4/bson/documents/#document
                                 if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
                                     value = new BsonString( Objects.requireNonNull( RexLiteral.stringValue( literal ) ) );
-                                } else if ( PolyType.INT_TYPES.contains( literal.getTypeName() ) ) {
+                                } else if ( PolyType.INT_TYPES.contains( literal.getType().getPolyType() ) ) {
                                     value = new BsonInt32( RexLiteral.intValue( literal ) );
-                                } else if ( PolyType.NUMERIC_TYPES.contains( literal.getTypeName() ) ) {
+                                } else if ( PolyType.FRACTIONAL_TYPES.contains( literal.getType().getPolyType() ) ) {
                                     value = new BsonDouble( literal.getValueAs( Double.class ) );
-                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.DATE ) {
+                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.DATE || literal.getTypeName().getFamily() == PolyTypeFamily.TIME ) {
                                     value = new BsonInt32( (Integer) literal.getValue2() );
+                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.TIMESTAMP ) {
+                                    value = new BsonInt64( (Long) literal.getValue2() );
                                 } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BOOLEAN ) {
                                     value = new BsonBoolean( (Boolean) literal.getValue2() );
+                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BINARY ) {
+                                    value = new BsonString( ((ByteString) literal.getValue2()).toBase64String() );
                                 } else {
                                     value = new BsonString( RexLiteral.value( literal ).toString() );
                                 }
