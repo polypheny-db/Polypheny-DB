@@ -41,6 +41,7 @@ import lombok.Setter;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptTable;
 import org.polypheny.db.rel.RelNode;
+import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.util.Pair;
 
 
@@ -71,6 +72,11 @@ public interface MongoRel extends RelNode {
         @Getter
         @Setter
         List<Object> results;
+        @Getter
+        final List<Long> prepFields = new ArrayList<>();
+        @Getter
+        @Setter
+        private RelDataType rowType;
 
 
         public Implementor() {
@@ -92,6 +98,7 @@ public interface MongoRel extends RelNode {
             assert ordinal == 0;
             ((MongoRel) input).implement( this );
         }
+
     }
 
 }

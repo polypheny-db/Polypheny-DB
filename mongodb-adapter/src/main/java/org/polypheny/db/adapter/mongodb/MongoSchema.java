@@ -88,7 +88,7 @@ public class MongoSchema extends AbstractSchema {
     /**
      * Allows tests to inject their instance of the database.
      *
-     * @param mongoDb existing mongo database instance
+     * @param database existing mongo database instance
      * @param connection
      */
     @VisibleForTesting
@@ -115,12 +115,24 @@ public class MongoSchema extends AbstractSchema {
         final RelDataTypeFactory typeFactory = new PolyTypeFactoryImpl( RelDataTypeSystem.DEFAULT );
         final RelDataTypeFactory.Builder fieldInfo = typeFactory.builder();
 
+        String physicalName = null;
+
         for ( CatalogColumnPlacement placement : columnPlacementsOnStore ) {
             CatalogColumn catalogColumn = Catalog.getInstance().getColumn( placement.columnId );
             RelDataType sqlType = catalogColumn.getRelDataType( typeFactory );
             fieldInfo.add( catalogColumn.name, catalogColumn.name, sqlType ).nullable( catalogColumn.nullable );
+
+            if ( physicalName == null ) {
+                physicalName = placement.physicalTableName;
+            }
         }
-        MongoTable table = new MongoTable( catalogTable.name, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
+        MongoTable table;
+        if ( physicalName == null ) {
+            table = new MongoTable( catalogTable.name, catalogTable.id, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
+        } else {
+            table = new MongoTable( physicalName, catalogTable.id, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
+        }
+
         tableMap.put( catalogTable.name, table );
         return table;
 

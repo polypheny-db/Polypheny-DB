@@ -150,8 +150,27 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         if ( !mongoImplementor.isDDL ) {
             enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, ops ) );
         } else {
+            if ( mongoImplementor.prepFields.size() != 0 ) {
+                Expression data = list.append( "data", DataContext.ROOT );
+                Expression preparedFields = list.append( "preparedFields", constantArrayList( mongoImplementor.getPrepFields(), Object.class ) );
+                Expression rowTypePrep = list.append( "rowTypePrep",
+                        constantArrayList(
+                                Pair.zip( MongoRules.mongoFieldNames( mongoImplementor.getRowType() ),
+                                        new AbstractList<Class>() {
+                                            @Override
+                                            public Class get( int index ) {
+                                                return physType.fieldClass( index );
+                                            }
 
-            if ( mongoImplementor.list.size() == 0 && mongoImplementor.results.size() == 0 ) {
+
+                                            @Override
+                                            public int size() {
+                                                return rowType.getFieldCount();
+                                            }
+                                        } ),
+                                Pair.class ) );
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED.method, data, preparedFields, rowTypePrep ) );
+            } else if ( mongoImplementor.list.size() == 0 && mongoImplementor.results.size() == 0 ) {
                 Expression data = list.append( "data", DataContext.ROOT );
                 enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_WRAPPER.method, data ) );
             } else {

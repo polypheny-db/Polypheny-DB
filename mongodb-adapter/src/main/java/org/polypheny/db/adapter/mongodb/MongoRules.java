@@ -80,6 +80,7 @@ import org.polypheny.db.rel.logical.LogicalProject;
 import org.polypheny.db.rel.metadata.RelMetadataQuery;
 import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.rex.RexCall;
+import org.polypheny.db.rex.RexDynamicParam;
 import org.polypheny.db.rex.RexInputRef;
 import org.polypheny.db.rex.RexLiteral;
 import org.polypheny.db.rex.RexNode;
@@ -505,48 +506,13 @@ public class MongoRules {
 
             switch ( this.getOperation() ) {
                 case INSERT: {
-                    MongoValues values = null;
                     if ( input instanceof MongoValues ) {
-                        values = ((MongoValues) input);
+                        handleDirectInsert( implementor, ((MongoValues) input) );
+                    } else if ( input instanceof MongoProject ) {
+                        handlePreparedInsert( implementor, ((MongoProject) input) );
                     } else {
                         return;
                     }
-
-                    List<Document> docs = new ArrayList<>();
-                    for ( ImmutableList<RexLiteral> literals : values.tuples ) {
-                        Document doc = new Document();
-                        int pos = 0;
-                        for ( RexLiteral literal : literals ) {
-                            if ( literal.getValue() != null ) {
-                                BsonValue value;
-                                // might needs some adjustment later on TODO DL
-                                //http://mongodb.github.io/mongo-java-driver/3.4/bson/documents/#document
-                                if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
-                                    value = new BsonString( Objects.requireNonNull( RexLiteral.stringValue( literal ) ) );
-                                } else if ( PolyType.INT_TYPES.contains( literal.getType().getPolyType() ) ) {
-                                    value = new BsonInt32( RexLiteral.intValue( literal ) );
-                                } else if ( PolyType.FRACTIONAL_TYPES.contains( literal.getType().getPolyType() ) ) {
-                                    value = new BsonDouble( literal.getValueAs( Double.class ) );
-                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.DATE || literal.getTypeName().getFamily() == PolyTypeFamily.TIME ) {
-                                    value = new BsonInt32( (Integer) literal.getValue2() );
-                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.TIMESTAMP ) {
-                                    value = new BsonInt64( (Long) literal.getValue2() );
-                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BOOLEAN ) {
-                                    value = new BsonBoolean( (Boolean) literal.getValue2() );
-                                } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BINARY ) {
-                                    value = new BsonString( ((ByteString) literal.getValue2()).toBase64String() );
-                                } else {
-                                    value = new BsonString( RexLiteral.value( literal ).toString() );
-                                }
-                                doc.append( values.getRowType().getFieldNames().get( pos ), value );
-                            }
-                            pos++;
-                        }
-                        docs.add( doc );
-
-                    }
-                    implementor.mongoTable.getCollection().insertMany( docs );
-                    implementor.results = Collections.singletonList( docs.size() );
                 }
                 break;
                 case UPDATE:
@@ -574,6 +540,57 @@ public class MongoRules {
 
             }
 
+        }
+
+
+        private void handlePreparedInsert( Implementor implementor, MongoProject input ) {
+            if ( !(input.getInput() instanceof MongoValues && input.getInput().getRowType().getFieldList().size() == 1) ) {
+                return;
+            }
+            implementor.setRowType( input.getRowType() );
+            for ( RexNode rexNode : input.getChildExps() ) {
+                implementor.prepFields.add( ((RexDynamicParam) rexNode).getIndex() );
+            }
+
+        }
+
+
+        private void handleDirectInsert( Implementor implementor, MongoValues values ) {
+            List<Document> docs = new ArrayList<>();
+            for ( ImmutableList<RexLiteral> literals : values.tuples ) {
+                Document doc = new Document();
+                int pos = 0;
+                for ( RexLiteral literal : literals ) {
+                    if ( literal.getValue() != null ) {
+                        BsonValue value;
+                        // might needs some adjustment later on TODO DL
+                        //http://mongodb.github.io/mongo-java-driver/3.4/bson/documents/#document
+                        if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
+                            value = new BsonString( Objects.requireNonNull( RexLiteral.stringValue( literal ) ) );
+                        } else if ( PolyType.INT_TYPES.contains( literal.getType().getPolyType() ) ) {
+                            value = new BsonInt32( RexLiteral.intValue( literal ) );
+                        } else if ( PolyType.FRACTIONAL_TYPES.contains( literal.getType().getPolyType() ) ) {
+                            value = new BsonDouble( literal.getValueAs( Double.class ) );
+                        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.DATE || literal.getTypeName().getFamily() == PolyTypeFamily.TIME ) {
+                            value = new BsonInt32( (Integer) literal.getValue2() );
+                        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.TIMESTAMP ) {
+                            value = new BsonInt64( (Long) literal.getValue2() );
+                        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BOOLEAN ) {
+                            value = new BsonBoolean( (Boolean) literal.getValue2() );
+                        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BINARY ) {
+                            value = new BsonString( ((ByteString) literal.getValue2()).toBase64String() );
+                        } else {
+                            value = new BsonString( RexLiteral.value( literal ).toString() );
+                        }
+                        doc.append( values.getRowType().getFieldNames().get( pos ), value );
+                    }
+                    pos++;
+                }
+                docs.add( doc );
+
+            }
+            implementor.mongoTable.getCollection().insertMany( docs );
+            implementor.results = Collections.singletonList( docs.size() );
         }
 
     }

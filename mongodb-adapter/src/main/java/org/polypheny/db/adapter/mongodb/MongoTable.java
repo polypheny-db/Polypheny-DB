@@ -73,6 +73,7 @@ import org.polypheny.db.schema.ModifiableTable;
 import org.polypheny.db.schema.SchemaPlus;
 import org.polypheny.db.schema.TranslatableTable;
 import org.polypheny.db.schema.impl.AbstractTableQueryable;
+import org.polypheny.db.util.Pair;
 import org.polypheny.db.util.Util;
 
 
@@ -89,14 +90,16 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
     private final MongoSchema mongoSchema;
     @Getter
     private final MongoCollection<Document> collection;
+    private final Long tableId;
 
 
     /**
      * Creates a MongoTable.
      */
-    MongoTable( String collectionName, MongoSchema schema, RelProtoDataType proto ) {
+    MongoTable( String collectionName, Long tableId, MongoSchema schema, RelProtoDataType proto ) {
         super( Object[].class );
         this.collectionName = collectionName;
+        this.tableId = tableId;
         this.protoRowType = proto;
         this.mongoSchema = schema;
         this.collection = schema.database.getCollection( collectionName );
@@ -300,6 +303,17 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 public Enumerator<Object> enumerator() {
 
                     return new IterWrapper( results.iterator() );
+                }
+            };
+        }
+
+
+        public Enumerable<Object> prepared( DataContext context, List<Long> preparedFields, List<Pair<?, ?>> pairs ) {
+            return new AbstractEnumerable<Object>() {
+                @Override
+                public Enumerator<Object> enumerator() {
+
+                    return new IterWrapper( Collections.singletonList( (Object) 1 ).iterator() );
                 }
             };
         }
