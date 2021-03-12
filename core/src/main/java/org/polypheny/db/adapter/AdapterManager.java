@@ -173,7 +173,7 @@ public class AdapterManager {
             if ( e instanceof InvocationTargetException && ((InvocationTargetException) e).getTargetException() instanceof DockerException ) {
                 throw new RuntimeException( ((InvocationTargetException) e).getTargetException() );
             } else {
-                removeAdapter( adapterId );
+                Catalog.getInstance().deleteAdapter( adapterId );
             }
 
             throw new RuntimeException( "Something went wrong while adding a new adapter", e );

@@ -48,6 +48,8 @@ public interface Transaction {
 
     PolyphenyDbSchema getSchema();
 
+    boolean isActive();
+
     JavaTypeFactory getTypeFactory();
 
     PolyphenyDbCatalogReader getCatalogReader();

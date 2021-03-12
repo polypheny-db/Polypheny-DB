@@ -204,6 +204,7 @@ public class SqlParserTest {
             "DIAGNOSTICS", "92", "99",
             "DISALLOW", "c",
             "DISCONNECT", "92", "99", "2003", "2011", "2014", "c",
+            "DISTANCE", "92", "99", "2003", "2011", "2014", "c",          // JS: Added for DISTANCE functions
             "DISTINCT", "92", "99", "2003", "2011", "2014", "c",
             "DO", "92", "99", "2003",
             "DOCUMENT", "92", "99", "2003", "2011", "2014", "c", // DL: added for document support
@@ -301,7 +302,6 @@ public class SqlParserTest {
             "JSON_VALUE", "c",
             "KEEP", "2011",
             "KEY", "92", "99",
-            "KNN", "92", "99", "2003", "2011", "2014", "c",          // JS: Added for KNN functions
             "LAG", "2011", "2014", "c",
             "LANGUAGE", "92", "99", "2003", "2011", "2014", "c",
             "LARGE", "99", "2003", "2011", "2014", "c",
