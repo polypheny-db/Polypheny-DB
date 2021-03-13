@@ -73,7 +73,6 @@ import org.polypheny.db.schema.ModifiableTable;
 import org.polypheny.db.schema.SchemaPlus;
 import org.polypheny.db.schema.TranslatableTable;
 import org.polypheny.db.schema.impl.AbstractTableQueryable;
-import org.polypheny.db.util.Pair;
 import org.polypheny.db.util.Util;
 
 
@@ -90,7 +89,8 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
     private final MongoSchema mongoSchema;
     @Getter
     private final MongoCollection<Document> collection;
-    private final Long tableId;
+    @Getter
+    private final Long id;
 
 
     /**
@@ -99,7 +99,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
     MongoTable( String collectionName, Long tableId, MongoSchema schema, RelProtoDataType proto ) {
         super( Object[].class );
         this.collectionName = collectionName;
-        this.tableId = tableId;
+        this.id = tableId;
         this.protoRowType = proto;
         this.mongoSchema = schema;
         this.collection = schema.database.getCollection( collectionName );
@@ -113,13 +113,6 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
     @Override
     public RelDataType getRowType( RelDataTypeFactory typeFactory ) {
-       /* final RelDataType mapType =
-                typeFactory.createMapType(
-                        typeFactory.createPolyType( PolyType.VARCHAR ),
-                        typeFactory.createTypeWithNullability( typeFactory.createPolyType( PolyType.ANY ), true ) );
-        */
-        // TODO (PCP)
-        // return typeFactory.builder().add( "_MAP", null, mapType ).build();
         return protoRowType.apply( typeFactory );
     }
 
@@ -301,19 +294,32 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             return new AbstractEnumerable<Object>() {
                 @Override
                 public Enumerator<Object> enumerator() {
-
                     return new IterWrapper( results.iterator() );
                 }
             };
         }
 
 
-        public Enumerable<Object> prepared( DataContext context, List<Long> preparedFields, List<Pair<?, ?>> pairs ) {
+        public Enumerable<Object> prepared( List<String> fieldNames ) {
+
+            MongoTable mongoTable = (MongoTable) table;
+            List<Document> docs = new ArrayList<>();
+
+            for ( Map<Long, Object> values : this.dataContext.getParameterValues() ) {
+                Document doc = new Document();
+
+                for ( Map.Entry<Long, Object> value : values.entrySet() ) {
+                    doc.append( fieldNames.get( Math.toIntExact( value.getKey() ) ), value.getValue() );
+                }
+                docs.add( doc );
+            }
+            if ( docs.size() > 0 ) {
+                mongoTable.getCollection().insertMany( docs );
+            }
             return new AbstractEnumerable<Object>() {
                 @Override
                 public Enumerator<Object> enumerator() {
-
-                    return new IterWrapper( Collections.singletonList( (Object) 1 ).iterator() );
+                    return new MongoEnumerator.ChangeMongoEnumerator( Collections.singletonList( docs.size() ).iterator() );
                 }
             };
         }

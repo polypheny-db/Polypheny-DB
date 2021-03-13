@@ -101,7 +101,7 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         final BlockBuilder list = new BlockBuilder();
         final MongoRel.Implementor mongoImplementor = new MongoRel.Implementor();
         mongoImplementor.visitChild( 0, getInput() );
-        int aggCount = 0; // TODO DL: check whats the idea behind this
+        /*int aggCount = 0; // TODO DL: check whats the idea behind this
         int findCount = 0;
         String project = null;
         String filter = null;
@@ -117,10 +117,11 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
                 project = op.left;
                 ++findCount;
             }
-        }
+        }*/
+
         final RelDataType rowType = getRowType();
-        final PhysType physType =
-                PhysTypeImpl.of( implementor.getTypeFactory(), rowType, pref.prefer( JavaRowFormat.ARRAY ) );
+        ;
+        final PhysType physType = PhysTypeImpl.of( implementor.getTypeFactory(), rowType, pref.prefer( JavaRowFormat.ARRAY ) );
 
         if ( mongoImplementor.table == null ) {
             return implementor.result( physType, new BlockBuilder().toBlock() );
@@ -151,25 +152,8 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
             enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, ops ) );
         } else {
             if ( mongoImplementor.prepFields.size() != 0 ) {
-                Expression data = list.append( "data", DataContext.ROOT );
-                Expression preparedFields = list.append( "preparedFields", constantArrayList( mongoImplementor.getPrepFields(), Object.class ) );
-                Expression rowTypePrep = list.append( "rowTypePrep",
-                        constantArrayList(
-                                Pair.zip( MongoRules.mongoFieldNames( mongoImplementor.getRowType() ),
-                                        new AbstractList<Class>() {
-                                            @Override
-                                            public Class get( int index ) {
-                                                return physType.fieldClass( index );
-                                            }
-
-
-                                            @Override
-                                            public int size() {
-                                                return rowType.getFieldCount();
-                                            }
-                                        } ),
-                                Pair.class ) );
-                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED.method, data, preparedFields, rowTypePrep ) );
+                Expression data = list.append( "data", Expressions.constant( mongoImplementor.getRowType().getFieldNames(), Object.class ) );
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED.method, data ) );
             } else if ( mongoImplementor.list.size() == 0 && mongoImplementor.results.size() == 0 ) {
                 Expression data = list.append( "data", DataContext.ROOT );
                 enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_WRAPPER.method, data ) );

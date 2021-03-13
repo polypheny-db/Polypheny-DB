@@ -119,7 +119,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void truncate( Context context, CatalogTable table ) {
-
+        currentSchema.database.getCollection( table.name ).deleteMany( new Document() );
     }
 
 
@@ -164,7 +164,7 @@ public class MongoStore extends DataStore {
     @Override
     public void createTable( Context context, CatalogTable catalogTable ) {
         Catalog catalog = Catalog.getInstance();
-        this.currentSchema.database.createCollection( catalogTable.name );
+        this.currentSchema.database.getCollection( catalogTable.name );
 
         for ( CatalogColumnPlacement placement : catalog.getColumnPlacementsOnAdapter( getAdapterId(), catalogTable.id ) ) {
             catalog.updateColumnPlacementPhysicalNames(
@@ -172,7 +172,7 @@ public class MongoStore extends DataStore {
                     placement.columnId,
                     catalogTable.getSchemaName(),
                     catalogTable.name,
-                    placement.getLogicalColumnName(),
+                    getPhysicalColumnName( placement.columnId ),
                     true );
         }
     }
@@ -215,9 +215,9 @@ public class MongoStore extends DataStore {
                 value = new BsonString( defaultValue.value );
             }
 
-            field = new Document().append( catalogColumn.name, value );
+            field = new Document().append( getPhysicalColumnName( catalogColumn.id ), value );
         } else {
-            field = new Document().append( catalogColumn.name, null );
+            field = new Document().append( getPhysicalColumnName( catalogColumn.id ), null );
         }
         Document update = new Document().append( "$set", field );
         this.currentSchema.database.getCollection( catalogTable.name ).updateMany( new Document(), update );
@@ -228,7 +228,7 @@ public class MongoStore extends DataStore {
                 catalogColumn.id,
                 currentSchema.getDatabase().getName(),
                 catalogTable.name,
-                catalogColumn.name,
+                getPhysicalColumnName( catalogColumn.id ),
                 false );
 
     }
@@ -269,7 +269,7 @@ public class MongoStore extends DataStore {
 
 
     @Override
-    public void updateColumnType( Context context, CatalogColumnPlacement columnPlacement, CatalogColumn catalogColumn ) {
+    public void updateColumnType( Context context, CatalogColumnPlacement columnPlacement, CatalogColumn catalogColumn, PolyType polyType ) {
         // this is not really possible in mongodb, only way would be to reinsert all date, which is not really performant, but could be a possibility
     }
 
@@ -292,6 +292,12 @@ public class MongoStore extends DataStore {
     @Override
     public List<FunctionalIndexInfo> getFunctionalIndexes( CatalogTable catalogTable ) {
         return null;
+    }
+
+
+    public static String getPhysicalColumnName( long id ) {
+        // we can simply use ids as our physical column names as MongoDB allows this
+        return String.valueOf( id );
     }
 
 }

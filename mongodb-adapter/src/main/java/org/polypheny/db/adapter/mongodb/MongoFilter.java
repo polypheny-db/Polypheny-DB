@@ -239,6 +239,8 @@ public class MongoFilter extends Filter implements MongoRel {
             switch ( right.getKind() ) {
                 case LITERAL:
                     break;
+                case DYNAMIC_PARAM:
+                    return true;
                 default:
                     return false;
             }

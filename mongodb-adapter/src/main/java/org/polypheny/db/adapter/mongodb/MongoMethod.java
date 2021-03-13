@@ -49,7 +49,7 @@ public enum MongoMethod {
     MONGO_QUERYABLE_AGGREGATE( MongoTable.MongoQueryable.class, "aggregate", List.class, List.class ),
     MONGO_GET_RESULT( MongoTable.MongoQueryable.class, "getResults", List.class ),
     PREPARED_WRAPPER( MongoTable.MongoQueryable.class, "preparedWrapper", DataContext.class ),
-    PREPARED( MongoTable.MongoQueryable.class, "prepared", DataContext.class, List.class, List.class );
+    PREPARED( MongoTable.MongoQueryable.class, "prepared", List.class );
 
     public final Method method;
 

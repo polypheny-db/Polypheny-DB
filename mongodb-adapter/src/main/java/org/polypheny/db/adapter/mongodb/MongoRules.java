@@ -56,6 +56,8 @@ import org.bson.Document;
 import org.polypheny.db.adapter.enumerable.RexImpTable;
 import org.polypheny.db.adapter.enumerable.RexToLixTranslator;
 import org.polypheny.db.adapter.java.JavaTypeFactory;
+import org.polypheny.db.catalog.Catalog;
+import org.polypheny.db.catalog.exceptions.UnknownColumnException;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptCost;
@@ -79,6 +81,7 @@ import org.polypheny.db.rel.logical.LogicalFilter;
 import org.polypheny.db.rel.logical.LogicalProject;
 import org.polypheny.db.rel.metadata.RelMetadataQuery;
 import org.polypheny.db.rel.type.RelDataType;
+import org.polypheny.db.rel.type.RelRecordType;
 import org.polypheny.db.rex.RexCall;
 import org.polypheny.db.rex.RexDynamicParam;
 import org.polypheny.db.rex.RexInputRef;
@@ -91,6 +94,7 @@ import org.polypheny.db.sql.SqlKind;
 import org.polypheny.db.sql.SqlOperator;
 import org.polypheny.db.sql.fun.SqlStdOperatorTable;
 import org.polypheny.db.sql.validate.SqlValidatorUtil;
+import org.polypheny.db.type.BasicPolyType;
 import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeFamily;
 import org.polypheny.db.util.Bug;
@@ -547,9 +551,11 @@ public class MongoRules {
             if ( !(input.getInput() instanceof MongoValues && input.getInput().getRowType().getFieldList().size() == 1) ) {
                 return;
             }
-            implementor.setRowType( input.getRowType() );
+            implementor.setRowType( (RelRecordType) input.getRowType() );
             for ( RexNode rexNode : input.getChildExps() ) {
-                implementor.prepFields.add( ((RexDynamicParam) rexNode).getIndex() );
+                if ( rexNode instanceof RexDynamicParam ) {
+                    implementor.prepFields.add( new Pair<>( ((RexDynamicParam) rexNode).getIndex(), (BasicPolyType) rexNode.getType() ) );
+                }
             }
 
         }
@@ -582,7 +588,11 @@ public class MongoRules {
                         } else {
                             value = new BsonString( RexLiteral.value( literal ).toString() );
                         }
-                        doc.append( values.getRowType().getFieldNames().get( pos ), value );
+                        try {
+                            doc.append( MongoStore.getPhysicalColumnName( Catalog.getInstance().getColumn( implementor.mongoTable.getId(), values.getRowType().getFieldNames().get( pos ) ).id ), value );
+                        } catch ( UnknownColumnException e ) {
+                            e.printStackTrace();
+                        }
                     }
                     pos++;
                 }
