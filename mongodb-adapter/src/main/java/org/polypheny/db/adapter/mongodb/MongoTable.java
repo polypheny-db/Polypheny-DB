@@ -57,6 +57,7 @@ import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.java.AbstractQueryableTable;
 import org.polypheny.db.adapter.mongodb.MongoEnumerator.IterWrapper;
 import org.polypheny.db.catalog.Catalog;
+import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptTable;
@@ -90,16 +91,16 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
     @Getter
     private final MongoCollection<Document> collection;
     @Getter
-    private final Long id;
+    private final CatalogTable catalogTable;
 
 
     /**
      * Creates a MongoTable.
      */
-    MongoTable( String collectionName, Long tableId, MongoSchema schema, RelProtoDataType proto ) {
+    MongoTable( String collectionName, CatalogTable catalogTable, MongoSchema schema, RelProtoDataType proto ) {
         super( Object[].class );
         this.collectionName = collectionName;
-        this.id = tableId;
+        this.catalogTable = catalogTable;
         this.protoRowType = proto;
         this.mongoSchema = schema;
         this.collection = schema.database.getCollection( collectionName );
@@ -354,7 +355,6 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             return new AbstractEnumerable<Object>() {
                 @Override
                 public Enumerator<Object> enumerator() {
-
                     return new IterWrapper( Collections.singletonList( (Object) docs.size() ).iterator() );
                 }
             };

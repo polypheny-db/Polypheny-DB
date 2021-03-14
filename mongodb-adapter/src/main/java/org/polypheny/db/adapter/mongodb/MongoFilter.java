@@ -85,7 +85,13 @@ public class MongoFilter extends Filter implements MongoRel {
     @Override
     public void implement( Implementor implementor ) {
         implementor.visitChild( 0, getInput() );
-        Translator translator = new Translator( MongoRules.mongoFieldNames( getRowType() ) );
+        // to not break the existing functionality for now we have to handle it this way
+        Translator translator = null;
+        if ( implementor.getRowType() != null && implementor.getRowType() instanceof MongoRowType ) {
+            translator = new Translator( MongoRules.mongoFieldNames( getRowType() ), (MongoRowType) implementor.getRowType() );
+        } else {
+            translator = new Translator( MongoRules.mongoFieldNames( getRowType() ) );
+        }
         String match = translator.translateMatch( condition, implementor.isDDL );
         implementor.add( null, match );
     }
@@ -100,10 +106,17 @@ public class MongoFilter extends Filter implements MongoRel {
         final Multimap<String, Pair<String, RexLiteral>> multimap = HashMultimap.create();
         final Map<String, RexLiteral> eqMap = new LinkedHashMap<>();
         private final List<String> fieldNames;
+        private final MongoRowType rowType;
 
 
         Translator( List<String> fieldNames ) {
+            this( fieldNames, null );
+        }
+
+
+        Translator( List<String> fieldNames, MongoRowType rowType ) {
             this.fieldNames = fieldNames;
+            this.rowType = rowType;
         }
 
 
@@ -249,6 +262,9 @@ public class MongoFilter extends Filter implements MongoRel {
                 case INPUT_REF:
                     final RexInputRef left1 = (RexInputRef) left;
                     String name = fieldNames.get( left1.getIndex() );
+                    if ( rowType != null && rowType.getId( name ) != null ) {
+                        name = rowType.getPhysicalName( name );
+                    }
                     translateOp2( op, name, rightLiteral );
                     return true;
                 case CAST:

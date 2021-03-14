@@ -128,9 +128,9 @@ public class MongoSchema extends AbstractSchema {
         }
         MongoTable table;
         if ( physicalName == null ) {
-            table = new MongoTable( catalogTable.name, catalogTable.id, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
+            table = new MongoTable( catalogTable.name, catalogTable, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
         } else {
-            table = new MongoTable( physicalName, catalogTable.id, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
+            table = new MongoTable( physicalName, catalogTable, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
         }
 
         tableMap.put( catalogTable.name, table );

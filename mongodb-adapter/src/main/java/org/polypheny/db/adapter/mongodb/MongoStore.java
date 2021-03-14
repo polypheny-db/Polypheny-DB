@@ -297,7 +297,7 @@ public class MongoStore extends DataStore {
 
     public static String getPhysicalColumnName( long id ) {
         // we can simply use ids as our physical column names as MongoDB allows this
-        return String.valueOf( id );
+        return "col" + id;
     }
 
 }

@@ -80,11 +80,22 @@ public class MongoProject extends Project implements MongoRel {
 
         final MongoRules.RexToMongoTranslator translator = new MongoRules.RexToMongoTranslator( (JavaTypeFactory) getCluster().getTypeFactory(), MongoRules.mongoFieldNames( getInput().getRowType() ) );
         final List<String> items = new ArrayList<>();
+        // we us our specialized rowType to derive the mapped underlying column identifiers
+        MongoRowType mongoRowType = null;
+        if ( implementor.getRowType() instanceof MongoRowType ) {
+            mongoRowType = ((MongoRowType) implementor.getRowType());
+        }
+
         for ( Pair<RexNode, String> pair : getNamedProjects() ) {
             final String name = pair.right;
+            String phyName = "1";
+            if ( mongoRowType != null && !name.contains( "$" ) ) {
+                phyName = "\"$" + mongoRowType.getPhysicalName( name ) + "\"";
+            }
+
             final String expr = pair.left.accept( translator );
             items.add( expr.equals( "'$" + name + "'" )
-                    ? MongoRules.maybeQuote( name ) + ": 1"
+                    ? MongoRules.maybeQuote( name ) + ": " + phyName//1" // we can you use a project of [name] : $[physical name] to rename our retrieved columns on aggregation
                     : MongoRules.maybeQuote( name ) + ": " + expr );
         }
         final String findString = Util.toString( items, "{", ", ", "}" );
@@ -94,5 +105,6 @@ public class MongoProject extends Project implements MongoRel {
             implementor.add( op.left, op.right );
         }
     }
+
 }
 

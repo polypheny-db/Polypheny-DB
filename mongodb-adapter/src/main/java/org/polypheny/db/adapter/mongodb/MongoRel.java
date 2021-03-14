@@ -67,6 +67,7 @@ public interface MongoRel extends RelNode {
         final List<Pair<String, String>> list = new ArrayList<>();
 
         RelOptTable table;
+
         MongoTable mongoTable;
         @Setter
         boolean isDDL;
@@ -76,7 +77,6 @@ public interface MongoRel extends RelNode {
         @Getter
         final List<Pair<Long, BasicPolyType>> prepFields = new ArrayList<>();
         @Getter
-        @Setter
         private RelRecordType rowType;
 
 
@@ -101,8 +101,12 @@ public interface MongoRel extends RelNode {
         }
 
 
-        public List<String> getRowNames() {
-            return rowType.getFieldNames();
+        public void setRowType( RelRecordType rowType ) {
+            if ( mongoTable != null ) {
+                this.rowType = MongoRowType.fromRecordType( rowType, mongoTable );
+            } else {
+                this.rowType = rowType;
+            }
         }
 
     }
