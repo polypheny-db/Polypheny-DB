@@ -214,6 +214,9 @@ public class MongoStore extends DataStore {
             } else {
                 value = new BsonString( defaultValue.value );
             }
+            if ( catalogColumn.collectionsType == PolyType.ARRAY ) {
+                throw new RuntimeException( "Default values are not supported for array types" );
+            }
 
             field = new Document().append( getPhysicalColumnName( catalogColumn.id ), value );
         } else {

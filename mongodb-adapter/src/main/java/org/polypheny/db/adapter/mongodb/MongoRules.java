@@ -44,13 +44,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import org.apache.calcite.avatica.util.ByteString;
+import org.bson.BsonArray;
 import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
 import org.bson.BsonDouble;
 import org.bson.BsonInt32;
 import org.bson.BsonInt64;
+import org.bson.BsonNull;
 import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.bson.Document;
@@ -579,11 +582,34 @@ public class MongoRules {
                 return;
             }
             implementor.setRowType( (RelRecordType) input.getRowType() );
+            int pos = 0;
+            Document docs = new Document();
+            MongoRowType rowType = (MongoRowType) implementor.getRowType();
             for ( RexNode rexNode : input.getChildExps() ) {
                 if ( rexNode instanceof RexDynamicParam ) {
+                    // preparedInsert
                     implementor.prepFields.add( new Pair<>( ((RexDynamicParam) rexNode).getIndex(), (BasicPolyType) rexNode.getType() ) );
+                } else if ( rexNode instanceof RexCall || rexNode instanceof RexLiteral ) {
+
+                    if ( rexNode instanceof RexCall ) {
+                        RexCall call = (RexCall) rexNode;
+                        if ( call.op.kind == SqlKind.ARRAY_VALUE_CONSTRUCTOR ) {
+                            BsonArray doc = new BsonArray();
+                            doc.addAll( call.operands.stream().filter( op -> op instanceof RexLiteral ).map( op -> getBsonValue( (RexLiteral) op ) ).collect( Collectors.toList() ) );
+                            docs.append( rowType.getPhysicalName( rowType.getFieldNames().get( pos ) ), doc );
+                        }
+                    } else {
+                        docs.append( rowType.getPhysicalName( rowType.getFieldNames().get( pos ) ), getBsonValue( (RexLiteral) rexNode ) );
+                    }
+
+                    pos++;
                 }
             }
+
+            if ( !docs.isEmpty() ) {
+                implementor.mongoTable.getCollection().insertOne( docs );
+            }
+
 
         }
 
@@ -631,6 +657,12 @@ public class MongoRules {
                 value = new BsonBoolean( (Boolean) literal.getValue2() );
             } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BINARY ) {
                 value = new BsonString( ((ByteString) literal.getValue2()).toBase64String() );
+            } else if ( literal.getType().getPolyType().getFamily() == PolyTypeFamily.ARRAY ) {
+                if ( literal.getValue2() == null ) {
+                    value = new BsonNull();
+                } else {
+                    throw new RuntimeException( "Arrays are not yet fully supported for the MongoDB Adapter" ); // todo dl: add array with content
+                }
             } else {
                 value = new BsonString( RexLiteral.value( literal ).toString() );
             }

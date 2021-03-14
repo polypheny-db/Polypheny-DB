@@ -89,13 +89,15 @@ public class MongoProject extends Project implements MongoRel {
         for ( Pair<RexNode, String> pair : getNamedProjects() ) {
             final String name = pair.right;
             String phyName = "1";
-            if ( mongoRowType != null && !name.contains( "$" ) ) {
+            // we can you use a project of [name] : $[physical name] to rename our retrieved columns on aggregation
+            // we have to pay attention to "DUMMY" as it is apparently used fro handling aggregates here
+            if ( mongoRowType != null && !name.contains( "$" ) && !name.equals( "DUMMY" ) ) {
                 phyName = "\"$" + mongoRowType.getPhysicalName( name ) + "\"";
             }
 
             final String expr = pair.left.accept( translator );
             items.add( expr.equals( "'$" + name + "'" )
-                    ? MongoRules.maybeQuote( name ) + ": " + phyName//1" // we can you use a project of [name] : $[physical name] to rename our retrieved columns on aggregation
+                    ? MongoRules.maybeQuote( name ) + ": " + phyName//1"
                     : MongoRules.maybeQuote( name ) + ": " + expr );
         }
         final String findString = Util.toString( items, "{", ", ", "}" );
