@@ -24,6 +24,7 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -72,16 +73,16 @@ public class MongoStore extends DataStore {
 
 
     public MongoStore( int adapterId, String uniqueName, Map<String, String> settings ) {
-        super( adapterId, uniqueName, settings, Boolean.parseBoolean( settings.get( "persistent" ) ) );
+        super( adapterId, uniqueName, settings, Boolean.parseBoolean( settings.get( "persistent" ) ), true );
 
         DockerManager.getInstance().download( Image.MONGODB );
         DockerManager.getInstance()
-                .createContainer(
+                .createIfAbsent(
                         getUniqueName(),
                         getAdapterId(),
                         Image.MONGODB,
-                        Integer.parseInt( settings.get( "port" ) ) )
-                .start();
+                        Collections.singletonList( Integer.parseInt( settings.get( "port" ) ) ) )
+                .start( Boolean.parseBoolean( settings.get( "persistent" ) ) );
 
         addInformationPhysicalNames();
         enableInformationPage();

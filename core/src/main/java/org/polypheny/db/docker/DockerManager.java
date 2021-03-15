@@ -38,7 +38,9 @@ public abstract class DockerManager {
     }
 
 
-    abstract Container createContainer( String uniqueName, int adapterId, Image image, int port );
+    abstract Container createContainer( String uniqueName, int adapterId, Image image, int port, boolean isRestored );
+
+    abstract Container createIfAbsent( String uniqueName, int adapterId, Image image, List<Integer> ports );
 
     abstract void download( Image image );
 
@@ -122,9 +124,11 @@ public abstract class DockerManager {
                 int adapterId,
                 String uniqueName,
                 Image image,
-                Map<Integer, Integer> internalExternalPortMapping
+                Map<Integer, Integer> internalExternalPortMapping,
+                boolean checkUnique
         ) {
-            if ( !DockerManager.getInstance().checkIfUnique( uniqueName ) ) {
+            // check for uniqueness only fires if checkUnique is false here
+            if ( checkUnique && !DockerManager.getInstance().checkIfUnique( uniqueName ) ) {
                 throw new NameExistsException();
             }
             this.adapterId = adapterId;
@@ -135,8 +139,12 @@ public abstract class DockerManager {
         }
 
 
-        public Container start() {
-            DockerManager.getInstance().start( this );
+        public Container start( boolean persistent ) {
+            if ( persistent ) {
+                DockerManager.getInstance().restart( this );
+            } else {
+                DockerManager.getInstance().start( this );
+            }
 
             return this;
         }

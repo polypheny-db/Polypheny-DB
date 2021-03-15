@@ -303,7 +303,25 @@ public enum RuntimeConfig {
     DEFAULT_SCHEMA_MODEL( "runtime/defaultSchemaModel",
             "Define default schema model, which is used when none is provided.",
             SchemaType.RELATIONAL,
-            ConfigType.ENUM );
+            ConfigType.ENUM ),
+
+    USE_DOCKER( "runtime/useDocker",
+            "Allow deploying stores and sources via Docker.",
+            true,
+            ConfigType.BOOLEAN,
+            "dockerGroup" ),
+
+    DOCKER_URL( "runtime/dockerUrl",
+            "List of potential (remote) Docker urls.",
+            "localhost",
+            ConfigType.STRING,
+            "dockerGroup" ),
+
+    DOCKER_PORT( "runtime/dockerPort",
+            "The port used to connect to Docker.",
+            2375,
+            ConfigType.INTEGER,
+            "dockerGroup" );
 
 
     private final String key;
@@ -372,6 +390,16 @@ public enum RuntimeConfig {
         exploreByExampleGroup.withTitle( "Explore by Example" );
         configManager.registerWebUiPage( exploreByExamplePage );
         configManager.registerWebUiGroup( exploreByExampleGroup );
+
+        //Docker Settings
+        final WebUiPage dockerPage = new WebUiPage(
+                "dockerPage",
+                "Docker",
+                "Settings for using Docker in Polypheny." );
+        final WebUiGroup dockerGroup = new WebUiGroup( "dockerGroup", dockerPage.getId() );
+        dockerGroup.withTitle( "Docker" );
+        configManager.registerWebUiPage( dockerPage );
+        configManager.registerWebUiGroup( dockerGroup );
 
         // UI specific setting
         final WebUiPage uiSettingsPage = new WebUiPage(

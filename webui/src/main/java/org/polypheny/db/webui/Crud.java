@@ -224,7 +224,7 @@ public class Crud implements InformationObserver {
     private final TransactionManager transactionManager;
     private final String databaseName;
     private final String userName;
-    private final StatisticsManager statisticsManager = StatisticsManager.getInstance();
+    private final StatisticsManager<?> statisticsManager = StatisticsManager.getInstance();
     private boolean isActiveTracking = false;
     private final Catalog catalog = Catalog.getInstance();
 
@@ -2254,6 +2254,7 @@ public class Crud implements InformationObserver {
             JsonObject jsonStore = new JsonObject();
             jsonStore.addProperty( "adapterId", src.getAdapterId() );
             jsonStore.addProperty( "uniqueName", src.getUniqueName() );
+            jsonStore.addProperty( "usesDocker", src.isUsesDocker() );
             jsonStore.add( "adapterSettings", context.serialize( adapterSettings ) );
             jsonStore.add( "currentSettings", context.serialize( src.getCurrentSettings() ) );
             jsonStore.addProperty( "adapterName", src.getAdapterName() );

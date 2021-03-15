@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lombok.Getter;
+import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.Exceptions.DockerNotRunningException;
 import org.polypheny.db.docker.Exceptions.NameExistsException;
 import org.polypheny.db.docker.Exceptions.PortExistsException;
@@ -91,6 +92,7 @@ public class DockerManagerImpl extends DockerManager {
             } );
             usedNames.addAll( Arrays.asList( container.getNames() ) );
         } );
+
     }
 
 
@@ -106,7 +108,7 @@ public class DockerManagerImpl extends DockerManager {
 
     private DockerClient generateClient() {
         DockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder()
-                .withDockerHost( "tcp://localhost:2375" )
+                .withDockerHost( "tcp://" + RuntimeConfig.DOCKER_URL.getString() + ":" + RuntimeConfig.DOCKER_PORT.getInteger() )
                 //.withDockerTlsVerify( true ) //TODO DL: use certificates
                 //.withDockerCertPath(certPath)
                 .build();
@@ -141,10 +143,24 @@ public class DockerManagerImpl extends DockerManager {
 
 
     @Override
-    public Container createContainer( String uniqueName, int adapterId, Image image, int port ) {
-        Container container = new Container( adapterId, uniqueName, image, Collections.singletonMap( image.internalPort, port ) );
+    public Container createContainer( String uniqueName, int adapterId, Image image, int port, boolean isRestored ) {
+        Container container = new Container( adapterId, uniqueName, image, Collections.singletonMap( image.internalPort, port ), isRestored );
         registerIfAbsent( container );
         return container;
+    }
+
+
+    @Override
+    public Container createIfAbsent( String uniqueName, int adapterId, Image image, List<Integer> ports ) {
+        if ( (!usedNames.contains( uniqueName ) && usedPorts.stream().noneMatch( ports::contains )) ) {
+            // new container
+            return createContainer( uniqueName, adapterId, image, ports.get( 0 ), false );
+        } else if ( usedNames.contains( uniqueName ) && usedPorts.containsAll( ports ) ) {
+            // restored container
+            return createContainer( uniqueName, adapterId, image, ports.get( 0 ), true );
+        } else {
+            throw new RuntimeException( "There was an error while restoring a Docker container." );
+        }
     }
 
 
@@ -152,7 +168,7 @@ public class DockerManagerImpl extends DockerManager {
         registerIfAbsent( container );
 
         if ( container.status == ContainerStatus.INIT ) {
-            startNewContainer( container );
+            createNewContainer( container );
         }
         client.startContainerCmd( container.uniqueName ).exec();
 
@@ -160,7 +176,23 @@ public class DockerManagerImpl extends DockerManager {
     }
 
 
-    private void startNewContainer( Container container ) {
+    void restart( Container container ) {
+        // first we try to use the existing container
+        if ( client.
+                listContainersCmd().
+                withShowAll( true ).
+                exec().
+                stream().
+                flatMap( cont -> Arrays.stream( cont.getNames() ) ).
+                anyMatch( cont -> cont.equals( container.uniqueName ) ) ) {
+            client.startContainerCmd( container.uniqueName );
+        } else {
+            start( container );
+        }
+    }
+
+
+    private void createNewContainer( Container container ) {
         Ports bindings = new Ports();
 
         for ( Map.Entry<Integer, Integer> mapping : container.internalExternalPortMapping.entrySet() ) {
