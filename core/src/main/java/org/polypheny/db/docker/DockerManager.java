@@ -141,7 +141,7 @@ public abstract class DockerManager {
 
         public Container start( boolean persistent ) {
             if ( persistent ) {
-                DockerManager.getInstance().restart( this );
+                DockerManager.getInstance().tryRestart( this );
             } else {
                 DockerManager.getInstance().start( this );
             }

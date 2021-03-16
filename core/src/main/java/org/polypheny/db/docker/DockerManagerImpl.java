@@ -18,6 +18,8 @@ package org.polypheny.db.docker;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerCmd;
+import com.github.dockerjava.api.command.InspectContainerResponse;
+import com.github.dockerjava.api.command.InspectContainerResponse.ContainerState;
 import com.github.dockerjava.api.command.PullImageResultCallback;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.Ports;
@@ -34,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.Exceptions.DockerNotRunningException;
@@ -60,7 +63,7 @@ public class DockerManagerImpl extends DockerManager {
     @Getter
     private final HashMap<Integer, ImmutableList<String>> containersOnAdapter = new HashMap<>();
 
-    // as Docker does not allow two containers with the same name or which expose the same port
+    // as Docker does not allow two containers with the same name or which expose the same port ( ports only for running containers )
     // we have to track them, so we can return correct messages to the user
     @Getter
     private final List<Integer> usedPorts = new ArrayList<>();
@@ -90,7 +93,8 @@ public class DockerManagerImpl extends DockerManager {
             Arrays.stream( container.getPorts() ).forEach( containerPort -> {
                 usedPorts.add( containerPort.getPublicPort() );
             } );
-            usedNames.addAll( Arrays.asList( container.getNames() ) );
+            // docker returns the names with a prefixed "/", so we remove it
+            usedNames.addAll( Arrays.stream( container.getNames() ).map( cont -> cont.substring( 1 ) ).collect( Collectors.toList() ) );
         } );
 
     }
@@ -155,7 +159,7 @@ public class DockerManagerImpl extends DockerManager {
         if ( (!usedNames.contains( uniqueName ) && usedPorts.stream().noneMatch( ports::contains )) ) {
             // new container
             return createContainer( uniqueName, adapterId, image, ports.get( 0 ), false );
-        } else if ( usedNames.contains( uniqueName ) && usedPorts.containsAll( ports ) ) {
+        } else if ( usedNames.contains( uniqueName ) /*&& usedPorts.containsAll( ports )*/ ) {
             // restored container
             return createContainer( uniqueName, adapterId, image, ports.get( 0 ), true );
         } else {
@@ -176,17 +180,16 @@ public class DockerManagerImpl extends DockerManager {
     }
 
 
-    void restart( Container container ) {
+    void tryRestart( Container container ) {
         // first we try to use the existing container
-        if ( client.
-                listContainersCmd().
-                withShowAll( true ).
-                exec().
-                stream().
-                flatMap( cont -> Arrays.stream( cont.getNames() ) ).
-                anyMatch( cont -> cont.equals( container.uniqueName ) ) ) {
-            client.startContainerCmd( container.uniqueName );
+        if ( usedNames.contains( container.uniqueName ) ) {
+            InspectContainerResponse containerInfo = client.inspectContainerCmd( "/" + container.uniqueName ).exec();
+            ContainerState state = containerInfo.getState();
+            if ( Objects.equals( state.getStatus(), "exited" ) ) {
+                client.startContainerCmd( container.uniqueName ).exec();
+            }
         } else {
+            // our container does not exist, we have to create it from scratch
             start( container );
         }
     }
