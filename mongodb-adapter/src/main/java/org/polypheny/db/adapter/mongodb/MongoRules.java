@@ -643,7 +643,9 @@ public class MongoRules {
 
         private BsonValue getBsonValue( RexLiteral literal ) {
             BsonValue value;
-            if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
+            if ( literal.getTypeName() == PolyType.NULL ) {
+                value = new BsonNull();
+            } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
                 value = new BsonString( Objects.requireNonNull( RexLiteral.stringValue( literal ) ) );
             } else if ( PolyType.INT_TYPES.contains( literal.getType().getPolyType() ) ) {
                 value = new BsonInt32( RexLiteral.intValue( literal ) );

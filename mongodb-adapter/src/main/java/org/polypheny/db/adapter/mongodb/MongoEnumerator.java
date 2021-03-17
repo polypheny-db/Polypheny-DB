@@ -61,7 +61,7 @@ class MongoEnumerator implements Enumerator<Object> {
     /**
      * Creates a MongoEnumerator.
      *
-     * @param cursor Mongo iterator (usually a {@link com.mongodb.DBCursor})
+     * @param cursor Mongo iterator (usually a {@link com.mongodb.ServerCursor})
      * @param getter Converts an object into a list of fields
      */
     MongoEnumerator( Iterator<Document> cursor, Function1<Document, Object> getter ) {

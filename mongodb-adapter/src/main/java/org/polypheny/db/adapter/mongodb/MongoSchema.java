@@ -35,7 +35,7 @@ package org.polypheny.db.adapter.mongodb;
 
 
 import com.google.common.annotations.VisibleForTesting;
-import com.mongodb.MongoClient;
+import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoDatabase;
 import java.util.HashMap;
 import java.util.List;
@@ -115,23 +115,12 @@ public class MongoSchema extends AbstractSchema {
         final RelDataTypeFactory typeFactory = new PolyTypeFactoryImpl( RelDataTypeSystem.DEFAULT );
         final RelDataTypeFactory.Builder fieldInfo = typeFactory.builder();
 
-        String physicalName = null;
-
         for ( CatalogColumnPlacement placement : columnPlacementsOnStore ) {
             CatalogColumn catalogColumn = Catalog.getInstance().getColumn( placement.columnId );
             RelDataType sqlType = catalogColumn.getRelDataType( typeFactory );
             fieldInfo.add( catalogColumn.name, MongoStore.getPhysicalColumnName( catalogColumn.id ), sqlType ).nullable( catalogColumn.nullable );
-
-            if ( physicalName == null ) {
-                physicalName = placement.physicalTableName;
-            }
         }
-        MongoTable table;
-        if ( physicalName == null ) {
-            table = new MongoTable( catalogTable.name, catalogTable, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
-        } else {
-            table = new MongoTable( physicalName, catalogTable, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
-        }
+        MongoTable table = new MongoTable( catalogTable, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
 
         tableMap.put( catalogTable.name, table );
         return table;

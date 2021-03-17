@@ -97,9 +97,9 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
     /**
      * Creates a MongoTable.
      */
-    MongoTable( String collectionName, CatalogTable catalogTable, MongoSchema schema, RelProtoDataType proto ) {
+    MongoTable( CatalogTable catalogTable, MongoSchema schema, RelProtoDataType proto ) {
         super( Object[].class );
-        this.collectionName = collectionName;
+        this.collectionName = MongoStore.getPhysicalTableName( catalogTable.id );
         this.catalogTable = catalogTable;
         this.protoRowType = proto;
         this.mongoSchema = schema;
@@ -183,7 +183,11 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             public Enumerator<Object> enumerator() {
                 final Iterator<Document> resultIterator;
                 try {
-                    resultIterator = mongoDb.getCollection( collectionName ).aggregate( list ).iterator();
+                    if ( list.size() != 0 ) {
+                        resultIterator = mongoDb.getCollection( collectionName ).aggregate( list ).iterator();
+                    } else {
+                        resultIterator = Collections.emptyIterator();
+                    }
                 } catch ( Exception e ) {
                     throw new RuntimeException( "While running MongoDB query " + Util.toString( operations, "[", ",\n", "]" ), e );
                 }

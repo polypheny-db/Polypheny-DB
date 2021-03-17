@@ -17,13 +17,17 @@
 package org.polypheny.db.adapter.mongodb;
 
 import com.google.common.collect.ImmutableList;
-import com.mongodb.MongoClient;
+import com.mongodb.MongoClientSettings;
+import com.mongodb.ServerAddress;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
 import com.mongodb.client.model.IndexOptions;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -86,7 +90,13 @@ public class MongoStore extends DataStore {
         addInformationPhysicalNames();
         enableInformationPage();
 
-        this.connection = new MongoClient( "localhost", Integer.parseInt( settings.get( "port" ) ) );
+        MongoClientSettings mongoSettings = MongoClientSettings
+                .builder()
+                .applyToClusterSettings( builder ->
+                        builder.hosts( Collections.singletonList( new ServerAddress( settings.get( "host" ), Integer.parseInt( settings.get( "port" ) ) ) ) )
+                ).build();
+
+        this.connection = MongoClients.create( mongoSettings );
     }
 
 
@@ -119,7 +129,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void truncate( Context context, CatalogTable table ) {
-        currentSchema.database.getCollection( table.name ).deleteMany( new Document() );
+        currentSchema.database.getCollection( getPhysicalTableName( table.id ) ).deleteMany( new Document() );
     }
 
 
@@ -164,7 +174,7 @@ public class MongoStore extends DataStore {
     @Override
     public void createTable( Context context, CatalogTable catalogTable ) {
         Catalog catalog = Catalog.getInstance();
-        this.currentSchema.database.getCollection( catalogTable.name );
+        this.currentSchema.database.getCollection( getPhysicalTableName( catalogTable.id ) );
 
         for ( CatalogColumnPlacement placement : catalog.getColumnPlacementsOnAdapter( getAdapterId(), catalogTable.id ) ) {
             catalog.updateColumnPlacementPhysicalNames(
@@ -180,7 +190,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void dropTable( Context context, CatalogTable combinedTable ) {
-        this.currentSchema.database.getCollection( combinedTable.name ).drop();
+        this.currentSchema.database.getCollection( getPhysicalTableName( combinedTable.id ) ).drop();
     }
 
 
@@ -223,7 +233,7 @@ public class MongoStore extends DataStore {
             field = new Document().append( getPhysicalColumnName( catalogColumn.id ), null );
         }
         Document update = new Document().append( "$set", field );
-        this.currentSchema.database.getCollection( catalogTable.name ).updateMany( new Document(), update );
+        this.currentSchema.database.getCollection( getPhysicalTableName( catalogTable.id ) ).updateMany( new Document(), update );
 
         // Add physical name to placement
         catalog.updateColumnPlacementPhysicalNames(
@@ -239,9 +249,9 @@ public class MongoStore extends DataStore {
 
     @Override
     public void dropColumn( Context context, CatalogColumnPlacement columnPlacement ) {
-        Document field = new Document().append( columnPlacement.physicalColumnName, 1 );
+        Document field = new Document().append( getPhysicalColumnName( columnPlacement.columnId ), 1 );
         Document filter = new Document().append( "$unset", field );
-        this.currentSchema.database.getCollection( columnPlacement.getLogicalTableName() ).updateMany( new Document(), filter );
+        this.currentSchema.database.getCollection( getPhysicalTableName( columnPlacement.tableId ) ).updateMany( new Document(), filter );
     }
 
 
@@ -253,7 +263,7 @@ public class MongoStore extends DataStore {
                 doc.append( name, 1 );
             }
 
-            this.currentSchema.database.getCollection( catalogIndex.key.getTableName() ).createIndex( doc, new IndexOptions().name( catalogIndex.name ) );
+            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).createIndex( doc, new IndexOptions().name( catalogIndex.name ) );
         }
     }
 
@@ -266,7 +276,7 @@ public class MongoStore extends DataStore {
                 doc.append( name, 1 );
             }
 
-            this.currentSchema.database.getCollection( catalogIndex.key.getTableName() ).dropIndex( catalogIndex.name );
+            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).dropIndex( catalogIndex.name );
         }
     }
 
@@ -301,6 +311,11 @@ public class MongoStore extends DataStore {
     public static String getPhysicalColumnName( long id ) {
         // we can simply use ids as our physical column names as MongoDB allows this
         return "col" + id;
+    }
+
+
+    public static String getPhysicalTableName( long id ) {
+        return "tab-" + id;
     }
 
 }
