@@ -43,9 +43,6 @@ import org.polypheny.db.docker.Exceptions.DockerNotRunningException;
 import org.polypheny.db.docker.Exceptions.NameExistsException;
 import org.polypheny.db.docker.Exceptions.PortExistsException;
 
-// TODO DL: check if already existing containers in system etc.
-// and move to core
-
 
 /**
  * This class servers as a organization unit which controls all Docker containers in Polypheny.

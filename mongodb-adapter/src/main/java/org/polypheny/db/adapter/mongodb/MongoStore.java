@@ -24,7 +24,6 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -81,7 +80,7 @@ public class MongoStore extends DataStore {
                         getUniqueName(),
                         getAdapterId(),
                         Image.MONGODB,
-                        Collections.singletonList( Integer.parseInt( settings.get( "port" ) ) ), )
+                        Integer.parseInt( settings.get( "port" ) ) )
                 .start();
 
         addInformationPhysicalNames();
