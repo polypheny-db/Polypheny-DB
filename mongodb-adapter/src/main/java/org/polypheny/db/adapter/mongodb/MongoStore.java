@@ -77,12 +77,12 @@ public class MongoStore extends DataStore {
 
         DockerManager.getInstance().download( Image.MONGODB );
         DockerManager.getInstance()
-                .createIfAbsent(
+                .initialize(
                         getUniqueName(),
                         getAdapterId(),
                         Image.MONGODB,
-                        Collections.singletonList( Integer.parseInt( settings.get( "port" ) ) ) )
-                .start( Boolean.parseBoolean( settings.get( "persistent" ) ) );
+                        Collections.singletonList( Integer.parseInt( settings.get( "port" ) ) ), )
+                .start();
 
         addInformationPhysicalNames();
         enableInformationPage();
@@ -150,7 +150,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void shutdown() {
-        DockerManagerImpl.getInstance().shutdownAll( getAdapterId() );
+        DockerManagerImpl.getInstance().destroyAll( getAdapterId() );
 
         removeInformationPage();
     }

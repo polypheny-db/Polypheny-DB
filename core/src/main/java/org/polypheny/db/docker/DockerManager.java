@@ -18,13 +18,21 @@ package org.polypheny.db.docker;
 
 import com.github.dockerjava.api.model.ExposedPort;
 import com.google.common.collect.ImmutableList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import org.polypheny.db.docker.Exceptions.NameExistsException;
 
+/**
+ * This class servers as a organization unit which controls all Docker containers in Polypheny.
+ * While the callers can and should mostly interact with the underlying containers directly,
+ * this instance is used to have a control layer, which allows to restore, start or shutdown multiple of
+ * these instances at the same time.
+ *
+ * For now, we have no way to determent if a previously created/running container with the same name
+ * was created by Polypheny, so we try to reuse it
+ */
 public abstract class DockerManager {
 
     public static DockerManagerImpl INSTANCE = null;
@@ -38,23 +46,100 @@ public abstract class DockerManager {
     }
 
 
-    abstract Container createContainer( String uniqueName, int adapterId, Image image, int port, boolean isRestored );
+    /**
+     * Tries to download the provided image through Docker,
+     * this is necessary to have it accessible when later generating a
+     * container from it
+     *
+     * If the image is already downloaded nothing happens
+     *
+     * @param image the image which is downloaded
+     */
+    public abstract void download( Image image );
 
-    abstract Container createIfAbsent( String uniqueName, int adapterId, Image image, List<Integer> ports );
+    /**
+     * This method generates a new Polypheny specific Container it additionally initializes said container in Docker itself
+     *
+     * @param uniqueName the name of the container; has to be unique
+     * @param adapterId the adapter to which the container belongs; can be null
+     * @param image the image, which is used to generate the container
+     * @param externalPort the external port, which uses the predefined port from the image
+     * to external (how those can be accessed from outside the container)
+     * @return the Container instance
+     */
+    public abstract Container initialize( String uniqueName, int adapterId, Image image, int externalPort );
 
-    abstract void download( Image image );
+    /**
+     * This method generates a new Polypheny specific Container it additionally initializes said container in Docker itself
+     *
+     * @param uniqueName the name of the container; has to be unique
+     * @param adapterId the adapter to which the container belongs; can be null
+     * @param image the image, which is used to generate the container
+     * @param internalExternalPortMapping the mapping of internal ports ( ports which the image uses internally)
+     * to external (how those can be accessed from outside the container)
+     * @return the Container instance
+     */
+    public abstract Container initialize( String uniqueName, int adapterId, Image image, Map<Integer, Integer> internalExternalPortMapping );
 
-    abstract void shutdownAll( int adapterId );
+    /**
+     * Starts the provided container,
+     * if the container already runs it does nothing,
+     * if the container was destroyed it recreates first
+     *
+     * @param container the container which is started
+     */
+    public abstract void start( Container container );
 
-    abstract java.util.HashMap<String, Container> getAvailableContainers();
+    /**
+     * All containers, which belong to the provided adapter, are stopped
+     *
+     * @param adapterId the id of the adapter
+     */
+    public abstract void stopAll( int adapterId );
 
-    abstract List<Image> getAvailableImages();
 
-    abstract HashMap<Integer, ImmutableList<String>> getContainersOnAdapter();
+    /**
+     * Getter for all available containers; except those with ContainerStatus.DESTROYED
+     *
+     * @return collection with the names and the corresponding container
+     */
+    public abstract Map<String, Container> getAvailableContainers();
 
-    abstract List<Integer> getUsedPorts();
+    /**
+     * Getter function, which retrieves all downloaded images
+     *
+     * @return the collection of the images
+     */
+    public abstract List<Image> getAvailableImages();
 
-    abstract List<String> getUsedNames();
+
+    /**
+     * Getter, which retrieves a collection, which matches all available containers to their associated adapter
+     *
+     * @return the collection which maps the ids of the adapters to the containers
+     */
+    public abstract Map<Integer, ImmutableList<String>> getContainersOnAdapter();
+
+    /**
+     * Getter, which returns all already used ports from containers
+     *
+     * @return the used ports
+     */
+    public abstract List<Integer> getUsedPorts();
+
+    /**
+     * Getter, which returns all already used names of containers
+     *
+     * @return the used names
+     */
+    public abstract List<String> getUsedNames();
+
+    /**
+     * Destroys all containers and removes them from the system, which belong to the provided adapter
+     *
+     * @param adapterId the id of the adapter
+     */
+    public abstract void destroyAll( int adapterId );
 
 
     /**
@@ -103,7 +188,8 @@ public abstract class DockerManager {
         INIT,
         STOPPED,
         RUNNING,
-        ERROR;
+        ERROR,
+        DESTROYED;
     }
 
 
@@ -116,7 +202,7 @@ public abstract class DockerManager {
         public final Image type;
         public final String uniqueName;
         public final Map<Integer, Integer> internalExternalPortMapping;
-        public final int adapterId;
+        public final Integer adapterId;
         public ContainerStatus status;
 
 
@@ -139,24 +225,31 @@ public abstract class DockerManager {
         }
 
 
-        public Container start( boolean persistent ) {
-            if ( persistent ) {
-                DockerManager.getInstance().tryRestart( this );
-            } else {
-                DockerManager.getInstance().start( this );
-            }
+        /**
+         * Starts the container
+         *
+         * @return the started container
+         */
+        public Container start() {
+            DockerManager.getInstance().start( this );
 
             return this;
         }
 
 
-        public void shutdown() {
-            DockerManager.getInstance().shutdown( this );
+        /**
+         * Stops the container
+         */
+        public void stop() {
+            DockerManager.getInstance().stop( this );
         }
 
 
-        public void stop() {
-            DockerManager.getInstance().stop( this );
+        /**
+         * Destroys the container, which stops and removes it from the system
+         */
+        public void destroy() {
+            DockerManager.getInstance().destroy( this );
         }
 
 
