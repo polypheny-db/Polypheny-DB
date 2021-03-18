@@ -53,6 +53,7 @@ import org.apache.calcite.linq4j.function.Function1;
 import org.bson.BsonDocument;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.polypheny.db.adapter.AdapterManager;
 import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.java.AbstractQueryableTable;
 import org.polypheny.db.adapter.mongodb.MongoEnumerator.IterWrapper;
@@ -92,18 +93,24 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
     private final MongoCollection<Document> collection;
     @Getter
     private final CatalogTable catalogTable;
+    @Getter
+    private final TransactionProvider transactionProvider;
+    @Getter
+    private final int storeId;
 
 
     /**
      * Creates a MongoTable.
      */
-    MongoTable( CatalogTable catalogTable, MongoSchema schema, RelProtoDataType proto ) {
+    MongoTable( CatalogTable catalogTable, MongoSchema schema, RelProtoDataType proto, TransactionProvider transactionProvider, int storeId ) {
         super( Object[].class );
         this.collectionName = MongoStore.getPhysicalTableName( catalogTable.id );
+        this.transactionProvider = transactionProvider;
         this.catalogTable = catalogTable;
         this.protoRowType = proto;
         this.mongoSchema = schema;
         this.collection = schema.database.getCollection( collectionName );
+        this.storeId = storeId;
     }
 
 
@@ -296,6 +303,8 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
         @SuppressWarnings("UnusedDeclaration")
         public Enumerable<Object> getResults( List<Object> results ) {
+            MongoTable mongoTable = (MongoTable) table;
+            dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
             return new AbstractEnumerable<Object>() {
                 @Override
                 public Enumerator<Object> enumerator() {
@@ -306,8 +315,8 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
 
         public Enumerable<Object> prepared( List<String> fieldNames ) {
-
             MongoTable mongoTable = (MongoTable) table;
+            dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
             List<Document> docs = new ArrayList<>();
 
             for ( Map<Long, Object> values : this.dataContext.getParameterValues() ) {
@@ -319,7 +328,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 docs.add( doc );
             }
             if ( docs.size() > 0 ) {
-                mongoTable.getCollection().insertMany( docs );
+                mongoTable.getCollection().insertMany( mongoTable.transactionProvider.getSession(), docs );
             }
             return new AbstractEnumerable<Object>() {
                 @Override
@@ -339,6 +348,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
         @SuppressWarnings("UnusedDeclaration")
         public Enumerable<Object> preparedWrapper( DataContext context ) {
             MongoTable mongoTable = (MongoTable) table;
+            context.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
             List<Document> docs = new ArrayList<>();
             Map<Long, String> names = new HashMap<>();
 
@@ -354,7 +364,8 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 docs.add( doc );
             }
             if ( docs.size() > 0 ) {
-                mongoTable.getCollection().insertMany( docs );
+                mongoTable.transactionProvider.startTransaction();
+                mongoTable.getCollection().insertMany( mongoTable.transactionProvider.getSession(), docs );
             }
             return new AbstractEnumerable<Object>() {
                 @Override

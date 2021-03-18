@@ -18,10 +18,9 @@ package org.polypheny.db.docker;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import org.junit.Test;
 import org.polypheny.db.docker.DockerManager.Container;
+import org.polypheny.db.docker.DockerManager.ContainerBuilder;
 import org.polypheny.db.docker.DockerManager.ContainerStatus;
 import org.polypheny.db.docker.DockerManager.Image;
 import org.polypheny.db.util.Pair;
@@ -45,7 +44,7 @@ public class DockerManagerTest {
         int adapterId = 1;
 
         Pair.zip( uniqueNames, uniquePorts ).forEach( namePortPairs -> {
-            manager.initialize( namePortPairs.left, adapterId, Image.MONGODB, namePortPairs.right );
+            manager.initialize( new ContainerBuilder( adapterId, Image.MONGODB, namePortPairs.left ).withMappedPort( namePortPairs.right, namePortPairs.right ).build() );
         } );
         assert (manager.getUsedNames().containsAll( uniqueNames ));
         assert (manager.getUsedPorts().containsAll( uniquePorts ));
@@ -69,9 +68,9 @@ public class DockerManagerTest {
 
         String uniqueName = "test3";
         List<Integer> multiplePorts = Arrays.asList( 3210, 4929 );
-        // for testing purpose we map the same ports internally to externally
-        Map<Integer, Integer> internalExternalPorts = multiplePorts.stream().collect( Collectors.toMap( port -> port, port -> port ) );
-        manager.initialize( uniqueName, adapterId, Image.MONGODB, internalExternalPorts );
+        ContainerBuilder containerBuilder = new ContainerBuilder( adapterId, Image.MONGODB, uniqueName );
+        multiplePorts.forEach( port -> containerBuilder.withMappedPort( port, port ) );
+        manager.initialize( containerBuilder.build() );
 
         assert (manager.getUsedNames().contains( uniqueName ));
         assert (manager.getUsedPorts().containsAll( multiplePorts ));
@@ -92,10 +91,10 @@ public class DockerManagerTest {
 
         //// new session has to handle already running container
         DockerManagerImpl managerThisSession = managerLastSession.generateNewSession();
-        Container restoredContainer = managerThisSession.initialize( uniqueName, 1, Image.MONGODB, usedPort );
+        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
         managerThisSession.start( restoredContainer );
 
-        assert (restoredContainer.status == ContainerStatus.RUNNING);
+        assert (restoredContainer.getStatus() == ContainerStatus.RUNNING);
         assert (managerThisSession.getUsedNames().contains( uniqueName ));
         assert (managerThisSession.getUsedPorts().contains( usedPort ));
 
@@ -120,17 +119,17 @@ public class DockerManagerTest {
         //// previous session left the container running
 
         DockerManagerImpl managerLastSession = new DockerManagerImpl();
-        Container container = managerLastSession.initialize( uniqueName, 1, Image.MONGODB, usedPort );
+        Container container = managerLastSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
         managerLastSession.start( container );
 
-        assert (container.status == ContainerStatus.RUNNING);
+        assert (container.getStatus() == ContainerStatus.RUNNING);
         assert (managerLastSession.getUsedNames().contains( uniqueName ));
         assert (managerLastSession.getUsedPorts().contains( usedPort ));
 
         if ( doStop ) {
             managerLastSession.stop( container );
 
-            assert (container.status == ContainerStatus.STOPPED);
+            assert (container.getStatus() == ContainerStatus.STOPPED);
             assert (managerLastSession.getUsedNames().contains( uniqueName ));
             assert (managerLastSession.getUsedPorts().contains( usedPort ));
         }
@@ -138,7 +137,7 @@ public class DockerManagerTest {
         if ( doDestroy ) {
             managerLastSession.destroy( container );
 
-            assert (container.status == ContainerStatus.DESTROYED);
+            assert (container.getStatus() == ContainerStatus.DESTROYED);
             assert (!managerLastSession.getUsedNames().contains( uniqueName ));
             assert (!managerLastSession.getUsedPorts().contains( usedPort ));
         }
@@ -157,10 +156,10 @@ public class DockerManagerTest {
 
         //// new session has to handle already running container
         DockerManagerImpl managerThisSession = managerLastSession.generateNewSession();
-        Container restoredContainer = managerThisSession.initialize( uniqueName, 1, Image.MONGODB, usedPort );
+        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
         managerThisSession.start( restoredContainer );
 
-        assert (restoredContainer.status == ContainerStatus.RUNNING);
+        assert (restoredContainer.getStatus() == ContainerStatus.RUNNING);
         assert (managerThisSession.getUsedNames().contains( uniqueName ));
         assert (managerThisSession.getUsedPorts().contains( usedPort ));
 
@@ -179,10 +178,10 @@ public class DockerManagerTest {
 
         //// new session has to handle already running container
         DockerManagerImpl managerThisSession = managerLastSession.generateNewSession();
-        Container restoredContainer = managerThisSession.initialize( uniqueName, 1, Image.MONGODB, usedPort );
+        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
         managerThisSession.start( restoredContainer );
 
-        assert (restoredContainer.status == ContainerStatus.RUNNING);
+        assert (restoredContainer.getStatus() == ContainerStatus.RUNNING);
         assert (managerThisSession.getUsedNames().contains( uniqueName ));
         assert (managerThisSession.getUsedPorts().contains( usedPort ));
 

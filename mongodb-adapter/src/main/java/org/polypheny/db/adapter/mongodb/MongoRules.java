@@ -540,10 +540,11 @@ public class MongoRules {
                     BsonDocument update = new BsonDocument();
                     update.append( "$set", doc );
                     UpdateResult res = null;
+                    implementor.mongoTable.getTransactionProvider().startTransaction();
                     if ( condImplementor.list.size() == 1 ) {
-                        res = implementor.mongoTable.getCollection().updateMany( BsonDocument.parse( condImplementor.list.get( 0 ).right ), update );
+                        res = implementor.mongoTable.getCollection().updateMany( implementor.mongoTable.getTransactionProvider().getSession(), BsonDocument.parse( condImplementor.list.get( 0 ).right ), update );
                     } else {
-                        res = implementor.mongoTable.getCollection().updateMany( new BsonDocument(), update );
+                        res = implementor.mongoTable.getCollection().updateMany( implementor.mongoTable.getTransactionProvider().getSession(), new BsonDocument(), update );
                     }
 
                     implementor.isDDL = true;
@@ -566,7 +567,8 @@ public class MongoRules {
                     } else {
                         // TODO DL: evaluate if this is even possible
                     }
-                    DeleteResult result = implementor.mongoTable.getCollection().deleteMany( BsonDocument.parse( docString ) );
+                    implementor.mongoTable.getTransactionProvider().startTransaction();
+                    DeleteResult result = implementor.mongoTable.getCollection().deleteMany( implementor.mongoTable.getTransactionProvider().getSession(), BsonDocument.parse( docString ) );
 
                     implementor.isDDL = true;
                     implementor.results = Collections.singletonList( result.getDeletedCount() );
@@ -607,7 +609,8 @@ public class MongoRules {
             }
 
             if ( !docs.isEmpty() ) {
-                implementor.mongoTable.getCollection().insertOne( docs );
+                implementor.mongoTable.getTransactionProvider().startTransaction();
+                implementor.mongoTable.getCollection().insertOne( implementor.mongoTable.getTransactionProvider().getSession(), docs );
             }
 
 
@@ -636,7 +639,8 @@ public class MongoRules {
                 docs.add( doc );
 
             }
-            implementor.mongoTable.getCollection().insertMany( docs );
+            implementor.mongoTable.getTransactionProvider().startTransaction();
+            implementor.mongoTable.getCollection().insertMany( implementor.mongoTable.getTransactionProvider().getSession(), docs );
             implementor.results = Collections.singletonList( docs.size() );
         }
 

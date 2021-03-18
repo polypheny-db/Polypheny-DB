@@ -17,11 +17,16 @@
 package org.polypheny.db.docker;
 
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.async.ResultCallback;
+import com.github.dockerjava.api.async.ResultCallbackTemplate;
 import com.github.dockerjava.api.command.CreateContainerCmd;
+import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.command.ExecCreateCmdResponse;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.command.InspectContainerResponse.ContainerState;
 import com.github.dockerjava.api.command.PullImageResultCallback;
 import com.github.dockerjava.api.model.ExposedPort;
+import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.Ports;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientConfig;
@@ -31,7 +36,6 @@ import com.github.dockerjava.transport.DockerHttpClient;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -154,34 +158,9 @@ public class DockerManagerImpl extends DockerManager {
     }
 
 
-    private Container createContainer( String uniqueName, int adapterId, Image image, Map<Integer, Integer> internalExternalPortMapping, boolean isRestored ) {
-        Container container = new Container( adapterId, uniqueName, image, internalExternalPortMapping, !isRestored );
-
-        registerIfAbsent( container );
-
-        return container;
-    }
-
-
     @Override
-    public Container initialize( String uniqueName, int adapterId, Image image, int externalPort ) {
-        return initialize( uniqueName, adapterId, image, Collections.singletonMap( image.internalPort, externalPort ) );
-    }
-
-
-    @Override
-    public Container initialize( String uniqueName, int adapterId, Image image, Map<Integer, Integer> internalExternalPortMapping ) {
-        Container container;
-        if ( (!usedNames.contains( uniqueName ) && usedPorts.stream().noneMatch( internalExternalPortMapping.values()::contains )) ) {
-            // new container
-            container = createContainer( uniqueName, adapterId, image, internalExternalPortMapping, false );
-            initContainer( container );
-        } else if ( usedNames.contains( uniqueName ) ) {
-            // restored container
-            container = createContainer( uniqueName, adapterId, image, internalExternalPortMapping, true );
-        } else {
-            throw new RuntimeException( "There was an error while initializing a Docker container." );
-        }
+    public Container initialize( Container container ) {
+        initContainer( container );
         // we add the name and the ports to our book-keeping functions as all previous checks passed
         usedPorts.addAll( container.internalExternalPortMapping.values() );
         usedNames.add( container.uniqueName );
@@ -194,30 +173,48 @@ public class DockerManagerImpl extends DockerManager {
     public void start( Container container ) {
         registerIfAbsent( container );
 
-        if ( container.status == ContainerStatus.DESTROYED ) {
+        if ( container.getStatus() == ContainerStatus.DESTROYED ) {
             // we got an already destroyed container which we have to recreate in Docker and call this method again
-            initialize(
-                    container.uniqueName,
-                    container.adapterId,
-                    container.type,
-                    container.internalExternalPortMapping )
-                    .start();
+            initialize( container ).start();
             return;
         }
 
-        if ( usedNames.contains( container.uniqueName ) ) {
-            // we have to check if the container is running and start it if its not
-            InspectContainerResponse containerInfo = client.inspectContainerCmd( "/" + container.uniqueName ).exec();
-            ContainerState state = containerInfo.getState();
-            if ( Objects.equals( state.getStatus(), "exited" ) || Objects.equals( state.getStatus(), "created" ) ) {
-                client.startContainerCmd( container.uniqueName ).exec();
-            }
-        } else {
-            // the container is new and can just be started
+        // we have to check if the container is running and start it if its not
+        InspectContainerResponse containerInfo = client.inspectContainerCmd( "/" + container.uniqueName ).exec();
+        ContainerState state = containerInfo.getState();
+        if ( Objects.equals( state.getStatus(), "exited" ) ) {
             client.startContainerCmd( container.uniqueName ).exec();
+        } else if ( Objects.equals( state.getStatus(), "created" ) ) {
+            client.startContainerCmd( container.uniqueName ).exec();
+            if ( container.afterCommands.size() != 0 ) {
+                execAfterInitCommands( container );
+            }
         }
 
         container.setStatus( ContainerStatus.RUNNING );
+    }
+
+
+    private void execAfterInitCommands( Container container ) {
+        try {
+            Thread.sleep( container.timeout );
+            ExecCreateCmdResponse cmd = client
+                    .execCreateCmd( container.getContainerId() )
+                    .withAttachStdout( true ) // todo dl: maybe enable for debug
+                    .withCmd( container.afterCommands.toArray( new String[0] ) )
+                    .exec();
+
+            ResultCallbackTemplate<ResultCallback<Frame>, Frame> callback = new ResultCallbackTemplate<ResultCallback<Frame>, Frame>() {
+                @Override
+                public void onNext( Frame event ) {
+
+                }
+            };
+
+            client.execStartCmd( cmd.getId() ).exec( callback ).awaitCompletion();
+        } catch ( InterruptedException e ) {
+            throw new RuntimeException( e );
+        }
     }
 
 
@@ -238,10 +235,12 @@ public class DockerManagerImpl extends DockerManager {
 
         CreateContainerCmd cmd = client.createContainerCmd( container.type.getFullName() )
                 .withName( container.uniqueName )
+                .withCmd( container.initCommands )
                 .withExposedPorts( container.getExposedPorts() );
 
         Objects.requireNonNull( cmd.getHostConfig() ).withPortBindings( bindings );
-        cmd.exec();
+        CreateContainerResponse response = cmd.exec();
+        container.setContainerId( response.getId() );
     }
 
 
@@ -280,7 +279,7 @@ public class DockerManagerImpl extends DockerManager {
 
 
     void destroy( Container container ) {
-        if ( container.status == ContainerStatus.RUNNING ) {
+        if ( container.getStatus() == ContainerStatus.RUNNING ) {
             stop( container );
         }
         client.removeContainerCmd( container.uniqueName ).exec();

@@ -18,10 +18,13 @@ package org.polypheny.db.docker;
 
 import com.github.dockerjava.api.model.ExposedPort;
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.Getter;
+import lombok.Setter;
 import org.polypheny.db.docker.Exceptions.NameExistsException;
 
 /**
@@ -60,26 +63,9 @@ public abstract class DockerManager {
     /**
      * This method generates a new Polypheny specific Container it additionally initializes said container in Docker itself
      *
-     * @param uniqueName the name of the container; has to be unique
-     * @param adapterId the adapter to which the container belongs; can be null
-     * @param image the image, which is used to generate the container
-     * @param externalPort the external port, which uses the predefined port from the image
-     * to external (how those can be accessed from outside the container)
      * @return the Container instance
      */
-    public abstract Container initialize( String uniqueName, int adapterId, Image image, int externalPort );
-
-    /**
-     * This method generates a new Polypheny specific Container it additionally initializes said container in Docker itself
-     *
-     * @param uniqueName the name of the container; has to be unique
-     * @param adapterId the adapter to which the container belongs; can be null
-     * @param image the image, which is used to generate the container
-     * @param internalExternalPortMapping the mapping of internal ports ( ports which the image uses internally)
-     * to external (how those can be accessed from outside the container)
-     * @return the Container instance
-     */
-    public abstract Container initialize( String uniqueName, int adapterId, Image image, Map<Integer, Integer> internalExternalPortMapping );
+    public abstract Container initialize( Container container );
 
     /**
      * Starts the provided container,
@@ -193,6 +179,65 @@ public abstract class DockerManager {
     }
 
 
+    public static class ContainerBuilder {
+
+        public final Integer adapterId;
+        public final Image image;
+        public final String uniqueName;
+        public Map<Integer, Integer> internalExternalPortMapping = new HashMap<>();
+        public boolean checkUnique = true;
+        public List<String> initCommands = new ArrayList<>();
+
+
+        public int timeout;
+        public List<String> afterCommands = new ArrayList<>();
+
+
+        public ContainerBuilder( Integer adapterId, Image image, String uniqueName ) {
+            this.adapterId = adapterId;
+            this.image = image;
+            this.uniqueName = uniqueName;
+        }
+
+
+        public ContainerBuilder withMappedPort( int internalPort, int externalPort ) {
+            this.internalExternalPortMapping.put( internalPort, externalPort );
+
+            return this;
+        }
+
+
+        public ContainerBuilder withInitCommands( List<String> commands ) {
+            this.initCommands = commands;
+
+            return this;
+        }
+
+
+        public ContainerBuilder withAfterCommands( List<String> commands, int timeout ) {
+            this.afterCommands = commands;
+            this.timeout = timeout;
+
+            return this;
+        }
+
+
+        public Container build() {
+            return new Container(
+                    adapterId,
+                    uniqueName,
+                    image,
+                    internalExternalPortMapping,
+                    checkUnique,
+                    initCommands,
+                    timeout,
+                    afterCommands );
+        }
+
+
+    }
+
+
     /**
      * The container is the main interaction instance for calling classes when interacting with Docker.
      * It holds all information for a specific Container
@@ -203,15 +248,30 @@ public abstract class DockerManager {
         public final String uniqueName;
         public final Map<Integer, Integer> internalExternalPortMapping;
         public final Integer adapterId;
-        public ContainerStatus status;
+        @Setter
+        @Getter
+        private ContainerStatus status;
+        @Setter
+        @Getter
+        private String containerId;
+
+        public final boolean usesInitCommands;
+        public final List<String> initCommands;
+
+        public final boolean usesAfterCommands;
+        public final Integer timeout;
+        public final List<String> afterCommands;
 
 
-        Container(
+        private Container(
                 int adapterId,
                 String uniqueName,
                 Image image,
                 Map<Integer, Integer> internalExternalPortMapping,
-                boolean checkUnique
+                boolean checkUnique,
+                List<String> initCommands,
+                Integer timeout,
+                List<String> afterCommands
         ) {
             // check for uniqueness only fires if checkUnique is false here
             if ( checkUnique && !DockerManager.getInstance().checkIfUnique( uniqueName ) ) {
@@ -222,6 +282,11 @@ public abstract class DockerManager {
             this.uniqueName = uniqueName;
             this.internalExternalPortMapping = internalExternalPortMapping;
             this.status = ContainerStatus.INIT;
+            this.initCommands = initCommands;
+            this.timeout = timeout;
+            this.usesInitCommands = !initCommands.isEmpty();
+            this.afterCommands = afterCommands;
+            this.usesAfterCommands = !afterCommands.isEmpty();
         }
 
 
@@ -255,11 +320,6 @@ public abstract class DockerManager {
 
         public List<ExposedPort> getExposedPorts() {
             return internalExternalPortMapping.values().stream().map( ExposedPort::tcp ).collect( Collectors.toList() );
-        }
-
-
-        void setStatus( ContainerStatus status ) {
-            this.status = status;
         }
 
     }

@@ -27,6 +27,7 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,7 @@ import org.polypheny.db.catalog.entity.CatalogDefaultValue;
 import org.polypheny.db.catalog.entity.CatalogIndex;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.docker.DockerManager;
+import org.polypheny.db.docker.DockerManager.ContainerBuilder;
 import org.polypheny.db.docker.DockerManager.Image;
 import org.polypheny.db.docker.DockerManagerImpl;
 import org.polypheny.db.jdbc.Context;
@@ -71,7 +73,8 @@ public class MongoStore extends DataStore {
             new AdapterSettingString( "host", false, true, false, "localhost" ),
             new AdapterSettingInteger( "port", false, true, false, 27017 )
     );
-    private final MongoClient connection;
+    private final MongoClient client;
+    private final TransactionProvider transactionProvider;
     private MongoSchema currentSchema;
 
 
@@ -79,13 +82,13 @@ public class MongoStore extends DataStore {
         super( adapterId, uniqueName, settings, Boolean.parseBoolean( settings.get( "persistent" ) ), true );
 
         DockerManager.getInstance().download( Image.MONGODB );
+        DockerManager.Container container = new ContainerBuilder( getAdapterId(), Image.MONGODB, getUniqueName() )
+                .withMappedPort( Image.MONGODB.getInternalPort(), Integer.parseInt( settings.get( "port" ) ) )
+                .withInitCommands( Arrays.asList( "mongod", "--replSet", "test" ) )
+                .withAfterCommands( Arrays.asList( "mongo", "--eval", "rs.initiate()" ), 2000 )
+                .build();
         DockerManager.getInstance()
-                .initialize(
-                        getUniqueName(),
-                        getAdapterId(),
-                        Image.MONGODB,
-                        Integer.parseInt( settings.get( "port" ) ) )
-                .start();
+                .initialize( container ).start();
 
         addInformationPhysicalNames();
         enableInformationPage();
@@ -94,9 +97,11 @@ public class MongoStore extends DataStore {
                 .builder()
                 .applyToClusterSettings( builder ->
                         builder.hosts( Collections.singletonList( new ServerAddress( settings.get( "host" ), Integer.parseInt( settings.get( "port" ) ) ) ) )
-                ).build();
+                )
+                .build();
 
-        this.connection = MongoClients.create( mongoSettings );
+        this.client = MongoClients.create( mongoSettings );
+        this.transactionProvider = new TransactionProvider( this.client );
     }
 
 
@@ -111,13 +116,13 @@ public class MongoStore extends DataStore {
         String[] splits = name.split( "_" );
         String database = splits[0] + "_" + splits[1];
         // TODO DL: physical schema name is null here, when no placement exists yet so we cut it
-        currentSchema = new MongoSchema( database, this.connection );
+        currentSchema = new MongoSchema( database, this.client, transactionProvider );
     }
 
 
     @Override
     public Table createTableSchema( CatalogTable combinedTable, List<CatalogColumnPlacement> columnPlacementsOnStore ) {
-        return currentSchema.createTable( combinedTable, columnPlacementsOnStore );
+        return currentSchema.createTable( combinedTable, columnPlacementsOnStore, getAdapterId() );
     }
 
 
@@ -129,7 +134,9 @@ public class MongoStore extends DataStore {
 
     @Override
     public void truncate( Context context, CatalogTable table ) {
-        currentSchema.database.getCollection( getPhysicalTableName( table.id ) ).deleteMany( new Document() );
+        context.getStatement().getTransaction().registerInvolvedAdapter( this );
+        transactionProvider.startTransaction();
+        currentSchema.database.getCollection( getPhysicalTableName( table.id ) ).deleteMany( transactionProvider.getSession(), new Document() );
     }
 
 
@@ -141,13 +148,13 @@ public class MongoStore extends DataStore {
 
     @Override
     public void commit( PolyXid xid ) {
-
+        transactionProvider.commit();
     }
 
 
     @Override
     public void rollback( PolyXid xid ) {
-
+        transactionProvider.rollback();
     }
 
 
@@ -174,7 +181,11 @@ public class MongoStore extends DataStore {
     @Override
     public void createTable( Context context, CatalogTable catalogTable ) {
         Catalog catalog = Catalog.getInstance();
-        this.currentSchema.database.getCollection( getPhysicalTableName( catalogTable.id ) );
+
+        context.getStatement().getTransaction().registerInvolvedAdapter( this );
+
+        transactionProvider.startTransaction();
+        this.currentSchema.database.createCollection( transactionProvider.getSession(), getPhysicalTableName( catalogTable.id ) );
 
         for ( CatalogColumnPlacement placement : catalog.getColumnPlacementsOnAdapter( getAdapterId(), catalogTable.id ) ) {
             catalog.updateColumnPlacementPhysicalNames(
@@ -190,7 +201,9 @@ public class MongoStore extends DataStore {
 
     @Override
     public void dropTable( Context context, CatalogTable combinedTable ) {
-        this.currentSchema.database.getCollection( getPhysicalTableName( combinedTable.id ) ).drop();
+        context.getStatement().getTransaction().registerInvolvedAdapter( this );
+        transactionProvider.startTransaction();
+        this.currentSchema.database.getCollection( getPhysicalTableName( combinedTable.id ) ).drop( transactionProvider.getSession() );
     }
 
 
@@ -233,7 +246,10 @@ public class MongoStore extends DataStore {
             field = new Document().append( getPhysicalColumnName( catalogColumn.id ), null );
         }
         Document update = new Document().append( "$set", field );
-        this.currentSchema.database.getCollection( getPhysicalTableName( catalogTable.id ) ).updateMany( new Document(), update );
+
+        context.getStatement().getTransaction().registerInvolvedAdapter( this );
+        transactionProvider.startTransaction();
+        this.currentSchema.database.getCollection( getPhysicalTableName( catalogTable.id ) ).updateMany( transactionProvider.getSession(), new Document(), update );
 
         // Add physical name to placement
         catalog.updateColumnPlacementPhysicalNames(
@@ -251,7 +267,10 @@ public class MongoStore extends DataStore {
     public void dropColumn( Context context, CatalogColumnPlacement columnPlacement ) {
         Document field = new Document().append( getPhysicalColumnName( columnPlacement.columnId ), 1 );
         Document filter = new Document().append( "$unset", field );
-        this.currentSchema.database.getCollection( getPhysicalTableName( columnPlacement.tableId ) ).updateMany( new Document(), filter );
+
+        context.getStatement().getTransaction().registerInvolvedAdapter( this );
+        transactionProvider.startTransaction();
+        this.currentSchema.database.getCollection( getPhysicalTableName( columnPlacement.tableId ) ).updateMany( transactionProvider.getSession(), new Document(), filter );
     }
 
 
@@ -263,7 +282,9 @@ public class MongoStore extends DataStore {
                 doc.append( name, 1 );
             }
 
-            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).createIndex( doc, new IndexOptions().name( catalogIndex.name ) );
+            context.getStatement().getTransaction().registerInvolvedAdapter( this );
+            transactionProvider.startTransaction();
+            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).createIndex( transactionProvider.getSession(), doc, new IndexOptions().name( catalogIndex.name ) );
         }
     }
 
@@ -276,7 +297,9 @@ public class MongoStore extends DataStore {
                 doc.append( name, 1 );
             }
 
-            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).dropIndex( catalogIndex.name );
+            context.getStatement().getTransaction().registerInvolvedAdapter( this );
+            transactionProvider.startTransaction();
+            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).dropIndex( transactionProvider.getSession(), catalogIndex.name );
         }
     }
 

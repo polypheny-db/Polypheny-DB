@@ -68,6 +68,7 @@ public class MongoSchema extends AbstractSchema {
 
     private final Map<String, Table> tableMap;
     private final MongoClient connection;
+    private final TransactionProvider transactionProvider;
 
 
     /**
@@ -75,11 +76,13 @@ public class MongoSchema extends AbstractSchema {
      *
      * @param database Mongo database name, e.g. "foodmart"
      * @param tableMap
+     * @param transactionProvider
      */
     //public MongoSchema( String host, String database, List<MongoCredential> credentialsList, MongoClientOptions options ) { // TODO DL: evaluate what options are needed in the end
-    public MongoSchema( String database, Map<String, Table> tableMap, MongoClient connection ) {
+    public MongoSchema( String database, Map<String, Table> tableMap, MongoClient connection, TransactionProvider transactionProvider ) {
         super();
         this.tableMap = tableMap;
+        this.transactionProvider = transactionProvider;
         this.connection = connection;
         this.database = this.connection.getDatabase( database );
     }
@@ -90,13 +93,11 @@ public class MongoSchema extends AbstractSchema {
      *
      * @param database existing mongo database instance
      * @param connection
+     * @param transactionProvider
      */
     @VisibleForTesting
-    MongoSchema( String database, MongoClient connection ) {
-        super();
-        this.tableMap = new HashMap<>();
-        this.connection = connection;
-        this.database = this.connection.getDatabase( database );
+    MongoSchema( String database, MongoClient connection, TransactionProvider transactionProvider ) {
+        this( database, new HashMap<>(), connection, transactionProvider );
     }
 
 
@@ -111,7 +112,7 @@ public class MongoSchema extends AbstractSchema {
     }
 
 
-    public MongoTable createTable( CatalogTable catalogTable, List<CatalogColumnPlacement> columnPlacementsOnStore ) {
+    public MongoTable createTable( CatalogTable catalogTable, List<CatalogColumnPlacement> columnPlacementsOnStore, int storeId ) {
         final RelDataTypeFactory typeFactory = new PolyTypeFactoryImpl( RelDataTypeSystem.DEFAULT );
         final RelDataTypeFactory.Builder fieldInfo = typeFactory.builder();
 
@@ -120,7 +121,7 @@ public class MongoSchema extends AbstractSchema {
             RelDataType sqlType = catalogColumn.getRelDataType( typeFactory );
             fieldInfo.add( catalogColumn.name, MongoStore.getPhysicalColumnName( catalogColumn.id ), sqlType ).nullable( catalogColumn.nullable );
         }
-        MongoTable table = new MongoTable( catalogTable, this, RelDataTypeImpl.proto( fieldInfo.build() ) );
+        MongoTable table = new MongoTable( catalogTable, this, RelDataTypeImpl.proto( fieldInfo.build() ), transactionProvider, storeId );
 
         tableMap.put( catalogTable.name, table );
         return table;
