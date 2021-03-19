@@ -18,6 +18,8 @@ package org.polypheny.db.config;
 
 
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.List;
 import org.polypheny.db.catalog.Catalog.SchemaType;
 import org.polypheny.db.config.Config.ConfigListener;
 import org.polypheny.db.util.background.BackgroundTask;
@@ -311,16 +313,10 @@ public enum RuntimeConfig {
             ConfigType.BOOLEAN,
             "dockerGroup" ),
 
-    DOCKER_URL( "runtime/dockerUrl",
-            "List of potential (remote) Docker urls.",
-            "localhost",
-            ConfigType.STRING,
-            "dockerGroup" ),
-
-    DOCKER_PORT( "runtime/dockerPort",
-            "The port used to connect to Docker.",
-            2375,
-            ConfigType.INTEGER,
+    DOCKER_URLS( "runtime/dockerUrls",
+            "List of potential (remote) Docker urls and ports.",
+            Collections.singletonList( "localhost:2375" ),
+            ConfigType.STRING_LIST,
             "dockerGroup" );
 
 
@@ -500,6 +496,10 @@ public enum RuntimeConfig {
                 config = new ConfigArray( key, (String[]) defaultValue );
                 break;
 
+            case STRING_LIST:
+                config = new ConfigList( key, (List<?>) defaultValue, String.class );
+                break;
+
             default:
                 throw new RuntimeException( "Unknown config type: " + configType.name() );
         }
@@ -544,6 +544,11 @@ public enum RuntimeConfig {
         return configManager.getConfig( key ).getString();
     }
 
+
+    public List<String> getStringList() {
+        return configManager.getConfig( key ).getStringList();
+    }
+
     // TODO: Add methods for array and table
 
 
@@ -583,7 +588,7 @@ public enum RuntimeConfig {
 
 
     public enum ConfigType {
-        BOOLEAN, DECIMAL, DOUBLE, INTEGER, LONG, STRING, ENUM, BOOLEAN_TABLE, DECIMAL_TABLE, DOUBLE_TABLE, INTEGER_TABLE, LONG_TABLE, STRING_TABLE, BOOLEAN_ARRAY, DECIMAL_ARRAY, DOUBLE_ARRAY, INTEGER_ARRAY, LONG_ARRAY, STRING_ARRAY
+        BOOLEAN, DECIMAL, DOUBLE, INTEGER, LONG, STRING, ENUM, BOOLEAN_TABLE, DECIMAL_TABLE, DOUBLE_TABLE, INTEGER_TABLE, LONG_TABLE, STRING_TABLE, BOOLEAN_ARRAY, DECIMAL_ARRAY, DOUBLE_ARRAY, INTEGER_ARRAY, LONG_ARRAY, STRING_ARRAY, STRING_LIST
     }
 
 }

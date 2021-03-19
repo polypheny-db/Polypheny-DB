@@ -394,6 +394,76 @@ public abstract class Config {
     }
 
 
+    /**
+     * Get the current value of this config
+     *
+     * @return List of String values
+     * @throws ConfigRuntimeException If config value can not be converted into a list of Strings
+     */
+    public List<String> getStringList() {
+        throw new ConfigRuntimeException( "Configuration of type " + this.getClass().getSimpleName() + " cannot be converted into a Enum value!" );
+    }
+
+
+    /**
+     * Get the current value of this config
+     *
+     * @return List of Integer values
+     * @throws ConfigRuntimeException If config value can not be converted into a list of Integer
+     */
+    public List<Integer> getIntegerList() {
+        throw new ConfigRuntimeException( "Configuration of type " + this.getClass().getSimpleName() + " cannot be converted into a Enum value!" );
+    }
+
+
+    /**
+     * Get the current value of this config
+     *
+     * @return List of Double values
+     * @throws ConfigRuntimeException If config value can not be converted into a list of Double
+     */
+    public List<Double> getDoubleList() {
+        throw new ConfigRuntimeException( "Configuration of type " + this.getClass().getSimpleName() + " cannot be converted into a Enum value!" );
+    }
+
+
+    /**
+     * Get the current value of this config
+     *
+     * @return List of Long values
+     * @throws ConfigRuntimeException If config value can not be converted into a list of Long.
+     */
+    public List<Long> getStringLong() {
+        throw new ConfigRuntimeException( "Configuration of type " + this.getClass().getSimpleName() + " cannot be converted into a Enum value!" );
+    }
+
+
+    /**
+     * Get the current value of this config
+     *
+     * @return List of BigDecimal values
+     * @throws ConfigRuntimeException If config value can not be converted into a list of BigDecimal.
+     */
+    public List<BigDecimal> getDecimalList() {
+        throw new ConfigRuntimeException( "Configuration of type " + this.getClass().getSimpleName() + " cannot be converted into a Enum value!" );
+    }
+
+
+    /**
+     * Get the current value of this config
+     *
+     * @return List of Boolean values
+     * @throws ConfigRuntimeException If config value can not be converted into a list of Boolean.
+     */
+    public List<Boolean> getBooleanList() {
+        throw new ConfigRuntimeException( "Configuration of type " + this.getClass().getSimpleName() + " cannot be converted into a Enum value!" );
+    }
+
+
+    public boolean setList( final List<Object> values, Class<?> clazz ) {
+        throw new ConfigRuntimeException( "Not possible to set a list on a configuration element of type " + this.getClass().getSimpleName() + "!" );
+    }
+
 
     /**
      * Get a list af classes implementing the specified super type.
@@ -865,6 +935,19 @@ public abstract class Config {
 
 
     /**
+     * Retrieve the template if set
+     *
+     * @return the template, which is a ConfigScalar
+     */
+    public Class<? extends ConfigScalar> getTemplateClass() {
+        throw new ConfigRuntimeException( "No template was set for this configType" );
+    }
+
+
+    ;
+
+
+    /**
      * The observers of a Configuration object need to implement the method onConfigChange() to define what needs to happen when this Configuration changes. The parameter "Config c" provides the changed Config.
      * The method restart() can be implemented to define what will happen, when a Config changes, that requires a restart.
      */
@@ -873,6 +956,7 @@ public abstract class Config {
         void onConfigChange( Config c );
 
         void restart( Config c );
+
     }
 
 
@@ -882,6 +966,7 @@ public abstract class Config {
     public interface ConfigValidator {
 
         boolean validate( Object a );
+
     }
 
 }

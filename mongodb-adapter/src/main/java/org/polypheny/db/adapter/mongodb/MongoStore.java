@@ -87,8 +87,7 @@ public class MongoStore extends DataStore {
                 .withInitCommands( Arrays.asList( "mongod", "--replSet", "test" ) )
                 .withAfterCommands( Arrays.asList( "mongo", "--eval", "rs.initiate()" ), 2000 )
                 .build();
-        DockerManager.getInstance()
-                .initialize( container ).start();
+        DockerManager.getInstance().initialize( container ).start();
 
         addInformationPhysicalNames();
         enableInformationPage();

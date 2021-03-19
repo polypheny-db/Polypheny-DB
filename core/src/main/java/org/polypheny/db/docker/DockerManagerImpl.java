@@ -120,7 +120,7 @@ public class DockerManagerImpl extends DockerManager {
 
     private static DockerClient generateClient() {
         DockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder()
-                .withDockerHost( "tcp://" + RuntimeConfig.DOCKER_URL.getString() + ":" + RuntimeConfig.DOCKER_PORT.getInteger() )
+                .withDockerHost( "tcp://" + RuntimeConfig.DOCKER_URLS.getStringList().get( 0 ) )
                 //.withDockerTlsVerify( true ) //TODO DL: use certificates
                 //.withDockerCertPath(certPath)
                 .build();

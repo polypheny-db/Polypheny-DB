@@ -25,7 +25,8 @@ public enum WebUiFormType {
     NUMBER( "number" ),
     BOOLEAN( "boolean" ),
     SELECT( "select" ),
-    CHECKBOXES( "checkboxes" );
+    CHECKBOXES( "checkboxes" ),
+    LIST( "list" );
 
     private final String type;
 
