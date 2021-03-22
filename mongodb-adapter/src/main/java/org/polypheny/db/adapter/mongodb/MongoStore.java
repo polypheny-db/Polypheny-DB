@@ -41,16 +41,17 @@ import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.bson.Document;
 import org.polypheny.db.adapter.DataStore;
+import org.polypheny.db.adapter.DockerDeployable;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
 import org.polypheny.db.catalog.entity.CatalogDefaultValue;
 import org.polypheny.db.catalog.entity.CatalogIndex;
 import org.polypheny.db.catalog.entity.CatalogTable;
+import org.polypheny.db.docker.DockerInstance;
 import org.polypheny.db.docker.DockerManager;
 import org.polypheny.db.docker.DockerManager.ContainerBuilder;
 import org.polypheny.db.docker.DockerManager.Image;
-import org.polypheny.db.docker.DockerManagerImpl;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.schema.Schema;
 import org.polypheny.db.schema.SchemaPlus;
@@ -60,7 +61,7 @@ import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeFamily;
 
 @Slf4j
-public class MongoStore extends DataStore {
+public class MongoStore extends DataStore implements DockerDeployable {
 
     @SuppressWarnings("WeakerAccess")
     public static final String ADAPTER_NAME = "MongoDB";
@@ -69,9 +70,11 @@ public class MongoStore extends DataStore {
     @SuppressWarnings("WeakerAccess")
     public static final List<AdapterSetting> AVAILABLE_SETTINGS = ImmutableList.of(
             new AdapterSettingBoolean( "persistent", false, true, false, false ),
-            new AdapterSettingList( "type", false, true, false, ImmutableList.of( "Mongo", "Fongo(embedded)" ) ),
-            new AdapterSettingString( "host", false, true, false, "localhost" ),
             new AdapterSettingInteger( "port", false, true, false, 27017 )
+    );
+    @SuppressWarnings("WeakerAccess")
+    public static final List<AdapterSetting> AVAILABLE_DOCKER_SETTINGS = ImmutableList.of(
+            new AdapterSettingString( "dockerUrl", false, true, false, "localhost" )
     );
     private final MongoClient client;
     private final TransactionProvider transactionProvider;
@@ -81,8 +84,7 @@ public class MongoStore extends DataStore {
     public MongoStore( int adapterId, String uniqueName, Map<String, String> settings ) {
         super( adapterId, uniqueName, settings, Boolean.parseBoolean( settings.get( "persistent" ) ), true );
 
-        DockerManager.getInstance().download( Image.MONGODB );
-        DockerManager.Container container = new ContainerBuilder( getAdapterId(), Image.MONGODB, getUniqueName() )
+        DockerManager.Container container = new ContainerBuilder( getAdapterId(), Image.MONGODB, getUniqueName(), settings.get( "dockerUrl" ) )
                 .withMappedPort( Image.MONGODB.getInternalPort(), Integer.parseInt( settings.get( "port" ) ) )
                 .withInitCommands( Arrays.asList( "mongod", "--replSet", "test" ) )
                 .withAfterCommands( Arrays.asList( "mongo", "--eval", "rs.initiate()" ), 2000 )
@@ -165,7 +167,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void shutdown() {
-        DockerManagerImpl.getInstance().destroyAll( getAdapterId() );
+        DockerInstance.getInstance().destroyAll( getAdapterId() );
 
         removeInformationPage();
     }
@@ -339,5 +341,12 @@ public class MongoStore extends DataStore {
     public static String getPhysicalTableName( long id ) {
         return "tab-" + id;
     }
+
+
+    @Override
+    public List<AdapterSetting> getDockerSettings() {
+        return AVAILABLE_DOCKER_SETTINGS;
+    }
+
 
 }

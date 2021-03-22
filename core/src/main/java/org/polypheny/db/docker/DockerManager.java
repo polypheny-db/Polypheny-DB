@@ -17,7 +17,6 @@
 package org.polypheny.db.docker;
 
 import com.github.dockerjava.api.model.ExposedPort;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,7 +24,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
-import org.polypheny.db.docker.Exceptions.NameExistsException;
 
 /**
  * This class servers as a organization unit which controls all Docker containers in Polypheny.
@@ -41,13 +39,12 @@ public abstract class DockerManager {
     public static DockerManagerImpl INSTANCE = null;
 
 
-    public static DockerManagerImpl getInstance() {
+    public static DockerManager getInstance() {
         if ( INSTANCE == null ) {
             INSTANCE = new DockerManagerImpl();
         }
         return INSTANCE;
     }
-
 
     /**
      * Tries to download the provided image through Docker,
@@ -56,9 +53,11 @@ public abstract class DockerManager {
      *
      * If the image is already downloaded nothing happens
      *
-     * @param image the image which is downloaded
+     * image the image which is downloaded
      */
-    public abstract void download( Image image );
+    /*
+    public abstract void download( Image image );*/
+
 
     /**
      * This method generates a new Polypheny specific Container it additionally initializes said container in Docker itself
@@ -76,49 +75,27 @@ public abstract class DockerManager {
      */
     public abstract void start( Container container );
 
+
+    /**
+     * Stops the provided container
+     *
+     * @param container the container which is stopped
+     */
+    public abstract void stop( Container container );
+
+    /**
+     * Destroys the provided container
+     *
+     * @param container the container which is stopped
+     */
+    public abstract void destroy( Container container );
+
     /**
      * All containers, which belong to the provided adapter, are stopped
      *
      * @param adapterId the id of the adapter
      */
     public abstract void stopAll( int adapterId );
-
-
-    /**
-     * Getter for all available containers; except those with ContainerStatus.DESTROYED
-     *
-     * @return collection with the names and the corresponding container
-     */
-    public abstract Map<String, Container> getAvailableContainers();
-
-    /**
-     * Getter function, which retrieves all downloaded images
-     *
-     * @return the collection of the images
-     */
-    public abstract List<Image> getAvailableImages();
-
-
-    /**
-     * Getter, which retrieves a collection, which matches all available containers to their associated adapter
-     *
-     * @return the collection which maps the ids of the adapters to the containers
-     */
-    public abstract Map<Integer, ImmutableList<String>> getContainersOnAdapter();
-
-    /**
-     * Getter, which returns all already used ports from containers
-     *
-     * @return the used ports
-     */
-    public abstract List<Integer> getUsedPorts();
-
-    /**
-     * Getter, which returns all already used names of containers
-     *
-     * @return the used names
-     */
-    public abstract List<String> getUsedNames();
 
     /**
      * Destroys all containers and removes them from the system, which belong to the provided adapter
@@ -185,18 +162,20 @@ public abstract class DockerManager {
         public final Image image;
         public final String uniqueName;
         public Map<Integer, Integer> internalExternalPortMapping = new HashMap<>();
-        public boolean checkUnique = true;
+        public boolean checkUnique = false;
         public List<String> initCommands = new ArrayList<>();
+        public String dockerUrl;
 
 
         public int timeout;
         public List<String> afterCommands = new ArrayList<>();
 
 
-        public ContainerBuilder( Integer adapterId, Image image, String uniqueName ) {
+        public ContainerBuilder( Integer adapterId, Image image, String uniqueName, String dockerUrl ) {
             this.adapterId = adapterId;
             this.image = image;
             this.uniqueName = uniqueName;
+            this.dockerUrl = dockerUrl;
         }
 
 
@@ -227,6 +206,7 @@ public abstract class DockerManager {
                     adapterId,
                     uniqueName,
                     image,
+                    dockerUrl,
                     internalExternalPortMapping,
                     checkUnique,
                     initCommands,
@@ -244,7 +224,7 @@ public abstract class DockerManager {
      */
     public static class Container {
 
-        public final Image type;
+        public final Image image;
         public final String uniqueName;
         public final Map<Integer, Integer> internalExternalPortMapping;
         public final Integer adapterId;
@@ -254,6 +234,8 @@ public abstract class DockerManager {
         @Setter
         @Getter
         private String containerId;
+        @Getter
+        private final String dockerUrl;
 
         public final boolean usesInitCommands;
         public final List<String> initCommands;
@@ -267,19 +249,17 @@ public abstract class DockerManager {
                 int adapterId,
                 String uniqueName,
                 Image image,
+                String dockerUrl,
                 Map<Integer, Integer> internalExternalPortMapping,
                 boolean checkUnique,
                 List<String> initCommands,
                 Integer timeout,
                 List<String> afterCommands
         ) {
-            // check for uniqueness only fires if checkUnique is false here
-            if ( checkUnique && !DockerManager.getInstance().checkIfUnique( uniqueName ) ) {
-                throw new NameExistsException();
-            }
             this.adapterId = adapterId;
-            this.type = image;
+            this.image = image;
             this.uniqueName = uniqueName;
+            this.dockerUrl = dockerUrl;
             this.internalExternalPortMapping = internalExternalPortMapping;
             this.status = ContainerStatus.INIT;
             this.initCommands = initCommands;

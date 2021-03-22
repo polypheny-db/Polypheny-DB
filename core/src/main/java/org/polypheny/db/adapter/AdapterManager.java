@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import lombok.AllArgsConstructor;
 import org.polypheny.db.adapter.Adapter.AdapterSetting;
+import org.polypheny.db.adapter.Adapter.AdapterSettingList;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogAdapter;
 import org.polypheny.db.catalog.entity.CatalogAdapter.AdapterType;
@@ -131,7 +133,12 @@ public class AdapterManager {
                 if ( !Modifier.isAbstract( clazz.getModifiers() ) ) {
                     String name = (String) clazz.getDeclaredField( "ADAPTER_NAME" ).get( null );
                     String description = (String) clazz.getDeclaredField( "DESCRIPTION" ).get( null );
-                    List<AdapterSetting> settings = (List<AdapterSetting>) clazz.getDeclaredField( "AVAILABLE_SETTINGS" ).get( null );
+                    Map<String, List<AdapterSetting>> settings = new HashMap<>();
+                    settings.put( "normal", (List<AdapterSetting>) clazz.getDeclaredField( "AVAILABLE_SETTINGS" ).get( null ) );
+                    if ( Arrays.asList( clazz.getGenericInterfaces() ).contains( DockerDeployable.class ) ) {
+                        settings.put( "docker", (List<AdapterSetting>) clazz.getDeclaredField( "AVAILABLE_DOCKER_SETTINGS" ).get( null ) );
+                    }
+                    settings.put( "mode", Arrays.asList( new AdapterSettingList( "mode", false, true, true, Arrays.asList( "embedded", "docker" ) ) ) );
                     result.add( new AdapterInformation( name, description, clazz, settings ) );
                 }
             }
@@ -235,7 +242,7 @@ public class AdapterManager {
         public final String name;
         public final String description;
         public final Class clazz;
-        public final List<AdapterSetting> settings;
+        public final Map<String, List<AdapterSetting>> settings;
 
     }
 

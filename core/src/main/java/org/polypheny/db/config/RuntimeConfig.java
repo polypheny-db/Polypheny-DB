@@ -314,8 +314,8 @@ public enum RuntimeConfig {
             "dockerGroup" ),
 
     DOCKER_URLS( "runtime/dockerUrls",
-            "List of potential (remote) Docker urls and ports.",
-            Collections.singletonList( "localhost:2375" ),
+            "List of potential (remote) Docker urls.",
+            Collections.singletonList( "localhost" ),
             ConfigType.STRING_LIST,
             "dockerGroup" );
 

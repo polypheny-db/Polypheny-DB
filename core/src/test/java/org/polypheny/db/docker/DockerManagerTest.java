@@ -53,7 +53,6 @@ public class DockerManagerTest {
 
         assert (!manager.getUsedNames().containsAll( uniqueNames ));
         assert (!manager.getUsedPorts().containsAll( uniquePorts ));
-        assert (!manager.getContainersOnAdapter().containsKey( adapterId ) || manager.getContainersOnAdapter().get( adapterId ).stream().noneMatch( uniqueNames::contains ));
 
     }
 
@@ -87,10 +86,10 @@ public class DockerManagerTest {
     public void startNotExistsContainerTest() {
         String uniqueName = "testContainer";
         int usedPort = 5555;
-        DockerManagerImpl managerLastSession = fakeLastSession( uniqueName, usedPort, true, false );
+        DockerInstance managerLastSession = fakeLastSession( uniqueName, usedPort, true, false );
 
         //// new session has to handle already running container
-        DockerManagerImpl managerThisSession = managerLastSession.generateNewSession();
+        DockerInstance managerThisSession = managerLastSession.generateNewSession();
         Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
         managerThisSession.start( restoredContainer );
 
@@ -112,13 +111,13 @@ public class DockerManagerTest {
      * @param doStop if the container was stopped
      * @return the managerImpl, which is used to fake a new session, but has to use the old client
      */
-    private DockerManagerImpl fakeLastSession( String uniqueName, int usedPort, boolean doDestroy, boolean doStop ) {
+    private DockerInstance fakeLastSession( String uniqueName, int usedPort, boolean doDestroy, boolean doStop ) {
         // so we can test the initialization process of the DockerManager,
         // when a container is already running
         // we use the impl here
         //// previous session left the container running
 
-        DockerManagerImpl managerLastSession = new DockerManagerImpl();
+        DockerInstance managerLastSession = new DockerInstance();
         Container container = managerLastSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
         managerLastSession.start( container );
 
@@ -152,10 +151,10 @@ public class DockerManagerTest {
     public void runningContainerTest() {
         String uniqueName = "testContainer";
         int usedPort = 5555;
-        DockerManagerImpl managerLastSession = fakeLastSession( uniqueName, usedPort, false, false );
+        DockerInstance managerLastSession = fakeLastSession( uniqueName, usedPort, false, false );
 
         //// new session has to handle already running container
-        DockerManagerImpl managerThisSession = managerLastSession.generateNewSession();
+        DockerInstance managerThisSession = managerLastSession.generateNewSession();
         Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
         managerThisSession.start( restoredContainer );
 
@@ -174,10 +173,10 @@ public class DockerManagerTest {
     public void stoppedContainerTest() {
         String uniqueName = "testContainer";
         int usedPort = 5555;
-        DockerManagerImpl managerLastSession = fakeLastSession( uniqueName, usedPort, false, true );
+        DockerInstance managerLastSession = fakeLastSession( uniqueName, usedPort, false, true );
 
         //// new session has to handle already running container
-        DockerManagerImpl managerThisSession = managerLastSession.generateNewSession();
+        DockerInstance managerThisSession = managerLastSession.generateNewSession();
         Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
         managerThisSession.start( restoredContainer );
 

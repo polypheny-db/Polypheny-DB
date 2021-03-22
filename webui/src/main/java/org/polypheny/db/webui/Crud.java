@@ -73,6 +73,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -103,6 +104,7 @@ import org.polypheny.db.adapter.DataSource;
 import org.polypheny.db.adapter.DataSource.ExportedColumn;
 import org.polypheny.db.adapter.DataStore;
 import org.polypheny.db.adapter.DataStore.FunctionalIndexInfo;
+import org.polypheny.db.adapter.DockerDeployable;
 import org.polypheny.db.adapter.index.IndexManager;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.Catalog.ConstraintType;
@@ -707,7 +709,7 @@ public class Crud implements InformationObserver {
         allQueries = allQueries.replaceAll( "(?m)(--.*?$)", "" );
         //remove whitespace at the end
         allQueries = allQueries.replaceAll( "(\\s*)$", "" );
-        String[] queries = allQueries.split(";(?=(?:[^\']*\'[^\']*\')*[^\']*$)");
+        String[] queries = allQueries.split( ";(?=(?:[^\']*\'[^\']*\')*[^\']*$)" );
         boolean noLimit;
         for ( String query : queries ) {
             Result result;
@@ -2242,14 +2244,13 @@ public class Crud implements InformationObserver {
     private Gson adapterSerializer() {
         //see https://futurestud.io/tutorials/gson-advanced-custom-serialization-part-1
         JsonSerializer<DataStore> storeSerializer = ( src, typeOfSrc, context ) -> {
-            List<AdapterSetting> adapterSettings = new ArrayList<>();
-            for ( AdapterSetting s : src.getAvailableSettings() ) {
-                for ( String current : src.getCurrentSettings().keySet() ) {
-                    if ( s.name.equals( current ) ) {
-                        adapterSettings.add( s );
-                    }
-                }
+            List<AdapterSetting> mergedSettings = src.getAvailableSettings();
+            if ( src instanceof DockerDeployable ) {
+                mergedSettings = Stream.concat(
+                        mergedSettings.stream(), ((DockerDeployable) src).getDockerSettings().stream() )
+                        .collect( Collectors.toList() );
             }
+            List<AdapterSetting> adapterSettings = serializeSettings( mergedSettings, src.getCurrentSettings() );
 
             JsonObject jsonStore = new JsonObject();
             jsonStore.addProperty( "adapterId", src.getAdapterId() );
@@ -2264,14 +2265,13 @@ public class Crud implements InformationObserver {
             return jsonStore;
         };
         JsonSerializer<DataSource> sourceSerializer = ( src, typeOfSrc, context ) -> {
-            List<AdapterSetting> adapterSettings = new ArrayList<>();
-            for ( AdapterSetting s : src.getAvailableSettings() ) {
-                for ( String current : src.getCurrentSettings().keySet() ) {
-                    if ( s.name.equals( current ) ) {
-                        adapterSettings.add( s );
-                    }
-                }
+            List<AdapterSetting> mergedSettings = src.getAvailableSettings();
+            if ( src instanceof DockerDeployable ) {
+                mergedSettings = Stream.concat(
+                        mergedSettings.stream(), ((DockerDeployable) src).getDockerSettings().stream() )
+                        .collect( Collectors.toList() );
             }
+            List<AdapterSetting> adapterSettings = serializeSettings( mergedSettings, src.getCurrentSettings() );
 
             JsonObject jsonSource = new JsonObject();
             jsonSource.addProperty( "adapterId", src.getAdapterId() );
@@ -2284,6 +2284,19 @@ public class Crud implements InformationObserver {
             return jsonSource;
         };
         return new GsonBuilder().registerTypeAdapter( DataStore.class, storeSerializer ).registerTypeAdapter( DataSource.class, sourceSerializer ).create();
+    }
+
+
+    private List<AdapterSetting> serializeSettings( List<AdapterSetting> availableSettings, Map<String, String> currentSettings ) {
+        ArrayList<AdapterSetting> adapterSettings = new ArrayList<>();
+        for ( AdapterSetting s : availableSettings ) {
+            for ( String current : currentSettings.keySet() ) {
+                if ( s.name.equals( current ) ) {
+                    adapterSettings.add( s );
+                }
+            }
+        }
+        return adapterSettings;
     }
 
 
