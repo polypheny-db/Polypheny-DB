@@ -74,7 +74,9 @@ public class MongoStore extends DataStore implements DockerDeployable {
     );
     @SuppressWarnings("WeakerAccess")
     public static final List<AdapterSetting> AVAILABLE_DOCKER_SETTINGS = ImmutableList.of(
-            new AdapterSettingString( "dockerUrl", false, true, false, "localhost" )
+            new AdapterSettingString( "dockerUrl", false, true, false, "localhost" ),
+            new AdapterSettingBoolean( "persistent", false, true, false, false ),
+            new AdapterSettingInteger( "port", false, true, false, 27017 )
     );
     private final MongoClient client;
     private final TransactionProvider transactionProvider;

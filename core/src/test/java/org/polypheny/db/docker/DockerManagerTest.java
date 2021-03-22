@@ -19,9 +19,7 @@ package org.polypheny.db.docker;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.Test;
-import org.polypheny.db.docker.DockerManager.Container;
 import org.polypheny.db.docker.DockerManager.ContainerBuilder;
-import org.polypheny.db.docker.DockerManager.ContainerStatus;
 import org.polypheny.db.docker.DockerManager.Image;
 import org.polypheny.db.util.Pair;
 
@@ -31,6 +29,9 @@ import org.polypheny.db.util.Pair;
  * the underlying java-docker library should not be tested
  */
 public class DockerManagerTest {
+
+    String DEFAULT_DOCKER_URL = "localhost";
+
 
     /**
      * We test if the DockerManager exposes the correct names to the callee
@@ -44,7 +45,7 @@ public class DockerManagerTest {
         int adapterId = 1;
 
         Pair.zip( uniqueNames, uniquePorts ).forEach( namePortPairs -> {
-            manager.initialize( new ContainerBuilder( adapterId, Image.MONGODB, namePortPairs.left ).withMappedPort( namePortPairs.right, namePortPairs.right ).build() );
+            manager.initialize( new ContainerBuilder( adapterId, Image.MONGODB, namePortPairs.left, DEFAULT_DOCKER_URL ).withMappedPort( namePortPairs.right, namePortPairs.right ).build() );
         } );
         assert (manager.getUsedNames().containsAll( uniqueNames ));
         assert (manager.getUsedPorts().containsAll( uniquePorts ));
@@ -67,7 +68,7 @@ public class DockerManagerTest {
 
         String uniqueName = "test3";
         List<Integer> multiplePorts = Arrays.asList( 3210, 4929 );
-        ContainerBuilder containerBuilder = new ContainerBuilder( adapterId, Image.MONGODB, uniqueName );
+        ContainerBuilder containerBuilder = new ContainerBuilder( adapterId, Image.MONGODB, uniqueName, DEFAULT_DOCKER_URL );
         multiplePorts.forEach( port -> containerBuilder.withMappedPort( port, port ) );
         manager.initialize( containerBuilder.build() );
 
@@ -76,115 +77,6 @@ public class DockerManagerTest {
 
         manager.destroyAll( adapterId );
 
-    }
-
-
-    /**
-     * We test if the DockerManager correctly initializes a new container
-     */
-    @Test
-    public void startNotExistsContainerTest() {
-        String uniqueName = "testContainer";
-        int usedPort = 5555;
-        DockerInstance managerLastSession = fakeLastSession( uniqueName, usedPort, true, false );
-
-        //// new session has to handle already running container
-        DockerInstance managerThisSession = managerLastSession.generateNewSession();
-        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
-        managerThisSession.start( restoredContainer );
-
-        assert (restoredContainer.getStatus() == ContainerStatus.RUNNING);
-        assert (managerThisSession.getUsedNames().contains( uniqueName ));
-        assert (managerThisSession.getUsedPorts().contains( usedPort ));
-
-        managerThisSession.destroy( restoredContainer );
-
-    }
-
-
-    /**
-     * Helper method which fakes a previous session, which was terminated and left the container in specified state
-     *
-     * @param uniqueName the name of the previous container
-     * @param usedPort the used port of the previous container
-     * @param doDestroy if the container was destroyed previously
-     * @param doStop if the container was stopped
-     * @return the managerImpl, which is used to fake a new session, but has to use the old client
-     */
-    private DockerInstance fakeLastSession( String uniqueName, int usedPort, boolean doDestroy, boolean doStop ) {
-        // so we can test the initialization process of the DockerManager,
-        // when a container is already running
-        // we use the impl here
-        //// previous session left the container running
-
-        DockerInstance managerLastSession = new DockerInstance();
-        Container container = managerLastSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
-        managerLastSession.start( container );
-
-        assert (container.getStatus() == ContainerStatus.RUNNING);
-        assert (managerLastSession.getUsedNames().contains( uniqueName ));
-        assert (managerLastSession.getUsedPorts().contains( usedPort ));
-
-        if ( doStop ) {
-            managerLastSession.stop( container );
-
-            assert (container.getStatus() == ContainerStatus.STOPPED);
-            assert (managerLastSession.getUsedNames().contains( uniqueName ));
-            assert (managerLastSession.getUsedPorts().contains( usedPort ));
-        }
-
-        if ( doDestroy ) {
-            managerLastSession.destroy( container );
-
-            assert (container.getStatus() == ContainerStatus.DESTROYED);
-            assert (!managerLastSession.getUsedNames().contains( uniqueName ));
-            assert (!managerLastSession.getUsedPorts().contains( usedPort ));
-        }
-        return managerLastSession;
-    }
-
-
-    /**
-     * We test if an already running container on system start can correctly be restored
-     */
-    @Test
-    public void runningContainerTest() {
-        String uniqueName = "testContainer";
-        int usedPort = 5555;
-        DockerInstance managerLastSession = fakeLastSession( uniqueName, usedPort, false, false );
-
-        //// new session has to handle already running container
-        DockerInstance managerThisSession = managerLastSession.generateNewSession();
-        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
-        managerThisSession.start( restoredContainer );
-
-        assert (restoredContainer.getStatus() == ContainerStatus.RUNNING);
-        assert (managerThisSession.getUsedNames().contains( uniqueName ));
-        assert (managerThisSession.getUsedPorts().contains( usedPort ));
-
-        managerThisSession.destroy( restoredContainer );
-    }
-
-
-    /**
-     * We test if a already existing container, which was stopped can be correctly restored
-     */
-    @Test
-    public void stoppedContainerTest() {
-        String uniqueName = "testContainer";
-        int usedPort = 5555;
-        DockerInstance managerLastSession = fakeLastSession( uniqueName, usedPort, false, true );
-
-        //// new session has to handle already running container
-        DockerInstance managerThisSession = managerLastSession.generateNewSession();
-        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName ).withMappedPort( usedPort, usedPort ).build() );
-        managerThisSession.start( restoredContainer );
-
-        assert (restoredContainer.getStatus() == ContainerStatus.RUNNING);
-        assert (managerThisSession.getUsedNames().contains( uniqueName ));
-        assert (managerThisSession.getUsedPorts().contains( usedPort ));
-
-        managerThisSession.destroy( restoredContainer );
     }
 
 }

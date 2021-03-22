@@ -46,18 +46,6 @@ public abstract class DockerManager {
         return INSTANCE;
     }
 
-    /**
-     * Tries to download the provided image through Docker,
-     * this is necessary to have it accessible when later generating a
-     * container from it
-     *
-     * If the image is already downloaded nothing happens
-     *
-     * image the image which is downloaded
-     */
-    /*
-    public abstract void download( Image image );*/
-
 
     /**
      * This method generates a new Polypheny specific Container it additionally initializes said container in Docker itself
@@ -103,6 +91,10 @@ public abstract class DockerManager {
      * @param adapterId the id of the adapter
      */
     public abstract void destroyAll( int adapterId );
+
+    public abstract List<String> getUsedNames();
+
+    public abstract List<Integer> getUsedPorts();
 
 
     /**

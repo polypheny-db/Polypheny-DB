@@ -19,6 +19,7 @@ package org.polypheny.db.docker;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.polypheny.db.config.Config;
 import org.polypheny.db.config.Config.ConfigListener;
 import org.polypheny.db.config.RuntimeConfig;
@@ -95,6 +96,18 @@ public class DockerManagerImpl extends DockerManager {
     @Override
     public void destroyAll( int adapterId ) {
         dockerInstances.values().forEach( dockerInstance -> dockerInstance.destroyAll( adapterId ) );
+    }
+
+
+    @Override
+    public List<String> getUsedNames() {
+        return dockerInstances.values().stream().flatMap( client -> client.getUsedNames().stream() ).collect( Collectors.toList() );
+    }
+
+
+    @Override
+    public List<Integer> getUsedPorts() {
+        return dockerInstances.values().stream().flatMap( client -> client.getUsedPorts().stream() ).collect( Collectors.toList() );
     }
 
 }

@@ -37,11 +37,9 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
@@ -68,9 +66,9 @@ public class DockerInstance extends DockerManager {
     // as Docker does not allow two containers with the same name or which expose the same port ( ports only for running containers )
     // we have to track them, so we can return correct messages to the user
     @Getter
-    private final Set<Integer> usedPorts = new HashSet<>();
+    private final List<Integer> usedPorts = new ArrayList<>();
     @Getter
-    private final Set<String> usedNames = new HashSet<>();
+    private final List<String> usedNames = new ArrayList<>();
     private final String url;
 
     @Getter
@@ -92,11 +90,13 @@ public class DockerInstance extends DockerManager {
 
     private void updateUsedValues( DockerClient client ) {
         client.listImagesCmd().exec().forEach( image -> {
-            for ( String tag : image.getRepoTags() ) {
-                String[] splits = tag.split( ":" );
+            if ( image.getRepoTags() != null ) {
+                for ( String tag : image.getRepoTags() ) {
+                    String[] splits = tag.split( ":" );
 
-                if ( splits[0].equals( Image.MONGODB.getName() ) ) {
-                    availableImages.add( Image.MONGODB.setVersion( splits[1] ) );
+                    if ( splits[0].equals( Image.MONGODB.getName() ) ) {
+                        availableImages.add( Image.MONGODB.setVersion( splits[1] ) );
+                    }
                 }
             }
         } );
@@ -255,6 +255,15 @@ public class DockerInstance extends DockerManager {
     }
 
 
+    /**
+     * Tries to download the provided image through Docker,
+     * this is necessary to have it accessible when later generating a
+     * container from it
+     *
+     * If the image is already downloaded nothing happens
+     *
+     * image the image which is downloaded
+     */
     public void download( Image image ) {
         PullImageResultCallback callback = new PullImageResultCallback();
         client.pullImageCmd( image.getFullName() ).exec( callback );
@@ -308,9 +317,10 @@ public class DockerInstance extends DockerManager {
         availableContainers.remove( container.uniqueName );
     }
 
+
     // non-conflicting initializer for DockerManagerImpl()
-    /*protected DockerInstance generateNewSession() {
-        return new DockerInstance( client );
-    }*/
+    protected DockerInstance generateNewSession( String url ) {
+        return new DockerInstance( url );
+    }
 
 }
