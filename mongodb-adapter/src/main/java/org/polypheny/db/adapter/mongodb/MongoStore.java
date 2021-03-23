@@ -48,6 +48,7 @@ import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
 import org.polypheny.db.catalog.entity.CatalogDefaultValue;
 import org.polypheny.db.catalog.entity.CatalogIndex;
 import org.polypheny.db.catalog.entity.CatalogTable;
+import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.DockerInstance;
 import org.polypheny.db.docker.DockerManager;
 import org.polypheny.db.docker.DockerManager.ContainerBuilder;
@@ -74,7 +75,7 @@ public class MongoStore extends DataStore implements DockerDeployable {
     );
     @SuppressWarnings("WeakerAccess")
     public static final List<AdapterSetting> AVAILABLE_DOCKER_SETTINGS = ImmutableList.of(
-            new AdapterSettingString( "dockerUrl", false, true, false, "localhost" ),
+            new AdapterSettingList( "dockerUrl", false, true, false, RuntimeConfig.DOCKER_URLS.getStringList() ).bind( RuntimeConfig.DOCKER_URLS ),
             new AdapterSettingBoolean( "persistent", false, true, false, false ),
             new AdapterSettingInteger( "port", false, true, false, 27017 )
     );
