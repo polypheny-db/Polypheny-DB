@@ -42,6 +42,7 @@ import org.bson.BsonValue;
 import org.bson.Document;
 import org.polypheny.db.adapter.DataStore;
 import org.polypheny.db.adapter.DockerDeployable;
+import org.polypheny.db.adapter.RemoteDeployable;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
@@ -62,7 +63,7 @@ import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeFamily;
 
 @Slf4j
-public class MongoStore extends DataStore implements DockerDeployable {
+public class MongoStore extends DataStore implements DockerDeployable, RemoteDeployable {
 
     @SuppressWarnings("WeakerAccess")
     public static final String ADAPTER_NAME = "MongoDB";
@@ -75,9 +76,11 @@ public class MongoStore extends DataStore implements DockerDeployable {
     );
     @SuppressWarnings("WeakerAccess")
     public static final List<AdapterSetting> AVAILABLE_DOCKER_SETTINGS = ImmutableList.of(
-            new AdapterSettingList( "dockerUrl", false, true, false, RuntimeConfig.DOCKER_URLS.getStringList() ).bind( RuntimeConfig.DOCKER_URLS ),
-            new AdapterSettingBoolean( "persistent", false, true, false, false ),
-            new AdapterSettingInteger( "port", false, true, false, 27017 )
+            new AdapterSettingList( "dockerUrl", false, true, false, RuntimeConfig.DOCKER_URLS.getStringList() ).bind( RuntimeConfig.DOCKER_URLS )
+    );
+    @SuppressWarnings("WeakerAccess")
+    public static final List<AdapterSetting> AVAILABLE_REMOTE_SETTINGS = ImmutableList.of(
+            new AdapterSettingString( "host", false, true, false, "localhost" )
     );
     private final MongoClient client;
     private final TransactionProvider transactionProvider;
@@ -100,7 +103,7 @@ public class MongoStore extends DataStore implements DockerDeployable {
         MongoClientSettings mongoSettings = MongoClientSettings
                 .builder()
                 .applyToClusterSettings( builder ->
-                        builder.hosts( Collections.singletonList( new ServerAddress( settings.get( "host" ), Integer.parseInt( settings.get( "port" ) ) ) ) )
+                        builder.hosts( Collections.singletonList( new ServerAddress( settings.get( "dockerUrl" ), Integer.parseInt( settings.get( "port" ) ) ) ) )
                 )
                 .build();
 
@@ -206,8 +209,8 @@ public class MongoStore extends DataStore implements DockerDeployable {
     @Override
     public void dropTable( Context context, CatalogTable combinedTable ) {
         context.getStatement().getTransaction().registerInvolvedAdapter( this );
-        transactionProvider.startTransaction();
-        this.currentSchema.database.getCollection( getPhysicalTableName( combinedTable.id ) ).drop( transactionProvider.getSession() );
+        //transactionProvider.startTransaction();
+        this.currentSchema.database.getCollection( getPhysicalTableName( combinedTable.id ) ).drop();
     }
 
 
@@ -302,8 +305,8 @@ public class MongoStore extends DataStore implements DockerDeployable {
             }
 
             context.getStatement().getTransaction().registerInvolvedAdapter( this );
-            transactionProvider.startTransaction();
-            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).dropIndex( transactionProvider.getSession(), catalogIndex.name );
+            //transactionProvider.startTransaction();
+            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).dropIndex( catalogIndex.name );
         }
     }
 
@@ -351,5 +354,10 @@ public class MongoStore extends DataStore implements DockerDeployable {
         return AVAILABLE_DOCKER_SETTINGS;
     }
 
+
+    @Override
+    public List<AdapterSetting> getRemoteSettings() {
+        return AVAILABLE_REMOTE_SETTINGS;
+    }
 
 }

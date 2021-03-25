@@ -166,6 +166,10 @@ public class DockerInstance extends DockerManager {
         if ( !usedNames.contains( container.uniqueName ) ) {
             initContainer( container );
         }
+        if ( !availableImages.contains( container.image ) ) {
+            download( container.image );
+        }
+
         // we add the name and the ports to our book-keeping functions as all previous checks passed
         // both get added above but the port is not always visible, e.g. when container is spopped
         usedPorts.addAll( container.internalExternalPortMapping.values() );
@@ -226,7 +230,7 @@ public class DockerInstance extends DockerManager {
 
 
     private void initContainer( Container container ) {
-        if ( availableImages.contains( container.image ) ) {
+        if ( !availableImages.contains( container.image ) ) {
             download( container.image );
         }
 

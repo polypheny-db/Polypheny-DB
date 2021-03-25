@@ -6,6 +6,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -134,11 +135,14 @@ public class AdapterManager {
                     String name = (String) clazz.getDeclaredField( "ADAPTER_NAME" ).get( null );
                     String description = (String) clazz.getDeclaredField( "DESCRIPTION" ).get( null );
                     Map<String, List<AdapterSetting>> settings = new HashMap<>();
-                    settings.put( "normal", (List<AdapterSetting>) clazz.getDeclaredField( "AVAILABLE_SETTINGS" ).get( null ) );
+                    settings.put( "default", (List<AdapterSetting>) clazz.getDeclaredField( "AVAILABLE_SETTINGS" ).get( null ) );
                     if ( Arrays.asList( clazz.getGenericInterfaces() ).contains( DockerDeployable.class ) ) {
                         settings.put( "docker", (List<AdapterSetting>) clazz.getDeclaredField( "AVAILABLE_DOCKER_SETTINGS" ).get( null ) );
                     }
-                    settings.put( "mode", Arrays.asList( new AdapterSettingList( "mode", false, true, true, Arrays.asList( "embedded", "docker" ) ) ) );
+                    if ( Arrays.asList( clazz.getGenericInterfaces() ).contains( RemoteDeployable.class ) ) {
+                        settings.put( "remote", (List<AdapterSetting>) clazz.getDeclaredField( "AVAILABLE_REMOTE_SETTINGS" ).get( null ) );
+                    }
+                    settings.put( "mode", Collections.singletonList( new AdapterSettingList( "mode", false, true, true, Collections.singletonList( "docker" ) ) ) );
                     result.add( new AdapterInformation( name, description, clazz, settings ) );
                 }
             }
