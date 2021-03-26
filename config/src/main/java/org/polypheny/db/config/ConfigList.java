@@ -55,6 +55,8 @@ public class ConfigList extends Config {
             decimalList( key, (List<BigDecimal>) list );
         } else if ( clazz.equals( Boolean.class ) ) {
             booleanList( key, (List<Boolean>) list );
+        } else if ( clazz.equals( ConfigDocker.class ) ) {
+            dockerList( key, (List<ConfigDocker>) list );
         } else {
             throw new UnsupportedOperationException( "A ConfigList, which uses that that type is not supported." );
         }
@@ -127,6 +129,18 @@ public class ConfigList extends Config {
     }
 
 
+    public void dockerList( String key, final List<ConfigDocker> list ) {
+        this.template = new ConfigDocker( "localhost", null, null );
+        this.list = list.stream().map( el -> (ConfigScalar) el ).collect( Collectors.toList() );
+    }
+
+
+    @Override
+    public <T> List<T> getList( Class<T> type ) {
+        return list.stream().map( type::cast ).collect( Collectors.toList() );
+    }
+
+
     @Override
     public List<String> getStringList() {
         return list.stream().map( Config::getString ).collect( Collectors.toList() );
@@ -184,6 +198,8 @@ public class ConfigList extends Config {
             setter = ( key, value ) -> new ConfigDecimal( key, (BigDecimal) value );
         } else if ( clazz.equals( ConfigBoolean.class ) ) {
             setter = ( key, value ) -> new ConfigBoolean( key, (Boolean) value );
+        } else if ( clazz.equals( ConfigDocker.class ) ) {
+            setter = ( key, value ) -> ConfigDocker.fromMap( (Map<String, Object>) value );
         } else {
             return false;
         }
@@ -198,7 +214,8 @@ public class ConfigList extends Config {
         for ( int i = 0; i < values.size(); i++ ) {
             if ( validate( values.get( i ) ) ) {
                 Map<String, Object> value = (Map<String, Object>) values.get( i );
-                temp.add( i, scalarGetter.apply( (String) value.get( "key" ), value.get( "value" ) ) );
+                temp.add( i, scalarGetter.apply( (String) value.get( "key" ), value.getOrDefault( "value", value ) ) );
+
             } else {
                 return false;
             }

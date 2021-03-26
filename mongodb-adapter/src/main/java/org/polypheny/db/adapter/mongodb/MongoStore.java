@@ -49,6 +49,9 @@ import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
 import org.polypheny.db.catalog.entity.CatalogDefaultValue;
 import org.polypheny.db.catalog.entity.CatalogIndex;
 import org.polypheny.db.catalog.entity.CatalogTable;
+import org.polypheny.db.config.Config;
+import org.polypheny.db.config.Config.ConfigListener;
+import org.polypheny.db.config.ConfigDocker;
 import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.DockerInstance;
 import org.polypheny.db.docker.DockerManager;
@@ -76,21 +79,23 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
     );
     @SuppressWarnings("WeakerAccess")
     public static final List<AdapterSetting> AVAILABLE_DOCKER_SETTINGS = ImmutableList.of(
-            new AdapterSettingList( "dockerUrl", false, true, false, RuntimeConfig.DOCKER_URLS.getStringList() ).bind( RuntimeConfig.DOCKER_URLS )
+            new GenericAdapterSettingsList<>( "instanceId", false, true, false, RuntimeConfig.DOCKER_TEST.getList( ConfigDocker.class ), ( el ) -> String.valueOf( el.getId() ), ConfigDocker.class ).bind( RuntimeConfig.DOCKER_TEST )
     );
     @SuppressWarnings("WeakerAccess")
     public static final List<AdapterSetting> AVAILABLE_REMOTE_SETTINGS = ImmutableList.of(
             new AdapterSettingString( "host", false, true, false, "localhost" )
     );
-    private final MongoClient client;
-    private final TransactionProvider transactionProvider;
+    private MongoClient client;
+    private TransactionProvider transactionProvider;
     private MongoSchema currentSchema;
+    private String currentUrl;
+    private final int dockerInstanceId;
 
 
     public MongoStore( int adapterId, String uniqueName, Map<String, String> settings ) {
         super( adapterId, uniqueName, settings, Boolean.parseBoolean( settings.get( "persistent" ) ), true );
 
-        DockerManager.Container container = new ContainerBuilder( getAdapterId(), Image.MONGODB, getUniqueName(), settings.get( "dockerUrl" ) )
+        DockerManager.Container container = new ContainerBuilder( getAdapterId(), Image.MONGODB, getUniqueName(), Integer.parseInt( settings.get( "instanceId" ) ) )
                 .withMappedPort( Image.MONGODB.getInternalPort(), Integer.parseInt( settings.get( "port" ) ) )
                 .withInitCommands( Arrays.asList( "mongod", "--replSet", "test" ) )
                 .withAfterCommands( Arrays.asList( "mongo", "--eval", "rs.initiate()" ), 2000 )
@@ -100,10 +105,38 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
         addInformationPhysicalNames();
         enableInformationPage();
 
+        dockerInstanceId = Integer.parseInt( settings.get( "instanceId" ) );
+        resetClient();
+        // we have to track the used docker url we attach a listener
+        ConfigListener listener = new ConfigListener() {
+            @Override
+            public void onConfigChange( Config c ) {
+                reset( c );
+            }
+
+
+            @Override
+            public void restart( Config c ) {
+                reset( c );
+            }
+
+
+            private void reset( Config c ) {
+                if ( c instanceof ConfigDocker && ((ConfigDocker) c).id == dockerInstanceId && !((ConfigDocker) c).getUrl().equals( currentUrl ) ) {
+                    resetClient();
+                }
+            }
+        };
+        RuntimeConfig.DOCKER_TEST.addObserver( listener );
+    }
+
+
+    public void resetClient() {
+        currentUrl = RuntimeConfig.DOCKER_TEST.getWithId( ConfigDocker.class, Integer.parseInt( settings.get( "instanceId" ) ) ).getUrl();
         MongoClientSettings mongoSettings = MongoClientSettings
                 .builder()
                 .applyToClusterSettings( builder ->
-                        builder.hosts( Collections.singletonList( new ServerAddress( settings.get( "dockerUrl" ), Integer.parseInt( settings.get( "port" ) ) ) ) )
+                        builder.hosts( Collections.singletonList( new ServerAddress( currentUrl ) ) )
                 )
                 .build();
 

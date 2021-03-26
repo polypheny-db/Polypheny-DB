@@ -22,11 +22,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.polypheny.db.config.Config;
 import org.polypheny.db.config.Config.ConfigListener;
+import org.polypheny.db.config.ConfigDocker;
 import org.polypheny.db.config.RuntimeConfig;
 
 public class DockerManagerImpl extends DockerManager {
 
-    private final Map<String, DockerInstance> dockerInstances = new HashMap<>();
+    private final Map<Integer, DockerInstance> dockerInstances = new HashMap<>();
 
 
     public DockerManagerImpl() {
@@ -45,17 +46,25 @@ public class DockerManagerImpl extends DockerManager {
         };
         resetClients();
         RuntimeConfig.DOCKER_URLS.addObserver( listener );
+        RuntimeConfig.DOCKER_TEST.addObserver( listener );
     }
 
 
     private void resetClients() {
-        List<String> dockerUrls = RuntimeConfig.DOCKER_URLS.getStringList();
+        List<Integer> dockerInstanceIds = RuntimeConfig.DOCKER_TEST
+                .getList( ConfigDocker.class )
+                .stream()
+                .map( config -> config.id )
+                .collect( Collectors.toList() );
         // remove unused clients
-        dockerInstances.keySet().stream().filter( url -> !dockerUrls.contains( url ) ).forEach( dockerInstances::remove );
+        dockerInstances.keySet().stream().filter( id -> !dockerInstanceIds.contains( id ) ).forEach( dockerInstanceIds::remove );
+        // update internal values
+        updateConfigs();
+
         // add new clients
-        dockerUrls.forEach( url -> {
-            if ( !dockerInstances.containsKey( url ) ) {
-                dockerInstances.put( url, new DockerInstance( url ) );
+        dockerInstanceIds.forEach( id -> {
+            if ( !dockerInstances.containsKey( id ) ) {
+                dockerInstances.put( id, new DockerInstance( id ) );
             }
         } );
     }
@@ -63,7 +72,7 @@ public class DockerManagerImpl extends DockerManager {
 
     @Override
     public Container initialize( Container container ) {
-        dockerInstances.get( container.getDockerUrl() ).initialize( container );
+        dockerInstances.get( container.getDockerInstanceId() ).initialize( container );
 
         return container;
     }
@@ -71,19 +80,19 @@ public class DockerManagerImpl extends DockerManager {
 
     @Override
     public void start( Container container ) {
-        dockerInstances.get( container.getDockerUrl() ).start( container );
+        dockerInstances.get( container.getDockerInstanceId() ).start( container );
     }
 
 
     @Override
     public void stop( Container container ) {
-        dockerInstances.get( container.getDockerUrl() ).stop( container );
+        dockerInstances.get( container.getDockerInstanceId() ).stop( container );
     }
 
 
     @Override
     public void destroy( Container container ) {
-        dockerInstances.get( container.getDockerUrl() ).destroy( container );
+        dockerInstances.get( container.getDockerInstanceId() ).destroy( container );
     }
 
 
@@ -108,6 +117,12 @@ public class DockerManagerImpl extends DockerManager {
     @Override
     public List<Integer> getUsedPorts() {
         return dockerInstances.values().stream().flatMap( client -> client.getUsedPorts().stream() ).collect( Collectors.toList() );
+    }
+
+
+    @Override
+    protected void updateConfigs() {
+        dockerInstances.values().forEach( DockerManager::updateConfigs );
     }
 
 }

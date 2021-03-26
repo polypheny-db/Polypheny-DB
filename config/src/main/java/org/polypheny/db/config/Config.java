@@ -401,7 +401,12 @@ public abstract class Config {
      * @throws ConfigRuntimeException If config value can not be converted into a list of Strings
      */
     public List<String> getStringList() {
-        throw new ConfigRuntimeException( "Configuration of type " + this.getClass().getSimpleName() + " cannot be converted into a Enum value!" );
+        throw new ConfigRuntimeException( "Configuration of type " + this.getClass().getSimpleName() + " cannot be converted into a String value!" );
+    }
+
+
+    public <T> List<T> getList( Class<T> type ) {
+        throw new ConfigRuntimeException( "Configuration of type " + this.getClass().getSimpleName() + " cannot be converted into a String value!" );
     }
 
 

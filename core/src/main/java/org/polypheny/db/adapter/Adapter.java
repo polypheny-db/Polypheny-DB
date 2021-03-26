@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
@@ -347,9 +349,9 @@ public abstract class Adapter {
     public static class AdapterSettingList extends AdapterSetting {
 
         private final String type = "List";
-        private List<String> options;
+        public List<String> options;
         @Setter
-        private String defaultValue;
+        String defaultValue;
 
 
         public AdapterSettingList( String name, boolean canBeNull, boolean required, boolean modifiable, List<String> options ) {
@@ -376,6 +378,34 @@ public abstract class Adapter {
                 }
             }
         }
+
+    }
+
+
+    @Accessors(chain = true)
+    public static class GenericAdapterSettingsList<T> extends AdapterSettingList {
+
+        private transient Function<T, String> mapper;
+        private transient Class<T> clazz;
+
+
+        public GenericAdapterSettingsList( String name, boolean canBeNull, boolean required, boolean modifiable, List<T> options, Function<T, String> mapper, Class<T> clazz ) {
+            super( name, canBeNull, required, modifiable, options.stream().map( mapper ).collect( Collectors.toList() ) );
+            this.mapper = mapper;
+            this.clazz = clazz;
+        }
+
+
+        @Override
+        public void refreshFromConfig() {
+            if ( boundConfig != null ) {
+                options = boundConfig.getList( clazz ).stream().map( mapper ).collect( Collectors.toList() );
+                if ( options.size() > 0 ) {
+                    this.defaultValue = options.get( 0 );
+                }
+            }
+        }
+
 
     }
 

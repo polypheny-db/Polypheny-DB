@@ -43,6 +43,8 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
+import org.polypheny.db.config.ConfigDocker;
+import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.Exceptions.NameExistsException;
 import org.polypheny.db.docker.Exceptions.PortExistsException;
 
@@ -58,7 +60,12 @@ import org.polypheny.db.docker.Exceptions.PortExistsException;
  */
 public class DockerInstance extends DockerManager {
 
-    private final DockerClient client;
+    private String url;
+    private String alias;
+    private String username;
+    private String password;
+
+    private DockerClient client;
     private final Map<String, Container> availableContainers = new HashMap<>();
     private final List<Image> availableImages = new ArrayList<>();
     private final HashMap<Integer, ImmutableList<String>> containersOnAdapter = new HashMap<>();
@@ -69,16 +76,21 @@ public class DockerInstance extends DockerManager {
     private final List<Integer> usedPorts = new ArrayList<>();
     @Getter
     private final List<String> usedNames = new ArrayList<>();
-    private final String url;
+    private final int instanceId;
 
     @Getter
     @Setter
     private boolean dockerRunning = false;
 
 
-    DockerInstance( String url ) {
-        this.url = url;
-        this.client = generateClient( url );
+    DockerInstance( Integer instanceId ) {
+        ConfigDocker config = RuntimeConfig.DOCKER_TEST.getWithId( ConfigDocker.class, instanceId );
+        this.instanceId = instanceId;
+        this.client = generateClient( this.instanceId );
+        this.alias = config.getAlias();
+        this.username = config.getUsername();
+        this.password = config.getPassword();
+        this.url = config.getUrl();
 
         dockerRunning = testDockerRunning( client );
 
@@ -111,9 +123,9 @@ public class DockerInstance extends DockerManager {
     }
 
 
-    private static DockerClient generateClient( String url ) {
+    private DockerClient generateClient( int instanceId ) {
         DockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder()
-                .withDockerHost( "tcp://" + url + ":" + 2375 )
+                .withDockerHost( "tcp://" + RuntimeConfig.DOCKER_TEST.getWithId( ConfigDocker.class, instanceId ).getUrl() + ":" + 2375 )
                 //.withDockerTlsVerify( true ) //TODO DL: use certificates
                 //.withDockerCertPath(certPath)
                 .build();
@@ -300,6 +312,28 @@ public class DockerInstance extends DockerManager {
 
 
     @Override
+    protected void updateConfigs() {
+        ConfigDocker newConfig = RuntimeConfig.DOCKER_TEST.getWithId( ConfigDocker.class, instanceId );
+        if ( !url.equals( newConfig.getUrl() ) ) {
+            this.url = newConfig.getUrl();
+            this.client = generateClient( instanceId );
+        }
+        if ( !alias.equals( newConfig.getAlias() ) ) {
+            this.alias = newConfig.getAlias();
+        }
+        // Objects.equals cause both can be null
+        if ( !Objects.equals( username, newConfig.getUsername() ) ) {
+            this.username = username;
+        }
+        // Objects.equals cause both can be null
+        if ( !Objects.equals( password, newConfig.getPassword() ) ) {
+            this.password = password;
+        }
+
+    }
+
+
+    @Override
     public void stop( Container container ) {
         client.stopContainerCmd( container.uniqueName ).exec();
         container.setStatus( ContainerStatus.STOPPED );
@@ -323,8 +357,8 @@ public class DockerInstance extends DockerManager {
 
 
     // non-conflicting initializer for DockerManagerImpl()
-    protected DockerInstance generateNewSession( String url ) {
-        return new DockerInstance( url );
+    protected DockerInstance generateNewSession( int instanceId ) {
+        return new DockerInstance( instanceId );
     }
 
 }

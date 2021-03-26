@@ -96,6 +96,11 @@ public abstract class DockerManager {
 
     public abstract List<Integer> getUsedPorts();
 
+    /**
+     * Refreshes the corresponding configs
+     */
+    protected abstract void updateConfigs();
+
 
     /**
      * This enum unifies the name building and provides additional information of an image
@@ -156,18 +161,18 @@ public abstract class DockerManager {
         public Map<Integer, Integer> internalExternalPortMapping = new HashMap<>();
         public boolean checkUnique = false;
         public List<String> initCommands = new ArrayList<>();
-        public String dockerUrl;
+        public int dockerInstanceId;
 
 
         public int timeout;
         public List<String> afterCommands = new ArrayList<>();
 
 
-        public ContainerBuilder( Integer adapterId, Image image, String uniqueName, String dockerUrl ) {
+        public ContainerBuilder( Integer adapterId, Image image, String uniqueName, int dockerInstanceId ) {
             this.adapterId = adapterId;
             this.image = image;
             this.uniqueName = uniqueName;
-            this.dockerUrl = dockerUrl;
+            this.dockerInstanceId = dockerInstanceId;
         }
 
 
@@ -198,7 +203,7 @@ public abstract class DockerManager {
                     adapterId,
                     uniqueName,
                     image,
-                    dockerUrl,
+                    dockerInstanceId,
                     internalExternalPortMapping,
                     checkUnique,
                     initCommands,
@@ -227,7 +232,7 @@ public abstract class DockerManager {
         @Getter
         private String containerId;
         @Getter
-        private final String dockerUrl;
+        private final int dockerInstanceId;
 
         public final boolean usesInitCommands;
         public final List<String> initCommands;
@@ -241,7 +246,7 @@ public abstract class DockerManager {
                 int adapterId,
                 String uniqueName,
                 Image image,
-                String dockerUrl,
+                int dockerInstanceId,
                 Map<Integer, Integer> internalExternalPortMapping,
                 boolean checkUnique,
                 List<String> initCommands,
@@ -251,7 +256,7 @@ public abstract class DockerManager {
             this.adapterId = adapterId;
             this.image = image;
             this.uniqueName = uniqueName;
-            this.dockerUrl = dockerUrl;
+            this.dockerInstanceId = dockerInstanceId;
             this.internalExternalPortMapping = internalExternalPortMapping;
             this.status = ContainerStatus.INIT;
             this.initCommands = initCommands;
