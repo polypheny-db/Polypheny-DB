@@ -41,6 +41,7 @@ import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.config.Config;
 import org.polypheny.db.config.Config.ConfigListener;
+import org.polypheny.db.config.ConfigObject;
 import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.information.Information;
 import org.polypheny.db.information.InformationGroup;
@@ -352,6 +353,7 @@ public abstract class Adapter {
         public List<String> options;
         @Setter
         String defaultValue;
+        public boolean dynamic = false;
 
 
         public AdapterSettingList( String name, boolean canBeNull, boolean required, boolean modifiable, List<String> options ) {
@@ -382,24 +384,36 @@ public abstract class Adapter {
     }
 
 
+    /**
+     * DynamicSettingsList which allows to configure mapped AdapterSettings, which expose an alias in the frontend
+     * but assign an corresponding id when the value is chosen
+     *
+     * @param <T>
+     */
     @Accessors(chain = true)
-    public static class GenericAdapterSettingsList<T> extends AdapterSettingList {
+    public static class DynamicAdapterSettingsList<T extends ConfigObject> extends AdapterSettingList {
 
-        private transient Function<T, String> mapper;
-        private transient Class<T> clazz;
+        private final transient Function<T, String> mapper;
+        private final transient Class<T> clazz;
+        private Map<Integer, String> alias;
+        private final String nameAlias;
 
 
-        public GenericAdapterSettingsList( String name, boolean canBeNull, boolean required, boolean modifiable, List<T> options, Function<T, String> mapper, Class<T> clazz ) {
-            super( name, canBeNull, required, modifiable, options.stream().map( mapper ).collect( Collectors.toList() ) );
+        public DynamicAdapterSettingsList( String name, String nameAlias, boolean canBeNull, boolean required, boolean modifiable, List<T> options, Function<T, String> mapper, Class<T> clazz ) {
+            super( name, canBeNull, required, modifiable, options.stream().map( ( el ) -> String.valueOf( el.getId() ) ).collect( Collectors.toList() ) );
             this.mapper = mapper;
             this.clazz = clazz;
+            this.dynamic = true;
+            this.nameAlias = nameAlias;
+            this.alias = options.stream().collect( Collectors.toMap( ConfigObject::getId, mapper ) );
         }
 
 
         @Override
         public void refreshFromConfig() {
             if ( boundConfig != null ) {
-                options = boundConfig.getList( clazz ).stream().map( mapper ).collect( Collectors.toList() );
+                options = boundConfig.getList( clazz ).stream().map( ( el ) -> String.valueOf( el.id ) ).collect( Collectors.toList() );
+                alias = boundConfig.getList( clazz ).stream().collect( Collectors.toMap( ConfigObject::getId, mapper ) );
                 if ( options.size() > 0 ) {
                     this.defaultValue = options.get( 0 );
                 }
