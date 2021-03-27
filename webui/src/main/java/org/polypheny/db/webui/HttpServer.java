@@ -202,6 +202,8 @@ public class HttpServer implements Runnable {
 
         webuiServer.get( "/getFile/:file", crud::getFile );
 
+        webuiServer.get( "/testDockerInstance/:dockerId", crud::testDockerInstance );
+
     }
 
 

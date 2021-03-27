@@ -132,6 +132,7 @@ import org.polypheny.db.catalog.exceptions.UnknownUserException;
 import org.polypheny.db.config.Config;
 import org.polypheny.db.config.Config.ConfigListener;
 import org.polypheny.db.config.RuntimeConfig;
+import org.polypheny.db.docker.DockerManager;
 import org.polypheny.db.exploreByExample.Explore;
 import org.polypheny.db.exploreByExample.ExploreManager;
 import org.polypheny.db.iface.QueryInterface;
@@ -3765,6 +3766,12 @@ public class Crud implements InformationObserver {
 
     public Map<String, SchemaType> getTypeSchemas( Request request, Response response ) {
         return catalog.getSchemas( 1, null ).stream().collect( Collectors.toMap( CatalogSchema::getName, CatalogSchema::getSchemaType ) );
+    }
+
+
+    public boolean testDockerInstance( Request req, Response res ) {
+        String dockerId = req.params( "dockerId" );
+        return DockerManager.getInstance().testDockerRunning( Integer.parseInt( dockerId ) );
     }
 
 

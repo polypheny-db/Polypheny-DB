@@ -79,8 +79,8 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
     );
     @SuppressWarnings("WeakerAccess")
     public static final List<AdapterSetting> AVAILABLE_DOCKER_SETTINGS = ImmutableList.of(
-            new DynamicAdapterSettingsList<>( "instanceId", "DockerInstance", false, true, false, RuntimeConfig.DOCKER_TEST.getList( ConfigDocker.class ), ConfigDocker::getAlias, ConfigDocker.class )
-                    .bind( RuntimeConfig.DOCKER_TEST )
+            new DynamicAdapterSettingsList<>( "instanceId", "DockerInstance", false, true, false, RuntimeConfig.DOCKER_INSTANCES.getList( ConfigDocker.class ), ConfigDocker::getAlias, ConfigDocker.class )
+                    .bind( RuntimeConfig.DOCKER_INSTANCES )
     );
     @SuppressWarnings("WeakerAccess")
     public static final List<AdapterSetting> AVAILABLE_REMOTE_SETTINGS = ImmutableList.of(
@@ -128,12 +128,12 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
                 }
             }
         };
-        RuntimeConfig.DOCKER_TEST.addObserver( listener );
+        RuntimeConfig.DOCKER_INSTANCES.addObserver( listener );
     }
 
 
     public void resetClient() {
-        currentUrl = RuntimeConfig.DOCKER_TEST.getWithId( ConfigDocker.class, Integer.parseInt( settings.get( "instanceId" ) ) ).getUrl();
+        currentUrl = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, Integer.parseInt( settings.get( "instanceId" ) ) ).getUrl();
         MongoClientSettings mongoSettings = MongoClientSettings
                 .builder()
                 .applyToClusterSettings( builder ->

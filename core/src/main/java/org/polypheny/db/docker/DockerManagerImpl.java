@@ -45,19 +45,24 @@ public class DockerManagerImpl extends DockerManager {
             }
         };
         resetClients();
-        RuntimeConfig.DOCKER_URLS.addObserver( listener );
-        RuntimeConfig.DOCKER_TEST.addObserver( listener );
+        RuntimeConfig.DOCKER_INSTANCES.addObserver( listener );
     }
 
 
     private void resetClients() {
-        List<Integer> dockerInstanceIds = RuntimeConfig.DOCKER_TEST
+        List<Integer> dockerInstanceIds = RuntimeConfig.DOCKER_INSTANCES
                 .getList( ConfigDocker.class )
                 .stream()
                 .map( config -> config.id )
                 .collect( Collectors.toList() );
         // remove unused clients
-        dockerInstances.keySet().stream().filter( id -> !dockerInstanceIds.contains( id ) ).forEach( dockerInstanceIds::remove );
+        List<Integer> removeIds = dockerInstances
+                .keySet()
+                .stream()
+                .filter( id -> !dockerInstanceIds.contains( id ) )
+                .collect( Collectors.toList() );
+
+        removeIds.forEach( dockerInstances::remove );
         // update internal values
         updateConfigs();
 
@@ -123,6 +128,15 @@ public class DockerManagerImpl extends DockerManager {
     @Override
     protected void updateConfigs() {
         dockerInstances.values().forEach( DockerManager::updateConfigs );
+    }
+
+
+    @Override
+    public boolean testDockerRunning( int dockerId ) {
+        if ( dockerInstances.containsKey( dockerId ) ) {
+            return dockerInstances.get( dockerId ).testDockerRunning( dockerId );
+        }
+        throw new RuntimeException( "There was a problem retrieving the correct Docker instance." );
     }
 
 }

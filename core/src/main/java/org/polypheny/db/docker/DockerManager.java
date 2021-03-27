@@ -101,6 +101,8 @@ public abstract class DockerManager {
      */
     protected abstract void updateConfigs();
 
+    public abstract boolean testDockerRunning( int dockerId );
+
 
     /**
      * This enum unifies the name building and provides additional information of an image

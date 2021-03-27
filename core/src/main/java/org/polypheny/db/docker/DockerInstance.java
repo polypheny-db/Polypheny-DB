@@ -84,7 +84,7 @@ public class DockerInstance extends DockerManager {
 
 
     DockerInstance( Integer instanceId ) {
-        ConfigDocker config = RuntimeConfig.DOCKER_TEST.getWithId( ConfigDocker.class, instanceId );
+        ConfigDocker config = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, instanceId );
         this.instanceId = instanceId;
         this.client = generateClient( this.instanceId );
         this.alias = config.getAlias();
@@ -125,7 +125,7 @@ public class DockerInstance extends DockerManager {
 
     private DockerClient generateClient( int instanceId ) {
         DockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder()
-                .withDockerHost( "tcp://" + RuntimeConfig.DOCKER_TEST.getWithId( ConfigDocker.class, instanceId ).getUrl() + ":" + 2375 )
+                .withDockerHost( "tcp://" + RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, instanceId ).getUrl() + ":" + 2375 )
                 //.withDockerTlsVerify( true ) //TODO DL: use certificates
                 //.withDockerCertPath(certPath)
                 .build();
@@ -313,7 +313,7 @@ public class DockerInstance extends DockerManager {
 
     @Override
     protected void updateConfigs() {
-        ConfigDocker newConfig = RuntimeConfig.DOCKER_TEST.getWithId( ConfigDocker.class, instanceId );
+        ConfigDocker newConfig = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, instanceId );
         if ( !url.equals( newConfig.getUrl() ) ) {
             this.url = newConfig.getUrl();
             this.client = generateClient( instanceId );
@@ -330,6 +330,15 @@ public class DockerInstance extends DockerManager {
             this.password = password;
         }
 
+    }
+
+
+    @Override
+    public boolean testDockerRunning( int dockerId ) {
+        if ( dockerId != instanceId ) {
+            throw new RuntimeException( "There was a problem retrieving the correct DockerInstance" );
+        }
+        return testDockerRunning( client );
     }
 
 

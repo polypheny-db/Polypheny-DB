@@ -314,12 +314,7 @@ public enum RuntimeConfig {
             ConfigType.BOOLEAN,
             "dockerGroup" ),
 
-    DOCKER_URLS( "runtime/dockerUrls",
-            "List of potential (remote) Docker urls.",
-            Collections.singletonList( "localhost" ),
-            ConfigType.STRING_LIST,
-            "dockerGroup" ),
-    DOCKER_TEST( "runtime/dockerTest",
+    DOCKER_INSTANCES( "runtime/dockerTest",
             "Test Config",
             Collections.singletonList( new ConfigDocker( 0, "localhost", null, null, "localhost" ) ),
             ConfigType.INSTANCE_LIST,
