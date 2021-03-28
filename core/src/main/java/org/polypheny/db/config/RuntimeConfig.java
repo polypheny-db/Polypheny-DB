@@ -308,14 +308,8 @@ public enum RuntimeConfig {
             SchemaType.RELATIONAL,
             ConfigType.ENUM ),
 
-    USE_DOCKER( "runtime/useDocker",
-            "Allow deploying stores and sources via Docker.",
-            true,
-            ConfigType.BOOLEAN,
-            "dockerGroup" ),
-
-    DOCKER_INSTANCES( "runtime/dockerTest",
-            "Test Config",
+    DOCKER_INSTANCES( "runtime/dockerInstances",
+            "Configure different docker instances, which can be used to place adapters on.",
             Collections.singletonList( new ConfigDocker( 0, "localhost", null, null, "localhost" ) ),
             ConfigType.INSTANCE_LIST,
             "dockerGroup" );

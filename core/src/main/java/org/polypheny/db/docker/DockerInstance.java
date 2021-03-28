@@ -47,6 +47,7 @@ import org.polypheny.db.config.ConfigDocker;
 import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.Exceptions.NameExistsException;
 import org.polypheny.db.docker.Exceptions.PortExistsException;
+import org.polypheny.db.util.FileSystemManager;
 
 
 /**
@@ -60,6 +61,9 @@ import org.polypheny.db.docker.Exceptions.PortExistsException;
  */
 public class DockerInstance extends DockerManager {
 
+    private ConfigDocker currentConfig;
+    private int port;
+    private String protocol;
     private String url;
     private String alias;
     private String username;
@@ -80,19 +84,16 @@ public class DockerInstance extends DockerManager {
 
     @Getter
     @Setter
-    private boolean dockerRunning = false;
+    private boolean dockerRunning;
 
 
     DockerInstance( Integer instanceId ) {
-        ConfigDocker config = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, instanceId );
+        this.currentConfig = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, instanceId );
         this.instanceId = instanceId;
         this.client = generateClient( this.instanceId );
-        this.alias = config.getAlias();
-        this.username = config.getUsername();
-        this.password = config.getPassword();
-        this.url = config.getUrl();
 
         dockerRunning = testDockerRunning( client );
+        RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, instanceId ).setDockerRunning( dockerRunning );
 
         if ( dockerRunning ) {
             updateUsedValues( client );
@@ -124,10 +125,21 @@ public class DockerInstance extends DockerManager {
 
 
     private DockerClient generateClient( int instanceId ) {
+        ConfigDocker settings = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, instanceId );
+        String host = null;
+        if ( settings.getProtocol().equals( "ssh" ) ) {
+            if ( settings.getUsername() == null ) {
+                throw new RuntimeException( "To use a ssh connection for Docker a username is needed." );
+            }
+            host = "ssh://" + settings.getUsername() + "@" + settings.getUrl() + ":" + settings.getPort();
+        } else {
+            host = "tcp://" + settings.getUrl() + ":" + settings.getPort();
+        }
+
         DockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder()
-                .withDockerHost( "tcp://" + RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, instanceId ).getUrl() + ":" + 2375 )
-                //.withDockerTlsVerify( true ) //TODO DL: use certificates
-                //.withDockerCertPath(certPath)
+                .withDockerHost( host )
+                .withDockerTlsVerify( true ) //TODO DL: use certificates
+                .withDockerCertPath( FileSystemManager.getInstance().registerNewFolder( "certs/" + settings.getUrl() + "/client" ).getPath() )
                 .build();
 
         DockerHttpClient httpClient = new ApacheDockerHttpClient.Builder()
@@ -314,22 +326,13 @@ public class DockerInstance extends DockerManager {
     @Override
     protected void updateConfigs() {
         ConfigDocker newConfig = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, instanceId );
-        if ( !url.equals( newConfig.getUrl() ) ) {
-            this.url = newConfig.getUrl();
+        if ( !currentConfig.equals( newConfig ) ) {
+            // something changed and we need to get a new client, which matches the new config
             this.client = generateClient( instanceId );
+            this.dockerRunning = testDockerRunning( instanceId );
+            RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, instanceId ).setDockerRunning( dockerRunning );
         }
-        if ( !alias.equals( newConfig.getAlias() ) ) {
-            this.alias = newConfig.getAlias();
-        }
-        // Objects.equals cause both can be null
-        if ( !Objects.equals( username, newConfig.getUsername() ) ) {
-            this.username = username;
-        }
-        // Objects.equals cause both can be null
-        if ( !Objects.equals( password, newConfig.getPassword() ) ) {
-            this.password = password;
-        }
-
+        currentConfig = newConfig;
     }
 
 

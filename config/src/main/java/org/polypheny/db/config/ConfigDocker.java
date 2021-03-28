@@ -16,17 +16,33 @@
 
 package org.polypheny.db.config;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.Getter;
 import lombok.Setter;
 
 public class ConfigDocker extends ConfigObject {
+
+    public static final String DEFAULT_PROTOCOL = "tcp";
+    public static final int DEFAULT_PORT = 2376;
+
+    // ssh is only usable with keys and not with username/passwort in docker for now,
+    // so this is disabled
+    public final List<String> protocols = Collections.singletonList( "tcp" );
 
     @Getter
     @Setter
     private String alias;
     @Getter
     private String url;
+    @Getter
+    @Setter
+    private String protocol = DEFAULT_PROTOCOL;
+    @Getter
+    @Setter
+    private int port = DEFAULT_PORT;
     @Getter
     private String username;
     @Getter
@@ -65,10 +81,12 @@ public class ConfigDocker extends ConfigObject {
         ConfigDocker config = new ConfigDocker(
                 ((Double) value.get( "id" )).intValue(),
                 (String) value.get( "url" ),
-                (String) value.getOrDefault( "username", null ),
+                (String) value.getOrDefault( "username", "" ),
                 (String) value.getOrDefault( "password", null ),
                 (String) value.get( "alias" ) );
         config.setDockerRunning( (Boolean) value.get( "dockerRunning" ) );
+        config.setPort( ((Double) value.getOrDefault( "port", DEFAULT_PORT )).intValue() );
+        config.setProtocol( (String) value.getOrDefault( "protocol", DEFAULT_PROTOCOL ) );
 
         return config;
     }
@@ -87,15 +105,27 @@ public class ConfigDocker extends ConfigObject {
 
 
     @Override
-    public String toString() {
-        return "ConfigDocker{" +
-                "id=" + id +
-                ", alias='" + alias + '\'' +
-                ", url='" + url + '\'' +
-                ", username='" + username + '\'' +
-                ", password='" + password + '\'' +
-                ", dockerRunning=" + dockerRunning +
-                '}';
+    public boolean equals( Object o ) {
+        if ( this == o ) {
+            return true;
+        }
+        if ( o == null || getClass() != o.getClass() ) {
+            return false;
+        }
+        ConfigDocker that = (ConfigDocker) o;
+        return port == that.port &&
+                dockerRunning == that.dockerRunning &&
+                url.equals( that.url ) &&
+                alias.equals( that.alias ) &&
+                protocol.equals( that.protocol ) &&
+                Objects.equals( username, that.username ) &&
+                Objects.equals( password, that.password );
+    }
+
+
+    @Override
+    public int hashCode() {
+        return 0;
     }
 
 }
