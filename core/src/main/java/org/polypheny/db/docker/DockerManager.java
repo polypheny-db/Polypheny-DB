@@ -106,7 +106,7 @@ public abstract class DockerManager {
 
     /**
      * This enum unifies the name building and provides additional information of an image
-     * If one wants to add a new image it has to be added here for now
+     * If one wants to add a new image it has to be added here
      */
     public enum Image {
         MONGODB( "mongo", 27017 );

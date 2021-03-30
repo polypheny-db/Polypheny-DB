@@ -19,6 +19,8 @@ package org.polypheny.db.docker;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.Test;
+import org.polypheny.db.config.ConfigDocker;
+import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.DockerManager.ContainerBuilder;
 import org.polypheny.db.docker.DockerManager.Image;
 import org.polypheny.db.util.Pair;
@@ -30,7 +32,7 @@ import org.polypheny.db.util.Pair;
  */
 public class DockerManagerTest {
 
-    String DEFAULT_DOCKER_URL = "localhost";
+    ConfigDocker config = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, 0 );
 
 
     /**
@@ -45,7 +47,7 @@ public class DockerManagerTest {
         int adapterId = 1;
 
         Pair.zip( uniqueNames, uniquePorts ).forEach( namePortPairs -> {
-            manager.initialize( new ContainerBuilder( adapterId, Image.MONGODB, namePortPairs.left, DEFAULT_DOCKER_URL ).withMappedPort( namePortPairs.right, namePortPairs.right ).build() );
+            manager.initialize( new ContainerBuilder( adapterId, Image.MONGODB, namePortPairs.left, config.id ).withMappedPort( namePortPairs.right, namePortPairs.right ).build() );
         } );
         assert (manager.getUsedNames().containsAll( uniqueNames ));
         assert (manager.getUsedPorts().containsAll( uniquePorts ));
@@ -68,7 +70,7 @@ public class DockerManagerTest {
 
         String uniqueName = "test3";
         List<Integer> multiplePorts = Arrays.asList( 3210, 4929 );
-        ContainerBuilder containerBuilder = new ContainerBuilder( adapterId, Image.MONGODB, uniqueName, DEFAULT_DOCKER_URL );
+        ContainerBuilder containerBuilder = new ContainerBuilder( adapterId, Image.MONGODB, uniqueName, config.id );
         multiplePorts.forEach( port -> containerBuilder.withMappedPort( port, port ) );
         manager.initialize( containerBuilder.build() );
 

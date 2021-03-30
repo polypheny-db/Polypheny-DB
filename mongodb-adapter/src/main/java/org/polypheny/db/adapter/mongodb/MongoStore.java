@@ -77,11 +77,14 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
             new AdapterSettingBoolean( "persistent", false, true, false, false ),
             new AdapterSettingInteger( "port", false, true, false, 27017 )
     );
+
     @SuppressWarnings("WeakerAccess")
     public static final List<AdapterSetting> AVAILABLE_DOCKER_SETTINGS = ImmutableList.of(
             new DynamicAdapterSettingsList<>( "instanceId", "DockerInstance", false, true, false, RuntimeConfig.DOCKER_INSTANCES.getList( ConfigDocker.class ), ConfigDocker::getAlias, ConfigDocker.class )
                     .bind( RuntimeConfig.DOCKER_INSTANCES )
+                    .setDescription( "To configure additional Docker instances, use the Docker Config in the Config Manager." )
     );
+
     @SuppressWarnings("WeakerAccess")
     public static final List<AdapterSetting> AVAILABLE_REMOTE_SETTINGS = ImmutableList.of(
             new AdapterSettingString( "host", false, true, false, "localhost" )

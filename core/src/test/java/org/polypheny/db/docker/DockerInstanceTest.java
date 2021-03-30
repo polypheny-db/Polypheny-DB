@@ -18,6 +18,7 @@ package org.polypheny.db.docker;
 
 import org.junit.Test;
 import org.polypheny.db.config.ConfigDocker;
+import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.DockerManager.Container;
 import org.polypheny.db.docker.DockerManager.ContainerBuilder;
 import org.polypheny.db.docker.DockerManager.ContainerStatus;
@@ -25,8 +26,7 @@ import org.polypheny.db.docker.DockerManager.Image;
 
 public class DockerInstanceTest {
 
-    String DOCKER_URL = "localhost";
-    ConfigDocker config = new ConfigDocker( DOCKER_URL, null, null );
+    ConfigDocker config = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, 0 );
 
 
     /**
@@ -40,7 +40,7 @@ public class DockerInstanceTest {
 
         //// new session has to handle already running container
         DockerInstance managerThisSession = managerLastSession.generateNewSession( config.id );
-        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName, DOCKER_URL ).withMappedPort( usedPort, usedPort ).build() );
+        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName, config.id ).withMappedPort( usedPort, usedPort ).build() );
         managerThisSession.start( restoredContainer );
 
         assert (restoredContainer.getStatus() == ContainerStatus.RUNNING);
@@ -68,7 +68,7 @@ public class DockerInstanceTest {
         //// previous session left the container running
 
         DockerInstance managerLastSession = new DockerInstance( config.id );
-        Container container = managerLastSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName, DOCKER_URL ).withMappedPort( usedPort, usedPort ).build() );
+        Container container = managerLastSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName, config.id ).withMappedPort( usedPort, usedPort ).build() );
         managerLastSession.start( container );
 
         assert (container.getStatus() == ContainerStatus.RUNNING);
@@ -105,7 +105,7 @@ public class DockerInstanceTest {
 
         //// new session has to handle already running container
         DockerInstance managerThisSession = managerLastSession.generateNewSession( config.id );
-        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName, DOCKER_URL ).withMappedPort( usedPort, usedPort ).build() );
+        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName, config.id ).withMappedPort( usedPort, usedPort ).build() );
         managerThisSession.start( restoredContainer );
 
         assert (restoredContainer.getStatus() == ContainerStatus.RUNNING);
@@ -127,7 +127,7 @@ public class DockerInstanceTest {
 
         //// new session has to handle already running container
         DockerInstance managerThisSession = managerLastSession.generateNewSession( config.id );
-        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName, DOCKER_URL ).withMappedPort( usedPort, usedPort ).build() );
+        Container restoredContainer = managerThisSession.initialize( new ContainerBuilder( 1, Image.MONGODB, uniqueName, config.id ).withMappedPort( usedPort, usedPort ).build() );
         managerThisSession.start( restoredContainer );
 
         assert (restoredContainer.getStatus() == ContainerStatus.RUNNING);

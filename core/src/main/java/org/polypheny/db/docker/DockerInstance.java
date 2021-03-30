@@ -29,10 +29,10 @@ import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.Ports;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
+import com.github.dockerjava.core.DefaultDockerClientConfig.Builder;
 import com.github.dockerjava.core.DockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
-import com.github.dockerjava.transport.DockerHttpClient;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,23 +51,18 @@ import org.polypheny.db.util.FileSystemManager;
 
 
 /**
- * This class servers as a organization unit which controls all Docker containers in Polypheny.
+ * This class servers as a organization unit which controls all Docker containers in Polypheny,
+ * which are placed on a specific Docker instance.
  * While the callers can and should mostly interact with the underlying containers directly,
  * this instance is used to have a control layer, which allows to restore, start or shutdown multiple of
  * these instances at the same time.
  *
  * For now, we have no way to determent if a previously created/running container with the same name
- * was created by Polypheny, so we try to reuse it
+ * was created by Polypheny, so we try to reuse it.
  */
 public class DockerInstance extends DockerManager {
 
     private ConfigDocker currentConfig;
-    private int port;
-    private String protocol;
-    private String url;
-    private String alias;
-    private String username;
-    private String password;
 
     private DockerClient client;
     private final Map<String, Container> availableContainers = new HashMap<>();
@@ -126,23 +121,29 @@ public class DockerInstance extends DockerManager {
 
     private DockerClient generateClient( int instanceId ) {
         ConfigDocker settings = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, instanceId );
-        String host = null;
+
+        String host;
         if ( settings.getProtocol().equals( "ssh" ) ) {
             if ( settings.getUsername() == null ) {
                 throw new RuntimeException( "To use a ssh connection for Docker a username is needed." );
             }
-            host = "ssh://" + settings.getUsername() + "@" + settings.getUrl() + ":" + settings.getPort();
+            host = "ssh://" + settings.getUsername() + "@" + settings.getUrl();
         } else {
             host = "tcp://" + settings.getUrl() + ":" + settings.getPort();
         }
 
-        DockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder()
-                .withDockerHost( host )
-                .withDockerTlsVerify( true ) //TODO DL: use certificates
-                .withDockerCertPath( FileSystemManager.getInstance().registerNewFolder( "certs/" + settings.getUrl() + "/client" ).getPath() )
-                .build();
+        Builder builder = DefaultDockerClientConfig
+                .createDefaultConfigBuilder()
+                .withDockerHost( host );
+        if ( !settings.isUsingInsecure() ) {
+            builder
+                    .withDockerTlsVerify( true )
+                    .withDockerCertPath( FileSystemManager.getInstance().registerNewFolder( "certs/" + settings.getUrl() + "/client" ).getPath() );
+        }
 
-        DockerHttpClient httpClient = new ApacheDockerHttpClient.Builder()
+        DockerClientConfig config = builder.build();
+
+        ApacheDockerHttpClient httpClient = new ApacheDockerHttpClient.Builder()
                 .dockerHost( config.getDockerHost() )
                 .sslConfig( config.getSSLConfig() )
                 .build();
@@ -195,7 +196,7 @@ public class DockerInstance extends DockerManager {
         }
 
         // we add the name and the ports to our book-keeping functions as all previous checks passed
-        // both get added above but the port is not always visible, e.g. when container is spopped
+        // both get added above but the port is not always visible, e.g. when container is stopped
         usedPorts.addAll( container.internalExternalPortMapping.values() );
         usedNames.add( container.uniqueName );
         registerIfAbsent( container );
@@ -290,7 +291,6 @@ public class DockerInstance extends DockerManager {
      *
      * If the image is already downloaded nothing happens
      *
-     * image the image which is downloaded
      */
     public void download( Image image ) {
         PullImageResultCallback callback = new PullImageResultCallback();
@@ -362,7 +362,11 @@ public class DockerInstance extends DockerManager {
 
         usedNames.remove( container.uniqueName );
         usedPorts.removeAll( container.getExposedPorts().stream().map( ExposedPort::getPort ).collect( Collectors.toList() ) );
-        List<String> adapterContainers = containersOnAdapter.get( container.adapterId ).stream().filter( cont -> !cont.equals( container.uniqueName ) ).collect( Collectors.toList() );
+        List<String> adapterContainers = containersOnAdapter
+                .get( container.adapterId )
+                .stream()
+                .filter( cont -> !cont.equals( container.uniqueName ) )
+                .collect( Collectors.toList() );
         containersOnAdapter.replace( container.adapterId, ImmutableList.copyOf( adapterContainers ) );
         availableContainers.remove( container.uniqueName );
     }

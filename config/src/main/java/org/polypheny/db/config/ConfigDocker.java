@@ -22,14 +22,17 @@ import java.util.Map;
 import java.util.Objects;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.experimental.Accessors;
 
+@Accessors(chain = true)
 public class ConfigDocker extends ConfigObject {
 
     public static final String DEFAULT_PROTOCOL = "tcp";
     public static final int DEFAULT_PORT = 2376;
 
-    // ssh is only usable with keys and not with username/passwort in docker for now,
-    // so this is disabled
+    // ssh was introduced as a possible transport protocol for connecting to remote
+    // docker hosts recently, it is not yet supported in java-docker but can be enabled as
+    // soon as this happens
     public final List<String> protocols = Collections.singletonList( "tcp" );
 
     @Getter
@@ -49,7 +52,10 @@ public class ConfigDocker extends ConfigObject {
     private String password;
     @Getter
     @Setter
-    private boolean dockerRunning = false;
+    private boolean dockerRunning;
+    @Getter
+    @Setter
+    private boolean usingInsecure;
 
 
     public ConfigDocker( String url, String username, String password, String alias ) {
@@ -87,6 +93,7 @@ public class ConfigDocker extends ConfigObject {
         config.setDockerRunning( (Boolean) value.get( "dockerRunning" ) );
         config.setPort( ((Double) value.getOrDefault( "port", DEFAULT_PORT )).intValue() );
         config.setProtocol( (String) value.getOrDefault( "protocol", DEFAULT_PROTOCOL ) );
+        config.setUsingInsecure( (Boolean) value.get( "usingInsecure" ) );
 
         return config;
     }
@@ -118,6 +125,7 @@ public class ConfigDocker extends ConfigObject {
                 url.equals( that.url ) &&
                 alias.equals( that.alias ) &&
                 protocol.equals( that.protocol ) &&
+                usingInsecure == that.usingInsecure &&
                 Objects.equals( username, that.username ) &&
                 Objects.equals( password, that.password );
     }
