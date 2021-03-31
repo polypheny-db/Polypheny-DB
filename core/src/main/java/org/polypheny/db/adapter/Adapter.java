@@ -78,6 +78,11 @@ public abstract class Adapter {
         informationPage = new InformationPage( uniqueName );
         informationGroups = new ArrayList<>();
         informationElements = new ArrayList<>();
+
+        // this is need for docker deployable stores and should not interfere too much with other adapters
+        if ( this instanceof DockerDeployable && settings.containsKey( "mode" ) && settings.get( "mode" ).equals( "docker" ) ) {
+            ((DockerDeployable) this).attachListener( Integer.parseInt( settings.get( "instanceId" ) ) );
+        }
     }
 
 

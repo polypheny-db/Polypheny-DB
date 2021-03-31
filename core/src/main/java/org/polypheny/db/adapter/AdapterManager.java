@@ -137,7 +137,7 @@ public class AdapterManager {
                     Map<String, List<AdapterSetting>> settings = new HashMap<>();
                     settings.put( "default", (List<AdapterSetting>) clazz.getDeclaredField( "AVAILABLE_SETTINGS" ).get( null ) );
                     if ( Arrays.asList( clazz.getGenericInterfaces() ).contains( DockerDeployable.class ) ) {
-                        settings.put( "docker", (List<AdapterSetting>) clazz.getDeclaredField( "AVAILABLE_DOCKER_SETTINGS" ).get( null ) );
+                        settings.put( "docker", (List<AdapterSetting>) clazz.getField( "AVAILABLE_DOCKER_SETTINGS" ).get( null ) );
                     }
                     if ( Arrays.asList( clazz.getGenericInterfaces() ).contains( RemoteDeployable.class ) ) {
                         settings.put( "remote", (List<AdapterSetting>) clazz.getDeclaredField( "AVAILABLE_REMOTE_SETTINGS" ).get( null ) );
@@ -158,6 +158,10 @@ public class AdapterManager {
         if ( getAdapters().containsKey( uniqueName ) ) {
             throw new RuntimeException( "There is already an adapter with this unique name" );
         }
+        if ( settings.containsKey( "mode" ) ) {
+            throw new RuntimeException( "Please specify a deployment mode, when adding a store" );
+        }
+
         Constructor<?> ctor;
         AdapterType adapterType;
         try {

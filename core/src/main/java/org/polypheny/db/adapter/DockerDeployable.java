@@ -16,11 +16,67 @@
 
 package org.polypheny.db.adapter;
 
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.polypheny.db.adapter.Adapter.AdapterSetting;
+import org.polypheny.db.adapter.Adapter.DynamicAdapterSettingsList;
+import org.polypheny.db.config.Config;
+import org.polypheny.db.config.Config.ConfigListener;
+import org.polypheny.db.config.ConfigDocker;
+import org.polypheny.db.config.RuntimeConfig;
 
+/**
+ * This interface allows to enhance implementors with the functionality
+ * of using a Docker container.
+ * For this it adds a specific docker setting which is responsible for the used
+ * Docker instance, as it is possible to deploy to different remote and local Docker instance.
+ *
+ * Docker instance configurations can change dynamically.
+ * To handle this, the interface can be used to attach a listener to the implementor
+ * ( for adapters this is done automatically ) by calling {@link #attachListener}
+ * This method calls the interface method {@link #resetConnection} with the changed configurations.
+ */
 public interface DockerDeployable {
 
-    List<AdapterSetting> getDockerSettings();
+    List<AdapterSetting> AVAILABLE_DOCKER_SETTINGS = ImmutableList.of(
+            new DynamicAdapterSettingsList<>( "instanceId", "DockerInstance", false, true, false, RuntimeConfig.DOCKER_INSTANCES.getList( ConfigDocker.class ), ConfigDocker::getAlias, ConfigDocker.class )
+                    .bind( RuntimeConfig.DOCKER_INSTANCES )
+                    .setDescription( "To configure additional Docker instances, use the Docker Config in the Config Manager." )
+    );
+
+    default List<AdapterSetting> getDockerSettings() {
+        return AVAILABLE_DOCKER_SETTINGS;
+    }
+
+    /**
+     * This function attaches the callee to the specified docker instance,
+     * it will call the appropriate resetConnection function when the docker configuration changes
+     *
+     * @param dockerInstanceId the id of the corresponding docker instance
+     */
+    default void attachListener( int dockerInstanceId ) {
+        // we have to track the used docker url we attach a listener
+        ConfigListener listener = new ConfigListener() {
+            @Override
+            public void onConfigChange( Config c ) {
+                resetConnection( RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, dockerInstanceId ) );
+            }
+
+
+            @Override
+            public void restart( Config c ) {
+                resetConnection( RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, dockerInstanceId ) );
+            }
+        };
+        RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, dockerInstanceId ).addObserver( listener );
+    }
+
+    /**
+     * This function is called automatically if the configuration of connected Docker instance changes,
+     * it is responsible for handling regenerating the connection if the Docker changes demand it
+     *
+     * @param c the new configuration of the corresponding Docker instance
+     */
+    void resetConnection( ConfigDocker c );
 
 }

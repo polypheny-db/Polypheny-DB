@@ -49,8 +49,6 @@ import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
 import org.polypheny.db.catalog.entity.CatalogDefaultValue;
 import org.polypheny.db.catalog.entity.CatalogIndex;
 import org.polypheny.db.catalog.entity.CatalogTable;
-import org.polypheny.db.config.Config;
-import org.polypheny.db.config.Config.ConfigListener;
 import org.polypheny.db.config.ConfigDocker;
 import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.DockerInstance;
@@ -79,13 +77,6 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
     );
 
     @SuppressWarnings("WeakerAccess")
-    public static final List<AdapterSetting> AVAILABLE_DOCKER_SETTINGS = ImmutableList.of(
-            new DynamicAdapterSettingsList<>( "instanceId", "DockerInstance", false, true, false, RuntimeConfig.DOCKER_INSTANCES.getList( ConfigDocker.class ), ConfigDocker::getAlias, ConfigDocker.class )
-                    .bind( RuntimeConfig.DOCKER_INSTANCES )
-                    .setDescription( "To configure additional Docker instances, use the Docker Config in the Config Manager." )
-    );
-
-    @SuppressWarnings("WeakerAccess")
     public static final List<AdapterSetting> AVAILABLE_REMOTE_SETTINGS = ImmutableList.of(
             new AdapterSettingString( "host", false, true, false, "localhost" )
     );
@@ -110,42 +101,28 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
         enableInformationPage();
 
         dockerInstanceId = Integer.parseInt( settings.get( "instanceId" ) );
-        resetClient();
-        // we have to track the used docker url we attach a listener
-        ConfigListener listener = new ConfigListener() {
-            @Override
-            public void onConfigChange( Config c ) {
-                reset( c );
-            }
 
+        resetConnection( RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, Integer.parseInt( settings.get( "instanceId" ) ) ) );
 
-            @Override
-            public void restart( Config c ) {
-                reset( c );
-            }
-
-
-            private void reset( Config c ) {
-                if ( c instanceof ConfigDocker && ((ConfigDocker) c).id == dockerInstanceId && !((ConfigDocker) c).getUrl().equals( currentUrl ) ) {
-                    resetClient();
-                }
-            }
-        };
-        RuntimeConfig.DOCKER_INSTANCES.addObserver( listener );
     }
 
 
-    public void resetClient() {
-        currentUrl = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, Integer.parseInt( settings.get( "instanceId" ) ) ).getUrl();
+    @Override
+    public void resetConnection( ConfigDocker c ) {
+        if ( c.id != dockerInstanceId || c.getUrl().equals( currentUrl ) ) {
+            return;
+        }
+
         MongoClientSettings mongoSettings = MongoClientSettings
                 .builder()
                 .applyToClusterSettings( builder ->
-                        builder.hosts( Collections.singletonList( new ServerAddress( currentUrl ) ) )
+                        builder.hosts( Collections.singletonList( new ServerAddress( c.getUrl() ) ) )
                 )
                 .build();
 
         this.client = MongoClients.create( mongoSettings );
         this.transactionProvider = new TransactionProvider( this.client );
+        this.currentUrl = c.getUrl();
     }
 
 
@@ -383,12 +360,6 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
 
     public static String getPhysicalTableName( long id ) {
         return "tab-" + id;
-    }
-
-
-    @Override
-    public List<AdapterSetting> getDockerSettings() {
-        return AVAILABLE_DOCKER_SETTINGS;
     }
 
 

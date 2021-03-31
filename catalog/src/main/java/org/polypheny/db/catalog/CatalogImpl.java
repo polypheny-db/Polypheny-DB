@@ -619,6 +619,7 @@ public class CatalogImpl extends Catalog {
             mongoSettings.put( "port", "27017" );
             mongoSettings.put( "type", "mongo" );
             mongoSettings.put( "instanceId", "0" );
+            mongoSettings.put( "mode", "docker" );
             addAdapter( "hsqldb", "org.polypheny.db.adapter.mongodb.MongoStore", AdapterType.STORE, mongoSettings );
 
             // Deploy default CSV view

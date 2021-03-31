@@ -310,7 +310,8 @@ public enum RuntimeConfig {
 
     DOCKER_INSTANCES( "runtime/dockerInstances",
             "Configure different docker instances, which can be used to place adapters on.",
-            Collections.singletonList( new ConfigDocker( 0, "localhost", null, null, "localhost" ) ),
+            Collections.singletonList( new ConfigDocker( 0, "localhost", null, null, "localhost" )
+                    .setDockerRunning( true ) ),
             ConfigType.INSTANCE_LIST,
             "dockerGroup" );
 
