@@ -406,7 +406,7 @@ public abstract class Config {
 
 
     public <T> List<T> getList( Class<T> type ) {
-        throw new ConfigRuntimeException( "Configuration of type " + this.getClass().getSimpleName() + " cannot be converted into a String value!" );
+        throw new ConfigRuntimeException( "Configuration of type " + this.getClass().getSimpleName() + " cannot be converted into a " + type.getSimpleName() + " value!" );
     }
 
 
@@ -465,7 +465,19 @@ public abstract class Config {
     }
 
 
-    public boolean setList( final List<Object> values, Class<?> clazz ) {
+    /**
+     * Sets the value of a config list which holds ConfigObjects
+     *
+     * @param values the raw values ( object type )
+     * @param clazz the class, which the raw values belong to
+     * @return if the parsing and setting was successful
+     */
+    public boolean setConfigObjectList( final List<Object> values, Class<? extends ConfigScalar> clazz ) {
+        throw new ConfigRuntimeException( "Not possible to set a list on a configuration element of type " + this.getClass().getSimpleName() + "!" );
+    }
+
+
+    public void setList( List<ConfigScalar> values ) {
         throw new ConfigRuntimeException( "Not possible to set a list on a configuration element of type " + this.getClass().getSimpleName() + "!" );
     }
 
@@ -947,9 +959,6 @@ public abstract class Config {
     public Class<? extends ConfigScalar> getTemplateClass() {
         throw new ConfigRuntimeException( "No template was set for this configType" );
     }
-
-
-    ;
 
 
     /**

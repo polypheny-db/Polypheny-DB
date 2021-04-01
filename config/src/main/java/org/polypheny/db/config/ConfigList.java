@@ -36,6 +36,23 @@ public class ConfigList extends Config {
 
     ConfigScalar template;
 
+    /**
+     * listener which propagates the changes to underlying configs to
+     * listeners of this config
+     */
+    ConfigListener listener = new ConfigListener() {
+        @Override
+        public void onConfigChange( Config c ) {
+            notifyConfigListeners();
+        }
+
+
+        @Override
+        public void restart( Config c ) {
+            notifyConfigListeners();
+        }
+    };
+
 
     // while java does not known if our cast are correct
     // we know, so we can suppress here
@@ -184,7 +201,7 @@ public class ConfigList extends Config {
 
 
     @Override
-    public boolean setList( List<Object> values, Class<?> clazz ) {
+    public boolean setConfigObjectList( List<Object> values, Class<? extends ConfigScalar> clazz ) {
         BiFunction<String, Object, ? extends ConfigScalar> setter;
         if ( clazz.equals( ConfigString.class ) ) {
             setter = ( key, value ) -> new ConfigString( key, (String) value );
@@ -204,12 +221,20 @@ public class ConfigList extends Config {
             return false;
         }
 
-        return setList( values, setter );
+        return setConfigObjectList( values, setter );
 
     }
 
 
-    private <T extends ConfigScalar> boolean setList( List<Object> values, BiFunction<String, Object, ? extends ConfigScalar> scalarGetter ) {
+    @Override
+    public void setList( List<ConfigScalar> values ) {
+        this.list = values;
+        values.forEach( val -> val.addObserver( listener ) );
+        notifyConfigListeners();
+    }
+
+
+    private boolean setConfigObjectList( List<Object> values, BiFunction<String, Object, ? extends ConfigScalar> scalarGetter ) {
         List<ConfigScalar> temp = new ArrayList<>();
         for ( int i = 0; i < values.size(); i++ ) {
             if ( validate( values.get( i ) ) ) {
@@ -221,6 +246,7 @@ public class ConfigList extends Config {
             }
         }
         this.list = temp;
+        this.list.forEach( val -> val.addObserver( listener ) );
         notifyConfigListeners();
         return true;
     }

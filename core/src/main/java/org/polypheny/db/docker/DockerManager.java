@@ -97,7 +97,7 @@ public abstract class DockerManager {
     public abstract List<Integer> getUsedPorts();
 
     /**
-     * Refreshes the corresponding configs
+     * Refreshes the settings of the underlying Docker clients e.g. name, alias etc.
      */
     protected abstract void updateConfigs();
 

@@ -62,6 +62,7 @@ import org.polypheny.db.util.FileSystemManager;
  */
 public class DockerInstance extends DockerManager {
 
+    @Getter
     private ConfigDocker currentConfig;
 
     private DockerClient client;

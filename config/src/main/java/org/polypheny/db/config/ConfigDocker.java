@@ -39,6 +39,7 @@ public class ConfigDocker extends ConfigObject {
     @Setter
     private String alias;
     @Getter
+    @Setter
     private String url;
     @Getter
     @Setter

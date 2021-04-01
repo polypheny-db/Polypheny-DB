@@ -141,7 +141,7 @@ public class ConfigServer implements ConfigListener {
                         }
                         break;
                     case "ConfigList":
-                        if ( !c.setList( (List<Object>) entry.getValue(), c.getTemplateClass() ) ) {
+                        if ( !c.setConfigObjectList( (List<Object>) entry.getValue(), c.getTemplateClass() ) ) {
                             allValid = false;
                             feedback.append( "Could not set " ).append( c.getKey() ).append( " to " ).append( entry.getValue() ).append( " because it was blocked by Java validation. " );
                         }

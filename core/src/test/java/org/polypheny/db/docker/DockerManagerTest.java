@@ -17,6 +17,7 @@
 package org.polypheny.db.docker;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
 import org.polypheny.db.config.ConfigDocker;
@@ -78,6 +79,46 @@ public class DockerManagerTest {
         assert (manager.getUsedPorts().containsAll( multiplePorts ));
 
         manager.destroyAll( adapterId );
+
+    }
+
+
+    /**
+     * This methods test if the automatic propagation of changes to the responsible
+     * RuntimeConfig.DOCKER_INSTANCE get correctly adapted by the {@link DockerManager}
+     * and the responsible {@link DockerInstance}
+     */
+    @Test
+    public void changingDockerInstanceTest() {
+        DockerManagerImpl manager = (DockerManagerImpl) DockerManager.getInstance();
+
+        String url = "localhost";
+        String alias = "name";
+        ConfigDocker c = new ConfigDocker( url, null, null, alias );
+
+        // config does not exist for the manager as it was not added to the runtimeConfigs
+        assert (!manager.getDockerInstances().containsKey( c.id ));
+
+        RuntimeConfig.DOCKER_INSTANCES.setList( Collections.singletonList( c ) );
+        // changes to RuntimeConfig.DOCKER_INSTANCES should automatically been handled by the DockerManger
+
+        assert (manager.getDockerInstances().containsKey( c.id ));
+
+        String newAlias = "name2";
+        RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, c.id ).setAlias( newAlias );
+        assert (manager.getDockerInstances().get( c.id ).getCurrentConfig().getAlias().equals( newAlias ));
+
+        String newUrl = "localhost2";
+        RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, c.id ).setUrl( newUrl );
+        assert (manager.getDockerInstances().get( c.id ).getCurrentConfig().getUrl().equals( newUrl ));
+
+        // when we replace the configs, they corresponding clients should automatically be removed
+        ConfigDocker newC = new ConfigDocker( url, null, null, alias );
+        RuntimeConfig.DOCKER_INSTANCES.setList( Collections.singletonList( newC ) );
+
+        assert (!manager.getDockerInstances().containsKey( c.id ));
+        assert (manager.getDockerInstances().containsKey( newC.id ));
+
 
     }
 

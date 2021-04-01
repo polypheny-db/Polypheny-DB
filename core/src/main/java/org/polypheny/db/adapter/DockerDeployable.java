@@ -29,12 +29,13 @@ import org.polypheny.db.config.RuntimeConfig;
  * This interface allows to enhance implementors with the functionality
  * of using a Docker container.
  * For this it adds a specific docker setting which is responsible for the used
- * Docker instance, as it is possible to deploy to different remote and local Docker instance.
+ * Docker instance, as it is possible to deploy to different remote and local Docker instances.
  *
  * Docker instance configurations can change dynamically.
  * To handle this, the interface can be used to attach a listener to the implementor
  * ( for adapters this is done automatically ) by calling {@link #attachListener}
- * This method calls the interface method {@link #resetConnection} with the changed configurations.
+ * This method calls the interface method {@link #resetConnection} with the changed configurations
+ * after the configurations for the attached Docker instance changes.
  */
 public interface DockerDeployable {
 
@@ -50,9 +51,9 @@ public interface DockerDeployable {
 
     /**
      * This function attaches the callee to the specified docker instance,
-     * it will call the appropriate resetConnection function when the docker configuration changes
+     * it will call the appropriate resetConnection function when the Docker configuration changes
      *
-     * @param dockerInstanceId the id of the corresponding docker instance
+     * @param dockerInstanceId the id of the corresponding Docker instance
      */
     default void attachListener( int dockerInstanceId ) {
         // we have to track the used docker url we attach a listener

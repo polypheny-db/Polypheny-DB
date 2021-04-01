@@ -587,6 +587,11 @@ public enum RuntimeConfig {
     }
 
 
+    public void setList( final List<ConfigScalar> values ) {
+        configManager.getConfig( key ).setList( values );
+    }
+
+
     public void addObserver( final ConfigListener listener ) {
         configManager.getConfig( key ).addObserver( listener );
     }

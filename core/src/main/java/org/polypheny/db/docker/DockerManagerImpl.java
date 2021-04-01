@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import lombok.Getter;
 import org.polypheny.db.config.Config;
 import org.polypheny.db.config.Config.ConfigListener;
 import org.polypheny.db.config.ConfigDocker;
@@ -27,6 +28,7 @@ import org.polypheny.db.config.RuntimeConfig;
 
 public class DockerManagerImpl extends DockerManager {
 
+    @Getter
     private final Map<Integer, DockerInstance> dockerInstances = new HashMap<>();
 
 
@@ -49,7 +51,11 @@ public class DockerManagerImpl extends DockerManager {
     }
 
 
-    private void resetClients() {
+    /**
+     * Resets the used clients by pulling the {@link RuntimeConfig} for Docker
+     * and deleting/adding new clients according to it
+     */
+    public void resetClients() {
         List<Integer> dockerInstanceIds = RuntimeConfig.DOCKER_INSTANCES
                 .getList( ConfigDocker.class )
                 .stream()
