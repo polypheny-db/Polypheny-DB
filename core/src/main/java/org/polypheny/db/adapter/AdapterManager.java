@@ -20,7 +20,6 @@ import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogAdapter;
 import org.polypheny.db.catalog.entity.CatalogAdapter.AdapterType;
 import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
-import org.polypheny.db.docker.Exceptions.DockerException;
 import org.reflections.Reflections;
 
 public class AdapterManager {
@@ -158,7 +157,7 @@ public class AdapterManager {
         if ( getAdapters().containsKey( uniqueName ) ) {
             throw new RuntimeException( "There is already an adapter with this unique name" );
         }
-        if ( settings.containsKey( "mode" ) ) {
+        if ( !settings.containsKey( "mode" ) ) {
             throw new RuntimeException( "Please specify a deployment mode, when adding a store" );
         }
 
@@ -185,12 +184,15 @@ public class AdapterManager {
         try {
             instance = (Adapter) ctor.newInstance( adapterId, uniqueName, settings );
         } catch ( Exception e ) {
-            if ( e instanceof InvocationTargetException && ((InvocationTargetException) e).getTargetException() instanceof DockerException ) {
-                throw new RuntimeException( ((InvocationTargetException) e).getTargetException() );
+            Catalog.getInstance().deleteAdapter( adapterId );
+            if ( e instanceof InvocationTargetException ) {
+                Throwable t = ((InvocationTargetException) e).getTargetException();
+                if ( t instanceof RuntimeException ) {
+                    throw (RuntimeException) t;
+                }
             } else {
                 Catalog.getInstance().deleteAdapter( adapterId );
             }
-
             throw new RuntimeException( "Something went wrong while adding a new adapter", e );
         }
         adapterByName.put( instance.getUniqueName(), instance );
