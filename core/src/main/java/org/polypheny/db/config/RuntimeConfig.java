@@ -597,6 +597,11 @@ public enum RuntimeConfig {
     }
 
 
+    public void removeObserver( final ConfigListener listener ) {
+        configManager.getConfig( key ).removeObserver( listener );
+    }
+
+
     public <T extends ConfigObject> T getWithId( Class<T> type, int id ) {
         Optional<T> optional = configManager.getConfig( key ).getList( type ).stream().filter( config -> config.id == id ).findAny();
         if ( optional.isPresent() ) {

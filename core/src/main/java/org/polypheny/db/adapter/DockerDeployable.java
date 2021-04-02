@@ -34,7 +34,7 @@ import org.polypheny.db.config.RuntimeConfig;
  * Docker instance configurations can change dynamically.
  * To handle this, the interface can be used to attach a listener to the implementor
  * ( for adapters this is done automatically ) by calling {@link #attachListener}
- * This method calls the interface method {@link #resetConnection} with the changed configurations
+ * This method calls the interface method {@link #resetDockerConnection} with the changed configurations
  * after the configurations for the attached Docker instance changes.
  */
 public interface DockerDeployable {
@@ -55,21 +55,22 @@ public interface DockerDeployable {
      *
      * @param dockerInstanceId the id of the corresponding Docker instance
      */
-    default void attachListener( int dockerInstanceId ) {
+    default ConfigListener attachListener( int dockerInstanceId ) {
         // we have to track the used docker url we attach a listener
         ConfigListener listener = new ConfigListener() {
             @Override
             public void onConfigChange( Config c ) {
-                resetConnection( RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, dockerInstanceId ) );
+                resetDockerConnection( RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, dockerInstanceId ) );
             }
 
 
             @Override
             public void restart( Config c ) {
-                resetConnection( RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, dockerInstanceId ) );
+                resetDockerConnection( RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, dockerInstanceId ) );
             }
         };
-        RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, dockerInstanceId ).addObserver( listener );
+        RuntimeConfig.DOCKER_INSTANCES.addObserver( listener );
+        return listener;
     }
 
     /**
@@ -78,6 +79,6 @@ public interface DockerDeployable {
      *
      * @param c the new configuration of the corresponding Docker instance
      */
-    void resetConnection( ConfigDocker c );
+    void resetDockerConnection( ConfigDocker c );
 
 }

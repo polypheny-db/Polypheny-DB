@@ -102,13 +102,13 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
 
         dockerInstanceId = Integer.parseInt( settings.get( "instanceId" ) );
 
-        resetConnection( RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, Integer.parseInt( settings.get( "instanceId" ) ) ) );
+        resetDockerConnection( RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, Integer.parseInt( settings.get( "instanceId" ) ) ) );
 
     }
 
 
     @Override
-    public void resetConnection( ConfigDocker c ) {
+    public void resetDockerConnection( ConfigDocker c ) {
         if ( c.id != dockerInstanceId || c.getUrl().equals( currentUrl ) ) {
             return;
         }

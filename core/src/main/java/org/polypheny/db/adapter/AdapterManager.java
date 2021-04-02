@@ -215,6 +215,11 @@ public class AdapterManager {
             throw new RuntimeException( "There is still data placed on this data store" );
         }
 
+        // Remove used listener
+        if ( adapterInstance instanceof DockerDeployable ) {
+            adapterInstance.removeListener();
+        }
+
         // Shutdown store
         adapterInstance.shutdown();
 

@@ -109,7 +109,8 @@ public abstract class DockerManager {
      * If one wants to add a new image it has to be added here
      */
     public enum Image {
-        MONGODB( "mongo", 27017 );
+        MONGODB( "mongo", 27017 ),
+        COTTONTAILDB( "cottontaildb", 1865 );
 
         @Getter
         private final String name;

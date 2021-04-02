@@ -66,6 +66,7 @@ public abstract class Adapter {
     protected final InformationPage informationPage;
     protected final List<InformationGroup> informationGroups;
     protected final List<Information> informationElements;
+    private ConfigListener listener;
 
 
     public Adapter( int adapterId, String uniqueName, Map<String, String> settings ) {
@@ -81,7 +82,7 @@ public abstract class Adapter {
 
         // this is need for docker deployable stores and should not interfere too much with other adapters
         if ( this instanceof DockerDeployable && settings.containsKey( "mode" ) && settings.get( "mode" ).equals( "docker" ) ) {
-            ((DockerDeployable) this).attachListener( Integer.parseInt( settings.get( "instanceId" ) ) );
+            this.listener = ((DockerDeployable) this).attachListener( Integer.parseInt( settings.get( "instanceId" ) ) );
         }
     }
 
@@ -105,6 +106,14 @@ public abstract class Adapter {
     public abstract List<AdapterSetting> getAvailableSettings();
 
     public abstract void shutdown();
+
+
+    public void removeListener() {
+        if ( this instanceof DockerDeployable ) {
+            RuntimeConfig.DOCKER_INSTANCES.removeObserver( this.listener );
+        }
+    }
+
 
     /**
      * Informs a store that its settings have changed.
