@@ -35,14 +35,19 @@ package org.polypheny.db.adapter.mongodb;
 
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.Getter;
 import lombok.Setter;
+import org.polypheny.db.catalog.Catalog;
+import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptTable;
 import org.polypheny.db.rel.RelNode;
 import org.polypheny.db.rel.type.RelRecordType;
-import org.polypheny.db.type.BasicPolyType;
 import org.polypheny.db.util.Pair;
 
 
@@ -70,12 +75,20 @@ public interface MongoRel extends RelNode {
 
         MongoTable mongoTable;
         @Setter
-        boolean isDDL;
+        @Getter
+        private boolean isDDL;
+        @Setter
+        @Getter
+        private boolean isPrepared;
+
         @Getter
         @Setter
         List<Object> results;
         @Getter
-        final List<Pair<Long, BasicPolyType>> prepFields = new ArrayList<>();
+        final Map<Integer, String> dynamicFields = new HashMap<>();
+        @Getter
+        final Map<Integer, Object> staticFields = new HashMap<>();
+
         @Getter
         private RelRecordType rowType;
 
@@ -107,6 +120,22 @@ public interface MongoRel extends RelNode {
             } else {
                 this.rowType = rowType;
             }
+        }
+
+
+        public Map<String, String> getLogicalPhysicalNameMapping() {
+            if ( rowType == null ) {
+                throw new RuntimeException( "Could no come up with mapping as rowtype was not specified" );
+            }
+            Catalog catalog = Catalog.getInstance();
+            CatalogTable table = catalog.getTable( mongoTable.getCatalogTable().id );
+            List<String> physicalNames = table.columnIds.stream().map( MongoStore::getPhysicalColumnName ).collect( Collectors.toList() );
+            return IntStream
+                    .range( 0, table.columnIds.size() )
+                    .boxed()
+                    .collect( Collectors.toMap( key -> table.getColumnNames().get( key ), physicalNames::get ) );
+
+
         }
 
     }

@@ -37,11 +37,11 @@ package org.polypheny.db.adapter.mongodb;
 import com.google.common.collect.Lists;
 import java.util.AbstractList;
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.linq4j.tree.BlockBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.Expressions;
 import org.apache.calcite.linq4j.tree.MethodCallExpression;
-import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.enumerable.EnumerableRel;
 import org.polypheny.db.adapter.enumerable.EnumerableRelImplementor;
 import org.polypheny.db.adapter.enumerable.JavaRowFormat;
@@ -147,16 +147,16 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         final Expression table = list.append( "table", mongoImplementor.table.getExpression( MongoTable.MongoQueryable.class ) );
         List<String> opList = Pair.right( mongoImplementor.list );
         final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );
-        Expression enumerable = null;
-        if ( !mongoImplementor.isDDL ) {
+        Expression enumerable;
+        if ( !mongoImplementor.isDDL() ) {
             enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, ops ) );
         } else {
-            if ( mongoImplementor.prepFields.size() != 0 ) {
+            if ( mongoImplementor.isPrepared() ) {
+                Expression staticFields = list.append( "staticFields", Expressions.constant( mongoImplementor.staticFields, Map.class ) );
+                Expression dynamicFields = list.append( "dynamicFields", Expressions.constant( mongoImplementor.dynamicFields, Map.class ) );
                 Expression data = list.append( "data", Expressions.constant( mongoImplementor.getRowType().getFieldNames(), Object.class ) );
-                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED.method, data ) );
-            } else if ( mongoImplementor.list.size() == 0 && mongoImplementor.results.size() == 0 ) {
-                Expression data = list.append( "data", DataContext.ROOT );
-                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_WRAPPER.method, data ) );
+                Expression physicalNames = list.append( "physicalNames", Expressions.constant( mongoImplementor.getLogicalPhysicalNameMapping(), Map.class ) );
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_EXECUTE.method, data, physicalNames, dynamicFields, staticFields ) );
             } else {
                 Expression results = list.append( "results", constantArrayList( mongoImplementor.getResults(), Object.class ) );
                 enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_GET_RESULT.method, results ) );

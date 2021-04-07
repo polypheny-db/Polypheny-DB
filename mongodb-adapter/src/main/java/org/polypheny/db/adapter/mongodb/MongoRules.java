@@ -98,7 +98,6 @@ import org.polypheny.db.sql.SqlKind;
 import org.polypheny.db.sql.SqlOperator;
 import org.polypheny.db.sql.fun.SqlStdOperatorTable;
 import org.polypheny.db.sql.validate.SqlValidatorUtil;
-import org.polypheny.db.type.BasicPolyType;
 import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeFamily;
 import org.polypheny.db.util.Bug;
@@ -501,7 +500,7 @@ public class MongoRules {
 
         @Override
         public void implement( Implementor implementor ) {
-            implementor.isDDL = true;
+            implementor.setDDL( true );
             implementor.results = new ArrayList<>();
 
             Table preTable = ((RelOptTableImpl) table).getTable();
@@ -547,7 +546,7 @@ public class MongoRules {
                         res = implementor.mongoTable.getCollection().updateMany( implementor.mongoTable.getTransactionProvider().getSession(), new BsonDocument(), update );
                     }
 
-                    implementor.isDDL = true;
+                    implementor.setDDL( true );
                     implementor.results = Collections.singletonList( res.getModifiedCount() );
 
                     break;
@@ -570,7 +569,7 @@ public class MongoRules {
                     implementor.mongoTable.getTransactionProvider().startTransaction();
                     DeleteResult result = implementor.mongoTable.getCollection().deleteMany( implementor.mongoTable.getTransactionProvider().getSession(), BsonDocument.parse( docString ) );
 
-                    implementor.isDDL = true;
+                    implementor.setDDL( true );
                     implementor.results = Collections.singletonList( result.getDeletedCount() );
                 }
 
@@ -584,31 +583,32 @@ public class MongoRules {
                 return;
             }
             implementor.setRowType( (RelRecordType) input.getRowType() );
+            implementor.setPrepared( true );
             int pos = 0;
             Document docs = new Document();
             MongoRowType rowType = (MongoRowType) implementor.getRowType();
             for ( RexNode rexNode : input.getChildExps() ) {
                 if ( rexNode instanceof RexDynamicParam ) {
                     // preparedInsert
-                    implementor.prepFields.add( new Pair<>( ((RexDynamicParam) rexNode).getIndex(), (BasicPolyType) rexNode.getType() ) );
-                } else if ( rexNode instanceof RexCall || rexNode instanceof RexLiteral ) {
-
-                    if ( rexNode instanceof RexCall ) {
-                        RexCall call = (RexCall) rexNode;
-                        if ( call.op.kind == SqlKind.ARRAY_VALUE_CONSTRUCTOR ) {
-                            BsonArray doc = new BsonArray();
-                            doc.addAll( call.operands.stream().filter( op -> op instanceof RexLiteral ).map( op -> getBsonValue( (RexLiteral) op ) ).collect( Collectors.toList() ) );
-                            docs.append( rowType.getPhysicalName( rowType.getFieldNames().get( pos ) ), doc );
-                        }
-                    } else {
-                        docs.append( rowType.getPhysicalName( rowType.getFieldNames().get( pos ) ), getBsonValue( (RexLiteral) rexNode ) );
+                    implementor.dynamicFields.put( pos, rexNode.getType().getPolyType().getTypeName() );
+                } else if ( rexNode instanceof RexLiteral ) {
+                    implementor.staticFields.put( pos, rexNode );
+                } else if ( rexNode instanceof RexCall ) {
+                    RexCall call = (RexCall) rexNode;
+                    if ( call.op.kind == SqlKind.ARRAY_VALUE_CONSTRUCTOR ) {
+                        BsonArray doc = new BsonArray();
+                        doc.addAll( call.operands.stream().filter( op -> op instanceof RexLiteral ).map( op -> getBsonValue( (RexLiteral) op ) ).collect( Collectors.toList() ) );
+                        docs.append( rowType.getPhysicalName( rowType.getFieldNames().get( pos ) ), doc );
                     }
-
-                    pos++;
+                } else {
+                    throw new RuntimeException( "This rexType was not considered" );
                 }
+
+                pos++;
             }
 
-            if ( !docs.isEmpty() ) {
+            if ( !docs.isEmpty() && implementor.dynamicFields.isEmpty() ) {
+                // only insert if it does not have dynamic
                 implementor.mongoTable.getTransactionProvider().startTransaction();
                 implementor.mongoTable.getCollection().insertOne( implementor.mongoTable.getTransactionProvider().getSession(), docs );
             }

@@ -37,6 +37,7 @@ package org.polypheny.db.adapter.mongodb;
 import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.linq4j.tree.Types;
 import org.polypheny.db.adapter.DataContext;
 
@@ -49,7 +50,7 @@ public enum MongoMethod {
     MONGO_QUERYABLE_AGGREGATE( MongoTable.MongoQueryable.class, "aggregate", List.class, List.class ),
     MONGO_GET_RESULT( MongoTable.MongoQueryable.class, "getResults", List.class ),
     PREPARED_WRAPPER( MongoTable.MongoQueryable.class, "preparedWrapper", DataContext.class ),
-    PREPARED( MongoTable.MongoQueryable.class, "prepared", List.class );
+    PREPARED_EXECUTE( MongoTable.MongoQueryable.class, "preparedExecute", List.class, Map.class, Map.class, Map.class );
 
     public final Method method;
 

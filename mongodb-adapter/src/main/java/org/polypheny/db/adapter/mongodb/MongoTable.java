@@ -51,6 +51,7 @@ import org.apache.calcite.linq4j.Enumerator;
 import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.linq4j.function.Function1;
 import org.bson.BsonDocument;
+import org.bson.BsonValue;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.polypheny.db.adapter.AdapterManager;
@@ -75,6 +76,7 @@ import org.polypheny.db.schema.ModifiableTable;
 import org.polypheny.db.schema.SchemaPlus;
 import org.polypheny.db.schema.TranslatableTable;
 import org.polypheny.db.schema.impl.AbstractTableQueryable;
+import org.polypheny.db.type.BasicPolyType;
 import org.polypheny.db.util.Util;
 
 
@@ -314,7 +316,8 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
         }
 
 
-        public Enumerable<Object> prepared( List<String> fieldNames ) {
+        @SuppressWarnings("UnusedDeclaration")
+        public Enumerable<Object> preparedExecute( List<String> fieldNames, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, BsonValue> staticValues ) {
             MongoTable mongoTable = (MongoTable) table;
             dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
             List<Document> docs = new ArrayList<>();
@@ -322,12 +325,24 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             for ( Map<Long, Object> values : this.dataContext.getParameterValues() ) {
                 Document doc = new Document();
 
-                for ( Map.Entry<Long, Object> value : values.entrySet() ) {
-                    doc.append( fieldNames.get( Math.toIntExact( value.getKey() ) ), value.getValue() );
+                // we traverse the columns and check if we have a static or a dynamic one
+                int pos = 0;
+                int dyn = 0;
+                for ( String name : fieldNames ) {
+
+                    if ( staticValues.containsKey( pos ) ) {
+                        doc.append( logicalPhysicalMapping.get( name ), staticValues.get( pos ) );
+                    } else if ( dynamicFields.containsKey( pos ) ) {
+                        doc.append( logicalPhysicalMapping.get( name ), MongoTypeUtil.getAsBson( values.get( (long) dyn ), (BasicPolyType) dataContext.getParameterType( dyn ) ) );
+                        dyn++;
+                    }
+
+                    pos++;
                 }
                 docs.add( doc );
             }
             if ( docs.size() > 0 ) {
+                mongoTable.getTransactionProvider().startTransaction();
                 mongoTable.getCollection().insertMany( mongoTable.transactionProvider.getSession(), docs );
             }
             return new AbstractEnumerable<Object>() {
