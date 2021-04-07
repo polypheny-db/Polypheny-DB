@@ -19,9 +19,12 @@ package org.polypheny.db.docker;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.polypheny.db.config.ConfigDocker;
 import org.polypheny.db.config.RuntimeConfig;
+import org.polypheny.db.docker.DockerManager.Container;
 import org.polypheny.db.docker.DockerManager.ContainerBuilder;
 import org.polypheny.db.docker.DockerManager.Image;
 import org.polypheny.db.util.Pair;
@@ -31,9 +34,17 @@ import org.polypheny.db.util.Pair;
  * DockerManager and its functionality, the functionality of
  * the underlying java-docker library should not be tested
  */
+@Category(DockerManagerTest.class)
 public class DockerManagerTest {
 
-    ConfigDocker config = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, 0 );
+    private static ConfigDocker config;
+
+
+    @Before
+    public void initConfig() {
+        config = new ConfigDocker( "localhost", null, null, "test" );
+        RuntimeConfig.DOCKER_INSTANCES.setList( Collections.singletonList( config ) );
+    }
 
 
     /**
@@ -48,7 +59,10 @@ public class DockerManagerTest {
         int adapterId = 1;
 
         Pair.zip( uniqueNames, uniquePorts ).forEach( namePortPairs -> {
-            manager.initialize( new ContainerBuilder( adapterId, Image.MONGODB, namePortPairs.left, config.id ).withMappedPort( namePortPairs.right, namePortPairs.right ).build() );
+            Container container = new ContainerBuilder( adapterId, Image.MONGODB, namePortPairs.left, config.id )
+                    .withMappedPort( namePortPairs.right, namePortPairs.right )
+                    .build();
+            manager.initialize( container );
         } );
         assert (manager.getUsedNames().containsAll( uniqueNames ));
         assert (manager.getUsedPorts().containsAll( uniquePorts ));
@@ -109,8 +123,8 @@ public class DockerManagerTest {
         assert (manager.getDockerInstances().get( c.id ).getCurrentConfig().getAlias().equals( newAlias ));
 
         String newUrl = "localhost2";
-        RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, c.id ).setUrl( newUrl );
-        assert (manager.getDockerInstances().get( c.id ).getCurrentConfig().getUrl().equals( newUrl ));
+        RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, c.id ).setHost( newUrl );
+        assert (manager.getDockerInstances().get( c.id ).getCurrentConfig().getHost().equals( newUrl ));
 
         // when we replace the configs, they corresponding clients should automatically be removed
         ConfigDocker newC = new ConfigDocker( url, null, null, alias );

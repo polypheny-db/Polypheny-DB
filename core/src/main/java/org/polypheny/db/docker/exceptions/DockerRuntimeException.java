@@ -16,11 +16,10 @@
 
 package org.polypheny.db.docker.Exceptions;
 
+public class DockerRuntimeException extends RuntimeException {
 
-public class NameExistsException extends DockerException {
-
-    public NameExistsException() {
-        super( "There already exists a container with this name." );
+    public DockerRuntimeException( String message ) {
+        super( message );
     }
 
 }

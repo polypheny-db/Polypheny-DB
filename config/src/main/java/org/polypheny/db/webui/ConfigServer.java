@@ -128,7 +128,7 @@ public class ConfigServer implements ConfigListener {
                         break;
                     case "ConfigClazz":
                     case "ConfigEnum":
-                        if ( !c.parseStringAndSetValue( (String) entry.getValue() ) ){
+                        if ( !c.parseStringAndSetValue( (String) entry.getValue() ) ) {
                             allValid = false;
                             feedback.append( "Could not set " ).append( c.getKey() ).append( " to " ).append( entry.getValue() ).append( " because it was blocked by Java validation. " );
                         }

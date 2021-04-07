@@ -45,8 +45,8 @@ import lombok.Getter;
 import lombok.Setter;
 import org.polypheny.db.config.ConfigDocker;
 import org.polypheny.db.config.RuntimeConfig;
-import org.polypheny.db.docker.Exceptions.NameExistsException;
-import org.polypheny.db.docker.Exceptions.PortExistsException;
+import org.polypheny.db.docker.Exceptions.NameExistsRuntimeException;
+import org.polypheny.db.docker.Exceptions.PortInUseRuntimeException;
 import org.polypheny.db.util.FileSystemManager;
 
 
@@ -111,9 +111,7 @@ public class DockerInstance extends DockerManager {
         } );
 
         client.listContainersCmd().withShowAll( true ).exec().forEach( container -> {
-            Arrays.stream( container.getPorts() ).forEach( containerPort -> {
-                usedPorts.add( containerPort.getPublicPort() );
-            } );
+            Arrays.stream( container.getPorts() ).forEach( containerPort -> usedPorts.add( containerPort.getPublicPort() ) );
             // docker returns the names with a prefixed "/", so we remove it
             usedNames.addAll( Arrays.stream( container.getNames() ).map( cont -> cont.substring( 1 ) ).collect( Collectors.toList() ) );
         } );
@@ -128,9 +126,9 @@ public class DockerInstance extends DockerManager {
             if ( settings.getUsername() == null ) {
                 throw new RuntimeException( "To use a ssh connection for Docker a username is needed." );
             }
-            host = "ssh://" + settings.getUsername() + "@" + settings.getUrl();
+            host = "ssh://" + settings.getUsername() + "@" + settings.getHost();
         } else {
-            host = "tcp://" + settings.getUrl() + ":" + settings.getPort();
+            host = "tcp://" + settings.getHost() + ":" + settings.getPort();
         }
 
         Builder builder = DefaultDockerClientConfig
@@ -139,7 +137,7 @@ public class DockerInstance extends DockerManager {
         if ( !settings.isUsingInsecure() ) {
             builder
                     .withDockerTlsVerify( true )
-                    .withDockerCertPath( FileSystemManager.getInstance().registerNewFolder( "certs/" + settings.getUrl() + "/client" ).getPath() );
+                    .withDockerCertPath( FileSystemManager.getInstance().registerNewFolder( "certs/" + settings.getHost() + "/client" ).getPath() );
         }
 
         DockerClientConfig config = builder.build();
@@ -266,12 +264,12 @@ public class DockerInstance extends DockerManager {
             // ExposedPort is exposed from container and Binding is port from outside
             bindings.bind( ExposedPort.tcp( mapping.getKey() ), Ports.Binding.bindPort( mapping.getValue() ) );
             if ( usedPorts.contains( mapping.getValue() ) ) {
-                throw new PortExistsException();
+                throw new PortInUseRuntimeException();
             }
         }
 
         if ( usedNames.contains( container.uniqueName ) ) {
-            throw new NameExistsException();
+            throw new NameExistsRuntimeException();
         }
 
         CreateContainerCmd cmd = client.createContainerCmd( container.image.getFullName() )
@@ -291,7 +289,6 @@ public class DockerInstance extends DockerManager {
      * container from it
      *
      * If the image is already downloaded nothing happens
-     *
      */
     public void download( Image image ) {
         PullImageResultCallback callback = new PullImageResultCallback();

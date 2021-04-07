@@ -40,7 +40,6 @@ public abstract class DataStore extends Adapter {
 
     protected final Catalog catalog = Catalog.getInstance();
 
-
     public DataStore( final int adapterId, final String uniqueName, final Map<String, String> settings, final boolean persistent ) {
         this( adapterId, uniqueName, settings, persistent, false );
     }

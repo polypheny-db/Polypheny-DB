@@ -14,23 +14,12 @@
  * limitations under the License.
  */
 
-package org.polypheny.db.adapter;
+package org.polypheny.db.docker.Exceptions;
 
-import com.google.common.collect.ImmutableList;
-import java.util.List;
-import org.polypheny.db.adapter.Adapter.AdapterSetting;
+public class DockerNotRunningRuntimeException extends DockerRuntimeException {
 
-/**
- * This interface can be used to add the needed configuration
- * settings and logic to an adapter to define it as remote.
- */
-public interface RemoteDeployable {
-
-    List<AdapterSetting> AVAILABLE_REMOTE_SETTINGS = ImmutableList.of();
-
-
-    default List<AdapterSetting> getRemoteSettings() {
-        return AVAILABLE_REMOTE_SETTINGS;
+    public DockerNotRunningRuntimeException() {
+        super( "Docker is either not installed or not running at the moment." );
     }
 
 }

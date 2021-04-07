@@ -16,7 +16,10 @@
 
 package org.polypheny.db.docker;
 
+import java.util.Collections;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.polypheny.db.config.ConfigDocker;
 import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.DockerManager.Container;
@@ -24,9 +27,17 @@ import org.polypheny.db.docker.DockerManager.ContainerBuilder;
 import org.polypheny.db.docker.DockerManager.ContainerStatus;
 import org.polypheny.db.docker.DockerManager.Image;
 
+@Category(DockerManagerTest.class)
 public class DockerInstanceTest {
 
-    ConfigDocker config = RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, 0 );
+    private static ConfigDocker config;
+
+
+    @Before
+    public void initConfig() {
+        config = new ConfigDocker( "localhost", null, null, "test" );
+        RuntimeConfig.DOCKER_INSTANCES.setList( Collections.singletonList( config ) );
+    }
 
 
     /**

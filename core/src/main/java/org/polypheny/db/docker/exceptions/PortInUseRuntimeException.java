@@ -16,9 +16,9 @@
 
 package org.polypheny.db.docker.Exceptions;
 
-public class PortExistsException extends DockerException {
+public class PortInUseRuntimeException extends DockerRuntimeException {
 
-    public PortExistsException() {
+    public PortInUseRuntimeException() {
         super( "There is already a container running which exposes that port." );
     }
 

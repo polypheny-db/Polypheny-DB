@@ -109,20 +109,20 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
 
     @Override
     public void resetDockerConnection( ConfigDocker c ) {
-        if ( c.id != dockerInstanceId || c.getUrl().equals( currentUrl ) ) {
+        if ( c.id != dockerInstanceId || c.getHost().equals( currentUrl ) ) {
             return;
         }
 
         MongoClientSettings mongoSettings = MongoClientSettings
                 .builder()
                 .applyToClusterSettings( builder ->
-                        builder.hosts( Collections.singletonList( new ServerAddress( c.getUrl() ) ) )
+                        builder.hosts( Collections.singletonList( new ServerAddress( c.getHost() ) ) )
                 )
                 .build();
 
         this.client = MongoClients.create( mongoSettings );
         this.transactionProvider = new TransactionProvider( this.client );
-        this.currentUrl = c.getUrl();
+        this.currentUrl = c.getHost();
     }
 
 

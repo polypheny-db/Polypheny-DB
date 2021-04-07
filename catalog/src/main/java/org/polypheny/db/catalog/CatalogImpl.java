@@ -613,13 +613,15 @@ public class CatalogImpl extends Catalog {
             hsqldbSettings.put( "maxConnections", "25" );
             hsqldbSettings.put( "trxControlMode", "mvcc" );
             hsqldbSettings.put( "trxIsolationLevel", "read_committed" );
+            hsqldbSettings.put( "mode", "default" );
+            addAdapter( "hsqldb", "org.polypheny.db.adapter.jdbc.stores.HsqldbStore", AdapterType.STORE, hsqldbSettings );
             addAdapter( "hsqldb", "org.polypheny.db.adapter.jdbc.stores.HsqldbStore", AdapterType.STORE, hsqldbSettings );*/
             Map<String, String> mongoSettings = new HashMap<>();
             mongoSettings.put( "persistent", "true" );
             mongoSettings.put( "port", "27017" );
             mongoSettings.put( "type", "mongo" );
             mongoSettings.put( "instanceId", "0" );
-            //mongoSettings.put( "mode", "docker" );
+            mongoSettings.put( "mode", "docker" );
             addAdapter( "hsqldb", "org.polypheny.db.adapter.mongodb.MongoStore", AdapterType.STORE, mongoSettings );
 
             // Deploy default CSV view

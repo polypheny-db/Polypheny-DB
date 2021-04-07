@@ -139,7 +139,10 @@ public class AdapterManager {
                         settings.put( "docker", (List<AdapterSetting>) clazz.getField( "AVAILABLE_DOCKER_SETTINGS" ).get( null ) );
                     }
                     if ( Arrays.asList( clazz.getGenericInterfaces() ).contains( RemoteDeployable.class ) ) {
-                        settings.put( "remote", (List<AdapterSetting>) clazz.getDeclaredField( "AVAILABLE_REMOTE_SETTINGS" ).get( null ) );
+                        settings.put( "remote", (List<AdapterSetting>) clazz.getField( "AVAILABLE_REMOTE_SETTINGS" ).get( null ) );
+                    }
+                    if ( Arrays.asList( clazz.getGenericInterfaces() ).contains( EmbeddedDeployable.class ) ) {
+                        settings.put( "embedded", (List<AdapterSetting>) clazz.getField( "AVAILABLE_EMBEDDED_SETTINGS" ).get( null ) );
                     }
                     settings.put( "mode", Collections.singletonList( new AdapterSettingList( "mode", false, true, true, Collections.singletonList( "docker" ) ) ) );
                     result.add( new AdapterInformation( name, description, clazz, settings ) );
@@ -157,8 +160,9 @@ public class AdapterManager {
         if ( getAdapters().containsKey( uniqueName ) ) {
             throw new RuntimeException( "There is already an adapter with this unique name" );
         }
+        // for clarity we add the default mode if none is specified
         if ( !settings.containsKey( "mode" ) ) {
-            throw new RuntimeException( "Please specify a deployment mode, when adding a store" );
+            settings.put( "mode", "default" );
         }
 
         Constructor<?> ctor;

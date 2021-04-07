@@ -303,17 +303,17 @@ public enum RuntimeConfig {
             ConfigType.BOOLEAN,
             "polystoreIndexGroup" ),
 
-    DEFAULT_SCHEMA_MODEL( "runtime/defaultSchemaModel",
-            "Define default schema model, which is used when none is provided.",
-            SchemaType.RELATIONAL,
-            ConfigType.ENUM ),
-
     DOCKER_INSTANCES( "runtime/dockerInstances",
             "Configure different docker instances, which can be used to place adapters on.",
             Collections.singletonList( new ConfigDocker( 0, "localhost", null, null, "localhost" )
                     .setDockerRunning( true ) ),
             ConfigType.INSTANCE_LIST,
-            "dockerGroup" );
+            "dockerGroup" ),
+
+    DEFAULT_SCHEMA_MODEL( "runtime/defaultSchemaModel",
+            "Define default schema model, which is used when none is provided.",
+            SchemaType.RELATIONAL,
+            ConfigType.ENUM );
 
 
     private final String key;

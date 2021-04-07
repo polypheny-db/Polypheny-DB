@@ -16,10 +16,11 @@
 
 package org.polypheny.db.docker.Exceptions;
 
-public class DockerNotRunningException extends DockerException {
 
-    public DockerNotRunningException() {
-        super( "Docker is either not installed or not running at the moment." );
+public class NameExistsRuntimeException extends DockerRuntimeException {
+
+    public NameExistsRuntimeException() {
+        super( "There already exists a container with this name." );
     }
 
 }
