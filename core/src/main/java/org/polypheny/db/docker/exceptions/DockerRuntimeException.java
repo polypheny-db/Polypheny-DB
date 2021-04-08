@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.polypheny.db.docker.Exceptions;
+package org.polypheny.db.docker.exceptions;
 
 public class DockerRuntimeException extends RuntimeException {
 

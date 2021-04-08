@@ -46,8 +46,8 @@ import lombok.Getter;
 import lombok.Setter;
 import org.polypheny.db.config.ConfigDocker;
 import org.polypheny.db.config.RuntimeConfig;
-import org.polypheny.db.docker.Exceptions.NameExistsRuntimeException;
-import org.polypheny.db.docker.Exceptions.PortInUseRuntimeException;
+import org.polypheny.db.docker.exceptions.NameExistsRuntimeException;
+import org.polypheny.db.docker.exceptions.PortInUseRuntimeException;
 import org.polypheny.db.util.FileSystemManager;
 
 

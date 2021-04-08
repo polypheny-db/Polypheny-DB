@@ -90,7 +90,7 @@ public class MongoProject extends Project implements MongoRel {
             final String name = pair.right;
             String phyName = "1";
             // we can you use a project of [name] : $[physical name] to rename our retrieved columns on aggregation
-            // we have to pay attention to "DUMMY" as it is apparently used fro handling aggregates here
+            // we have to pay attention to "DUMMY" as it is apparently used for handling aggregates here
             if ( mongoRowType != null && !name.contains( "$" ) && !name.equals( "DUMMY" ) ) {
                 phyName = "\"$" + mongoRowType.getPhysicalName( name ) + "\"";
             }

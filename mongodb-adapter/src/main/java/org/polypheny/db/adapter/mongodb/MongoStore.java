@@ -305,7 +305,8 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
 
             context.getStatement().getTransaction().registerInvolvedAdapter( this );
             transactionProvider.startTransaction();
-            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).createIndex( transactionProvider.getSession(), doc, new IndexOptions().name( catalogIndex.name ) );
+            // creation of indexes is auto-commit
+            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).createIndex( doc, new IndexOptions().name( catalogIndex.name ) );
         }
     }
 

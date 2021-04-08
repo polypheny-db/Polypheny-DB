@@ -19,7 +19,10 @@ package org.polypheny.db.adapter.mongodb;
 import com.google.common.io.ByteStreams;
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Objects;
 import org.apache.calcite.avatica.util.ByteString;
 import org.bson.BsonBoolean;
@@ -72,9 +75,33 @@ public class MongoTypeUtil {
     }
 
 
-    public enum Type {
-
+    public static BsonValue getAsBson( Object obj ) {
+        if ( obj == null ) {
+            return new BsonNull();
+        } else if ( obj instanceof String ) {
+            return new BsonString( (String) obj );
+        } else if ( obj instanceof Integer ) {
+            return new BsonInt32( (Integer) obj );
+        } else if ( obj instanceof Double ) {
+            return new BsonDouble( (Double) obj );
+        } else if ( obj instanceof Time || obj instanceof Date ) {
+            return new BsonInt32( (Integer) obj );
+        } else if ( obj instanceof Timestamp ) {
+            return new BsonInt64( (Long) obj );
+        } else if ( obj instanceof Boolean ) {
+            return new BsonBoolean( (Boolean) obj );
+        } else if ( obj instanceof ByteString ) {
+            return new BsonString( ((ByteString) obj).toBase64String() );
+            // add array
+        } else if ( obj instanceof InputStream ) {
+            try {
+                return new BsonString( Arrays.toString( ByteStreams.toByteArray( (InputStream) obj ) ) );
+            } catch ( IOException e ) {
+                throw new RuntimeException( e );
+            }
+        } else {
+            return new BsonString( obj.toString() );
+        }
     }
-
 
 }

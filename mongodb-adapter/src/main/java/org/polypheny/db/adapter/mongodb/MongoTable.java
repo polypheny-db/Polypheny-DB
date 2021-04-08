@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import lombok.Getter;
 import org.apache.calcite.linq4j.AbstractEnumerable;
 import org.apache.calcite.linq4j.Enumerable;
@@ -51,7 +52,6 @@ import org.apache.calcite.linq4j.Enumerator;
 import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.linq4j.function.Function1;
 import org.bson.BsonDocument;
-import org.bson.BsonValue;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.polypheny.db.adapter.AdapterManager;
@@ -317,7 +317,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
 
         @SuppressWarnings("UnusedDeclaration")
-        public Enumerable<Object> preparedExecute( List<String> fieldNames, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, BsonValue> staticValues ) {
+        public Enumerable<Object> preparedExecute( List<String> fieldNames, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, Object> staticValues ) {
             MongoTable mongoTable = (MongoTable) table;
             dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
             List<Document> docs = new ArrayList<>();
@@ -341,6 +341,14 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 }
                 docs.add( doc );
             }
+            if ( this.dataContext.getParameterValues().size() == 0 ) {
+                // single prepared entry with only static values
+                Document doc = new Document();
+                for ( Entry<Integer, Object> entry : staticValues.entrySet() ) {
+                    doc.append( logicalPhysicalMapping.get( fieldNames.get( entry.getKey() ) ), MongoTypeUtil.getAsBson( entry.getValue() ) );
+                }
+            }
+
             if ( docs.size() > 0 ) {
                 mongoTable.getTransactionProvider().startTransaction();
                 mongoTable.getCollection().insertMany( mongoTable.transactionProvider.getSession(), docs );

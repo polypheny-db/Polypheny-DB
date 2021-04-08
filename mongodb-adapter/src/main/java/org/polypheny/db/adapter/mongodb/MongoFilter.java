@@ -92,7 +92,7 @@ public class MongoFilter extends Filter implements MongoRel {
         } else {
             translator = new Translator( MongoRules.mongoFieldNames( getRowType() ) );
         }
-        String match = translator.translateMatch( condition, implementor.isPrepared() );
+        String match = translator.translateMatch( condition, implementor.isDDL() );
         implementor.add( null, match );
     }
 
