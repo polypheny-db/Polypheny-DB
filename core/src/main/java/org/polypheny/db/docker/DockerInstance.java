@@ -39,6 +39,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.Getter;
@@ -113,7 +114,7 @@ public class DockerInstance extends DockerManager {
         client.listContainersCmd().withShowAll( true ).exec().forEach( container -> {
             Arrays.stream( container.getPorts() ).forEach( containerPort -> usedPorts.add( containerPort.getPublicPort() ) );
             // docker returns the names with a prefixed "/", so we remove it
-            usedNames.addAll( Arrays.stream( container.getNames() ).map( cont -> cont.substring( 1 ) ).collect( Collectors.toList() ) );
+            usedNames.addAll( Arrays.stream( container.getNames() ).map( cont -> Container.getFromPhysicalName( cont.substring( 1 ) ) ).collect( Collectors.toList() ) );
         } );
     }
 
@@ -215,12 +216,12 @@ public class DockerInstance extends DockerManager {
         }
 
         // we have to check if the container is running and start it if its not
-        InspectContainerResponse containerInfo = client.inspectContainerCmd( "/" + container.uniqueName ).exec();
+        InspectContainerResponse containerInfo = client.inspectContainerCmd( "/" + container.getPhysicalName() ).exec();
         ContainerState state = containerInfo.getState();
         if ( Objects.equals( state.getStatus(), "exited" ) ) {
-            client.startContainerCmd( container.uniqueName ).exec();
+            client.startContainerCmd( container.getPhysicalName() ).exec();
         } else if ( Objects.equals( state.getStatus(), "created" ) ) {
-            client.startContainerCmd( container.uniqueName ).exec();
+            client.startContainerCmd( container.getPhysicalName() ).exec();
             if ( container.afterCommands.size() != 0 ) {
                 execAfterInitCommands( container );
             }
@@ -230,25 +231,34 @@ public class DockerInstance extends DockerManager {
     }
 
 
+    /**
+     * This executes multiple defined commands after a delay in the given container
+     *
+     * @param container the container with specifies the afterCommands and to which they are applied
+     */
     private void execAfterInitCommands( Container container ) {
-        try {
-            Thread.sleep( container.timeout );
-            ExecCreateCmdResponse cmd = client
-                    .execCreateCmd( container.getContainerId() )
-                    .withAttachStdout( true )
-                    .withCmd( container.afterCommands.toArray( new String[0] ) )
-                    .exec();
+        int offset = 0;
+        for ( Entry<Integer, List<String>> entry : container.afterCommands.entrySet() ) {
+            offset = entry.getKey() - offset;
+            try {
+                Thread.sleep( offset );
+                ExecCreateCmdResponse cmd = client
+                        .execCreateCmd( container.getContainerId() )
+                        .withAttachStdout( true )
+                        .withCmd( entry.getValue().toArray( new String[0] ) )
+                        .exec();
 
-            ResultCallbackTemplate<ResultCallback<Frame>, Frame> callback = new ResultCallbackTemplate<ResultCallback<Frame>, Frame>() {
-                @Override
-                public void onNext( Frame event ) {
+                ResultCallbackTemplate<ResultCallback<Frame>, Frame> callback = new ResultCallbackTemplate<ResultCallback<Frame>, Frame>() {
+                    @Override
+                    public void onNext( Frame event ) {
 
-                }
-            };
+                    }
+                };
 
-            client.execStartCmd( cmd.getId() ).exec( callback ).awaitCompletion();
-        } catch ( InterruptedException e ) {
-            throw new RuntimeException( e );
+                client.execStartCmd( cmd.getId() ).exec( callback ).awaitCompletion();
+            } catch ( InterruptedException e ) {
+                throw new RuntimeException( e );
+            }
         }
     }
 
@@ -273,7 +283,7 @@ public class DockerInstance extends DockerManager {
         }
 
         CreateContainerCmd cmd = client.createContainerCmd( container.image.getFullName() )
-                .withName( container.uniqueName )
+                .withName( Container.getPhysicalUniqueName( container ) )
                 .withCmd( container.initCommands )
                 .withExposedPorts( container.getExposedPorts() );
 
@@ -345,7 +355,7 @@ public class DockerInstance extends DockerManager {
 
     @Override
     public void stop( Container container ) {
-        client.stopContainerCmd( container.uniqueName ).exec();
+        client.stopContainerCmd( container.getPhysicalName() ).exec();
         container.setStatus( ContainerStatus.STOPPED );
     }
 
@@ -355,7 +365,7 @@ public class DockerInstance extends DockerManager {
         if ( container.getStatus() == ContainerStatus.RUNNING ) {
             stop( container );
         }
-        client.removeContainerCmd( container.uniqueName ).exec();
+        client.removeContainerCmd( container.getPhysicalName() ).exec();
         container.setStatus( ContainerStatus.DESTROYED );
 
         usedNames.remove( container.uniqueName );
