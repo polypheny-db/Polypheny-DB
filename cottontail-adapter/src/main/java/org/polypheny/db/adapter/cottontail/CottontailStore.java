@@ -29,9 +29,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.polypheny.db.adapter.Adapter.AdapterProperties;
+import org.polypheny.db.adapter.Adapter.AdapterSettingInteger;
+import org.polypheny.db.adapter.Adapter.AdapterSettingString;
 import org.polypheny.db.adapter.DataStore;
-import org.polypheny.db.adapter.EmbeddedDeployable;
-import org.polypheny.db.adapter.RemoteDeployable;
+import org.polypheny.db.adapter.DeployMode;
 import org.polypheny.db.adapter.cottontail.util.CottontailNameUtil;
 import org.polypheny.db.adapter.cottontail.util.CottontailTypeUtil;
 import org.polypheny.db.catalog.Catalog;
@@ -77,17 +79,14 @@ import org.vitrivr.cottontail.server.grpc.CottontailGrpcServer;
 
 
 @Slf4j
-public class CottontailStore extends DataStore implements EmbeddedDeployable, RemoteDeployable {
-
-    public static final String ADAPTER_NAME = "Cottontail-DB";
-
-    public static final String DESCRIPTION = "Cottontail-DB is a column store aimed at multimedia retrieval. It is optimized for classical boolean as well as vector-space retrieval.";
-
-    public static final List<AdapterSetting> AVAILABLE_SETTINGS = ImmutableList.of(
-            new AdapterSettingString( "host", false, true, false, "localhost" ),
-            new AdapterSettingInteger( "port", false, true, false, 1865 ),
-            new AdapterSettingString( "database", false, true, false, "cottontail" )
-    );
+@AdapterProperties(
+        name = "Cottontail-DB",
+        description = "Cottontail-DB is a column store aimed at multimedia retrieval. It is optimized for classical boolean as well as vector-space retrieval.",
+        usedModes = { DeployMode.EMBEDDED, DeployMode.REMOTE })
+@AdapterSettingString(name = "host", defaultValue = "localhost", position = 1)
+@AdapterSettingInteger(name = "port", defaultValue = 1865, position = 2)
+@AdapterSettingString(name = "database", defaultValue = "cottontail", position = 3)
+public class CottontailStore extends DataStore {
 
     // Running embedded
     private final boolean isEmbedded;
@@ -547,18 +546,6 @@ public class CottontailStore extends DataStore implements EmbeddedDeployable, Re
         }
 
         this.wrapper.dropEntityBlocking( tableEntity );
-    }
-
-
-    @Override
-    public String getAdapterName() {
-        return ADAPTER_NAME;
-    }
-
-
-    @Override
-    public List<AdapterSetting> getAvailableSettings() {
-        return AVAILABLE_SETTINGS;
     }
 
 

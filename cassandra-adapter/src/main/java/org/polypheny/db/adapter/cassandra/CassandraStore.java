@@ -43,7 +43,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
+import org.polypheny.db.adapter.Adapter.AdapterProperties;
+import org.polypheny.db.adapter.Adapter.AdapterSettingInteger;
+import org.polypheny.db.adapter.Adapter.AdapterSettingString;
 import org.polypheny.db.adapter.DataStore;
+import org.polypheny.db.adapter.DeployMode;
 import org.polypheny.db.adapter.cassandra.util.CassandraTypesUtils;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
@@ -60,21 +64,16 @@ import org.polypheny.db.type.PolyType;
 
 
 @Slf4j
+@AdapterProperties(
+        name = "Cassandra",
+        description = "Apache Cassandra is an open-source wide-column store (i.e. a two-dimensional key–value store) designed to handle large amount of data. Cassandra can be deployed in a distributed manner.",
+        usedModes = { DeployMode.EMBEDDED, DeployMode.REMOTE })
+@AdapterSettingString(name = "host", defaultValue = "localhost", position = 0)
+@AdapterSettingInteger(name = "port", defaultValue = 9042, position = 1)
+@AdapterSettingString(name = "keyspace", defaultValue = "cassandra", position = 2)
+@AdapterSettingString(name = "username", defaultValue = "cassandra", position = 3)
+@AdapterSettingString(name = "password", defaultValue = "", position = 4)
 public class CassandraStore extends DataStore {
-
-    @SuppressWarnings("WeakerAccess")
-    public static final String ADAPTER_NAME = "Cassandra";
-    @SuppressWarnings("WeakerAccess")
-    public static final String DESCRIPTION = "Apache Cassandra is an open-source wide-column store (i.e. a two-dimensional key–value store) designed to handle large amount of data. Cassandra can be deployed in a distributed manner.";
-    @SuppressWarnings("WeakerAccess")
-    public static final List<AdapterSetting> AVAILABLE_SETTINGS = ImmutableList.of(
-            new AdapterSettingList( "type", false, true, false, ImmutableList.of( "Standalone", "Embedded" ) ),
-            new AdapterSettingString( "host", false, true, false, "localhost" ),
-            new AdapterSettingInteger( "port", false, true, false, 9042 ),
-            new AdapterSettingString( "keyspace", false, true, false, "cassandra" ),
-            new AdapterSettingString( "username", false, true, false, "cassandra" ),
-            new AdapterSettingString( "password", false, true, false, "" )
-    );
 
     // Running embedded
     private final boolean isEmbedded;
@@ -107,7 +106,7 @@ public class CassandraStore extends DataStore {
         this.dbKeyspace = settings.get( "keyspace" );
         this.dbUsername = settings.get( "username" );
         this.dbPassword = settings.get( "password" );
-        this.isEmbedded = settings.get( "type" ).equalsIgnoreCase( "Embedded" );
+        this.isEmbedded = settings.get( "mode" ).equalsIgnoreCase( "embedded" );
 
         if ( this.isEmbedded ) {
             // Making sure we are on java 8, as cassandra does not support anything newer!
@@ -429,18 +428,6 @@ public class CassandraStore extends DataStore {
                 .dropColumn( physicalColumnName ).build() );
 
         physicalNameProvider.updatePhysicalColumnName( catalogColumn.id, newPhysicalColumnName, true );
-    }
-
-
-    @Override
-    public String getAdapterName() {
-        return ADAPTER_NAME;
-    }
-
-
-    @Override
-    public List<AdapterSetting> getAvailableSettings() {
-        return AVAILABLE_SETTINGS;
     }
 
 

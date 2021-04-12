@@ -34,13 +34,9 @@
 package org.polypheny.db.sql;
 
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import lombok.Setter;
-import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.Catalog.SchemaType;
-import org.polypheny.db.catalog.exceptions.UnknownDatabaseException;
-import org.polypheny.db.catalog.exceptions.UnknownSchemaException;
 import org.polypheny.db.sql.parser.SqlParserPos;
 import org.polypheny.db.sql.validate.SqlValidator;
 import org.polypheny.db.sql.validate.SqlValidatorScope;
@@ -186,10 +182,10 @@ public class SqlInsert extends SqlCall {
     public SchemaType getSchemaType() {
         // this breaks previously written test if it tries to use catalog
         // TODO DL: change
-        if ( Catalog.isUnitTest ) {
-            return SchemaType.RELATIONAL;
-        }
-
+        //if ( Catalog.isUnitTest ) {
+        return SchemaType.RELATIONAL;
+        //}
+        /*
         try {
             // here we use default value TODO DL: change
             ImmutableList<String> names = ((SqlIdentifier) targetTable).names;
@@ -204,6 +200,8 @@ public class SqlInsert extends SqlCall {
         } catch ( UnknownSchemaException | UnknownDatabaseException e ) {
             throw new RuntimeException( e );
         }
+
+         */
     }
 
 }

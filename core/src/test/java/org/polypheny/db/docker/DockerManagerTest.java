@@ -26,7 +26,6 @@ import org.polypheny.db.config.ConfigDocker;
 import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.DockerManager.Container;
 import org.polypheny.db.docker.DockerManager.ContainerBuilder;
-import org.polypheny.db.docker.DockerManager.Image;
 import org.polypheny.db.util.Pair;
 
 /**
@@ -38,6 +37,7 @@ import org.polypheny.db.util.Pair;
 public class DockerManagerTest {
 
     private static ConfigDocker config;
+    private static final String imageName = "mongo";
 
 
     @Before
@@ -59,7 +59,7 @@ public class DockerManagerTest {
         int adapterId = 1;
 
         Pair.zip( uniqueNames, uniquePorts ).forEach( namePortPairs -> {
-            Container container = new ContainerBuilder( adapterId, Image.MONGODB, namePortPairs.left, config.id )
+            Container container = new ContainerBuilder( adapterId, imageName, namePortPairs.left, config.id )
                     .withMappedPort( namePortPairs.right, namePortPairs.right )
                     .build();
             manager.initialize( container );
@@ -85,7 +85,7 @@ public class DockerManagerTest {
 
         String uniqueName = "test3";
         List<Integer> multiplePorts = Arrays.asList( 3210, 4929 );
-        ContainerBuilder containerBuilder = new ContainerBuilder( adapterId, Image.MONGODB, uniqueName, config.id );
+        ContainerBuilder containerBuilder = new ContainerBuilder( adapterId, imageName, uniqueName, config.id );
         multiplePorts.forEach( port -> containerBuilder.withMappedPort( port, port ) );
         manager.initialize( containerBuilder.build() );
 

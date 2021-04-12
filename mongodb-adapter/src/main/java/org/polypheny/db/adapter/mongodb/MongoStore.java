@@ -16,7 +16,6 @@
 
 package org.polypheny.db.adapter.mongodb;
 
-import com.google.common.collect.ImmutableList;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ServerAddress;
 import com.mongodb.client.MongoClient;
@@ -40,9 +39,13 @@ import org.bson.BsonInt64;
 import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.bson.Document;
+import org.polypheny.db.adapter.Adapter.AdapterProperties;
+import org.polypheny.db.adapter.Adapter.AdapterSettingBoolean;
+import org.polypheny.db.adapter.Adapter.AdapterSettingInteger;
+import org.polypheny.db.adapter.Adapter.AdapterSettingString;
 import org.polypheny.db.adapter.DataStore;
-import org.polypheny.db.adapter.DockerDeployable;
-import org.polypheny.db.adapter.RemoteDeployable;
+import org.polypheny.db.adapter.DeployMode;
+import org.polypheny.db.adapter.DeployMode.DeploySetting;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
@@ -54,7 +57,6 @@ import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.docker.DockerInstance;
 import org.polypheny.db.docker.DockerManager;
 import org.polypheny.db.docker.DockerManager.ContainerBuilder;
-import org.polypheny.db.docker.DockerManager.Image;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.schema.Schema;
 import org.polypheny.db.schema.SchemaPlus;
@@ -64,22 +66,15 @@ import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeFamily;
 
 @Slf4j
-public class MongoStore extends DataStore implements DockerDeployable, RemoteDeployable {
+@AdapterProperties(
+        name = "MongoDB",
+        description = "MongoDB is a document-based and distributed database.",
+        usedModes = { DeployMode.REMOTE, DeployMode.DOCKER })
+@AdapterSettingBoolean(name = "persistent", defaultValue = false)
+@AdapterSettingInteger(name = "port", defaultValue = 27017)
+@AdapterSettingString(name = "host", defaultValue = "localhost", appliesTo = DeploySetting.REMOTE)
+public class MongoStore extends DataStore {
 
-    @SuppressWarnings("WeakerAccess")
-    public static final String ADAPTER_NAME = "MongoDB";
-    @SuppressWarnings("WeakerAccess")
-    public static final String DESCRIPTION = "MongoDB is a document-based and distributed database.";
-    @SuppressWarnings("WeakerAccess")
-    public static final List<AdapterSetting> AVAILABLE_SETTINGS = ImmutableList.of(
-            new AdapterSettingBoolean( "persistent", false, true, false, false ),
-            new AdapterSettingInteger( "port", false, true, false, 27017 )
-    );
-
-    @SuppressWarnings("WeakerAccess")
-    public static final List<AdapterSetting> AVAILABLE_REMOTE_SETTINGS = ImmutableList.of(
-            new AdapterSettingString( "host", false, true, false, "localhost" )
-    );
     private MongoClient client;
     private TransactionProvider transactionProvider;
     private MongoSchema currentSchema;
@@ -90,8 +85,8 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
     public MongoStore( int adapterId, String uniqueName, Map<String, String> settings ) {
         super( adapterId, uniqueName, settings, Boolean.parseBoolean( settings.get( "persistent" ) ), true );
 
-        DockerManager.Container container = new ContainerBuilder( getAdapterId(), Image.MONGODB, getUniqueName(), Integer.parseInt( settings.get( "instanceId" ) ) )
-                .withMappedPort( Image.MONGODB.getInternalPort(), Integer.parseInt( settings.get( "port" ) ) )
+        DockerManager.Container container = new ContainerBuilder( getAdapterId(), "mongo:latest", getUniqueName(), Integer.parseInt( settings.get( "instanceId" ) ) )
+                .withMappedPort( 27017, Integer.parseInt( settings.get( "port" ) ) )
                 .withInitCommands( Arrays.asList( "mongod", "--replSet", "test" ) )
                 .withAfterCommands( Arrays.asList( "mongo", "--eval", "rs.initiate()" ), 2000 )
                 .build();
@@ -123,12 +118,6 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
         this.client = MongoClients.create( mongoSettings );
         this.transactionProvider = new TransactionProvider( this.client );
         this.currentUrl = c.getHost();
-    }
-
-
-    @Override
-    public String getAdapterName() {
-        return ADAPTER_NAME;
     }
 
 
@@ -176,12 +165,6 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
     @Override
     public void rollback( PolyXid xid ) {
         transactionProvider.rollback();
-    }
-
-
-    @Override
-    public List<AdapterSetting> getAvailableSettings() {
-        return AVAILABLE_SETTINGS;
     }
 
 
@@ -363,10 +346,5 @@ public class MongoStore extends DataStore implements DockerDeployable, RemoteDep
         return "tab-" + id;
     }
 
-
-    @Override
-    public List<AdapterSetting> getRemoteSettings() {
-        return AVAILABLE_REMOTE_SETTINGS;
-    }
 
 }
