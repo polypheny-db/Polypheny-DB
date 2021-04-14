@@ -16,8 +16,7 @@
 
 package org.polypheny.db.adapter.mongodb;
 
-import com.google.common.io.ByteStreams;
-import java.io.IOException;
+import com.mongodb.client.gridfs.GridFSBucket;
 import java.io.InputStream;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -26,19 +25,21 @@ import java.util.Date;
 import java.util.Objects;
 import org.apache.calcite.avatica.util.ByteString;
 import org.bson.BsonBoolean;
+import org.bson.BsonDocument;
 import org.bson.BsonDouble;
 import org.bson.BsonInt32;
 import org.bson.BsonInt64;
 import org.bson.BsonNull;
 import org.bson.BsonString;
 import org.bson.BsonValue;
+import org.bson.types.ObjectId;
 import org.polypheny.db.type.BasicPolyType;
 import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeFamily;
 
 public class MongoTypeUtil {
 
-    public static BsonValue getAsBson( Object obj, BasicPolyType type ) {
+    public static BsonValue getAsBson( Object obj, BasicPolyType type, GridFSBucket bucket ) {
         BsonValue value;
         if ( type.getPolyType() == PolyType.NULL ) {
             value = new BsonNull();
@@ -62,12 +63,10 @@ public class MongoTypeUtil {
             } else {
                 throw new RuntimeException( "Arrays are not yet fully supported for the MongoDB Adapter" ); // todo dl: add array with content
             }
-        } else if ( type.getPolyType().equals( PolyType.FILE ) ) {
-            try {
-                value = new BsonString( Arrays.toString( ByteStreams.toByteArray( (InputStream) obj ) ) );
-            } catch ( IOException e ) {
-                throw new RuntimeException( e );
-            }
+        } else if ( Arrays.asList( PolyType.FILE, PolyType.IMAGE, PolyType.VIDEO, PolyType.SOUND ).contains( type.getPolyType() ) ) {
+            ObjectId id = bucket.uploadFromStream( "test", (InputStream) obj );
+            value = new BsonDocument().append( "_id", new BsonString( id.toString() ) );
+
         } else {
             value = new BsonString( obj.toString() );
         }
@@ -75,7 +74,7 @@ public class MongoTypeUtil {
     }
 
 
-    public static BsonValue getAsBson( Object obj ) {
+    public static BsonValue getAsBson( Object obj, GridFSBucket bucket ) {
         if ( obj == null ) {
             return new BsonNull();
         } else if ( obj instanceof String ) {
@@ -94,11 +93,9 @@ public class MongoTypeUtil {
             return new BsonString( ((ByteString) obj).toBase64String() );
             // add array
         } else if ( obj instanceof InputStream ) {
-            try {
-                return new BsonString( Arrays.toString( ByteStreams.toByteArray( (InputStream) obj ) ) );
-            } catch ( IOException e ) {
-                throw new RuntimeException( e );
-            }
+            // the object is a file which need to be handle specially
+            ObjectId id = bucket.uploadFromStream( "test", (InputStream) obj );
+            return new BsonDocument().append( "_id", new BsonString( id.toString() ) );
         } else {
             return new BsonString( obj.toString() );
         }

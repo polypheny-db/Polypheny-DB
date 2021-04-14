@@ -37,6 +37,8 @@ package org.polypheny.db.adapter.mongodb;
 import com.google.common.annotations.VisibleForTesting;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.gridfs.GridFSBucket;
+import com.mongodb.client.gridfs.GridFSBuckets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +71,8 @@ public class MongoSchema extends AbstractSchema {
     private final Map<String, Table> tableMap;
     private final MongoClient connection;
     private final TransactionProvider transactionProvider;
+    @Getter
+    private final GridFSBucket bucket;
 
 
     /**
@@ -85,6 +89,7 @@ public class MongoSchema extends AbstractSchema {
         this.transactionProvider = transactionProvider;
         this.connection = connection;
         this.database = this.connection.getDatabase( database );
+        this.bucket = GridFSBuckets.create( this.database, database );
     }
 
 

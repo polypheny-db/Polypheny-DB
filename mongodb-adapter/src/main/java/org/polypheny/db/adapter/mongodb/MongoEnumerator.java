@@ -35,6 +35,8 @@ package org.polypheny.db.adapter.mongodb;
 
 
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.gridfs.GridFSBucket;
+import com.mongodb.client.gridfs.GridFSDownloadStream;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.Date;
@@ -46,6 +48,7 @@ import org.apache.calcite.linq4j.Enumerator;
 import org.apache.calcite.linq4j.function.Function1;
 import org.apache.calcite.linq4j.tree.Primitive;
 import org.bson.Document;
+import org.bson.types.ObjectId;
 
 
 /**
@@ -55,6 +58,7 @@ class MongoEnumerator implements Enumerator<Object> {
 
     private final Iterator<Document> cursor;
     private final Function1<Document, Object> getter;
+    private final GridFSBucket bucket;
     private Object current;
 
 
@@ -64,9 +68,10 @@ class MongoEnumerator implements Enumerator<Object> {
      * @param cursor Mongo iterator (usually a {@link com.mongodb.ServerCursor})
      * @param getter Converts an object into a list of fields
      */
-    MongoEnumerator( Iterator<Document> cursor, Function1<Document, Object> getter ) {
+    MongoEnumerator( Iterator<Document> cursor, Function1<Document, Object> getter, GridFSBucket bucket ) {
         this.cursor = cursor;
         this.getter = getter;
+        this.bucket = bucket;
     }
 
 
@@ -82,6 +87,15 @@ class MongoEnumerator implements Enumerator<Object> {
             if ( cursor.hasNext() ) {
                 Document map = cursor.next();
                 current = getter.apply( map );
+                // if we have inserted a document we have distributed chunks which we have to fetch
+                if ( current instanceof Document ) {
+                    ObjectId objectId = new ObjectId( (String) ((Document) current).get( "_id" ) );
+                    GridFSDownloadStream stream = bucket.openDownloadStream( objectId );
+                    long length = stream.getGridFSFile().getLength();
+                    byte[] bytes = new byte[(int) length];
+                    stream.read( bytes );
+                    current = bytes;
+                }
                 return true;
             } else {
                 current = null;

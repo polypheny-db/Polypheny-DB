@@ -83,7 +83,7 @@ public class MongoStore extends DataStore {
 
 
     public MongoStore( int adapterId, String uniqueName, Map<String, String> settings ) {
-        super( adapterId, uniqueName, settings, Boolean.parseBoolean( settings.get( "persistent" ) ), true );
+        super( adapterId, uniqueName, settings, Boolean.parseBoolean( settings.get( "persistent" ) ) );
 
         DockerManager.Container container = new ContainerBuilder( getAdapterId(), "mongo:latest", getUniqueName(), Integer.parseInt( settings.get( "instanceId" ) ) )
                 .withMappedPort( 27017, Integer.parseInt( settings.get( "port" ) ) )

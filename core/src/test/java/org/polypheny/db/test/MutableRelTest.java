@@ -37,9 +37,7 @@ package org.polypheny.db.test;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
-import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.plan.RelOptRule;
 import org.polypheny.db.plan.RelOptUtil;
 import org.polypheny.db.plan.hep.HepPlanner;
@@ -66,10 +64,6 @@ import org.polypheny.db.util.Litmus;
  */
 public class MutableRelTest {
 
-    @Before
-    public void setCatalog() {
-        Catalog.isUnitTest = true;
-    }
 
 
     @Test

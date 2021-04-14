@@ -57,6 +57,7 @@ import org.bson.conversions.Bson;
 import org.polypheny.db.adapter.AdapterManager;
 import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.java.AbstractQueryableTable;
+import org.polypheny.db.adapter.mongodb.MongoEnumerator.ChangeMongoEnumerator;
 import org.polypheny.db.adapter.mongodb.MongoEnumerator.IterWrapper;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogTable;
@@ -152,7 +153,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
      * @param fields List of fields to project; or null to return map
      * @return Enumerator of results
      */
-    private Enumerable<Object> find( MongoDatabase mongoDb, String filterJson, String projectJson, List<Map.Entry<String, Class>> fields ) {
+    private Enumerable<Object> find( MongoDatabase mongoDb, MongoTable table, String filterJson, String projectJson, List<Map.Entry<String, Class>> fields ) {
         final MongoCollection collection = mongoDb.getCollection( collectionName );
         final Bson filter = filterJson == null ? null : BsonDocument.parse( filterJson );
         final Bson project = projectJson == null ? null : BsonDocument.parse( projectJson );
@@ -161,7 +162,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             @Override
             public Enumerator<Object> enumerator() {
                 @SuppressWarnings("unchecked") final FindIterable<Document> cursor = collection.find( filter ).projection( project );
-                return new MongoEnumerator( cursor.iterator(), getter );
+                return new MongoEnumerator( cursor.iterator(), getter, table.getMongoSchema().getBucket() );
             }
         };
     }
@@ -181,7 +182,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
      * @param operations One or more JSON strings
      * @return Enumerator of results
      */
-    private Enumerable<Object> aggregate( final MongoDatabase mongoDb, final List<Map.Entry<String, Class>> fields, final List<String> operations ) {
+    private Enumerable<Object> aggregate( final MongoDatabase mongoDb, MongoTable table, final List<Map.Entry<String, Class>> fields, final List<String> operations ) {
         final List<Bson> list = new ArrayList<>();
         for ( String operation : operations ) {
             list.add( BsonDocument.parse( operation ) );
@@ -200,7 +201,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 } catch ( Exception e ) {
                     throw new RuntimeException( "While running MongoDB query " + Util.toString( operations, "[", ",\n", "]" ), e );
                 }
-                return new MongoEnumerator( resultIterator, getter );
+                return new MongoEnumerator( resultIterator, getter, table.getMongoSchema().getBucket() );
             }
         };
     }
@@ -262,7 +263,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
         @Override
         public Enumerator<T> enumerator() {
             //noinspection unchecked
-            final Enumerable<T> enumerable = (Enumerable<T>) getTable().find( getMongoDb(), null, null, null );
+            final Enumerable<T> enumerable = (Enumerable<T>) getTable().find( getMongoDb(), getTable(), null, null, null );
             return enumerable.enumerator();
         }
 
@@ -284,7 +285,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
          */
         @SuppressWarnings("UnusedDeclaration")
         public Enumerable<Object> aggregate( List<Map.Entry<String, Class>> fields, List<String> operations ) {
-            return getTable().aggregate( getMongoDb(), fields, operations );
+            return getTable().aggregate( getMongoDb(), getTable(), fields, operations );
         }
 
 
@@ -299,7 +300,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
          */
         @SuppressWarnings("UnusedDeclaration")
         public Enumerable<Object> find( String filterJson, String projectJson, List<Map.Entry<String, Class>> fields ) {
-            return getTable().find( getMongoDb(), filterJson, projectJson, fields );
+            return getTable().find( getMongoDb(), getTable(), filterJson, projectJson, fields );
         }
 
 
@@ -333,7 +334,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                     if ( staticValues.containsKey( pos ) ) {
                         doc.append( logicalPhysicalMapping.get( name ), staticValues.get( pos ) );
                     } else if ( dynamicFields.containsKey( pos ) ) {
-                        doc.append( logicalPhysicalMapping.get( name ), MongoTypeUtil.getAsBson( values.get( (long) dyn ), (BasicPolyType) dataContext.getParameterType( dyn ) ) );
+                        doc.append( logicalPhysicalMapping.get( name ), MongoTypeUtil.getAsBson( values.get( (long) dyn ), (BasicPolyType) dataContext.getParameterType( dyn ), mongoTable.getMongoSchema().getBucket() ) );
                         dyn++;
                     }
 
@@ -345,7 +346,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 // single prepared entry with only static values
                 Document doc = new Document();
                 for ( Entry<Integer, Object> entry : staticValues.entrySet() ) {
-                    doc.append( logicalPhysicalMapping.get( fieldNames.get( entry.getKey() ) ), MongoTypeUtil.getAsBson( entry.getValue() ) );
+                    doc.append( logicalPhysicalMapping.get( fieldNames.get( entry.getKey() ) ), MongoTypeUtil.getAsBson( entry.getValue(), mongoTable.getMongoSchema().getBucket() ) );
                 }
             }
 
@@ -356,7 +357,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             return new AbstractEnumerable<Object>() {
                 @Override
                 public Enumerator<Object> enumerator() {
-                    return new MongoEnumerator.ChangeMongoEnumerator( Collections.singletonList( docs.size() ).iterator() );
+                    return new ChangeMongoEnumerator( Collections.singletonList( docs.size() ).iterator() );
                 }
             };
         }
