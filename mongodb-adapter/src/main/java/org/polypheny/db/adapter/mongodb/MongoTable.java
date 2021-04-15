@@ -52,6 +52,7 @@ import org.apache.calcite.linq4j.Enumerator;
 import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.linq4j.function.Function1;
 import org.bson.BsonDocument;
+import org.bson.BsonValue;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.polypheny.db.adapter.AdapterManager;
@@ -318,7 +319,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
 
         @SuppressWarnings("UnusedDeclaration")
-        public Enumerable<Object> preparedExecute( List<String> fieldNames, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, Object> staticValues ) {
+        public Enumerable<Object> preparedExecute( List<String> fieldNames, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, Object> staticValues, BsonValue testfield ) {
             MongoTable mongoTable = (MongoTable) table;
             dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
             List<Document> docs = new ArrayList<>();

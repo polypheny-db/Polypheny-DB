@@ -42,6 +42,8 @@ import org.apache.calcite.linq4j.tree.BlockBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.Expressions;
 import org.apache.calcite.linq4j.tree.MethodCallExpression;
+import org.bson.BsonInt32;
+import org.bson.BsonValue;
 import org.polypheny.db.adapter.enumerable.EnumerableRel;
 import org.polypheny.db.adapter.enumerable.EnumerableRelImplementor;
 import org.polypheny.db.adapter.enumerable.JavaRowFormat;
@@ -153,10 +155,11 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         } else {
             if ( mongoImplementor.isPrepared() ) {
                 Expression staticFields = list.append( "staticFields", Expressions.constant( mongoImplementor.staticFields, Map.class ) );
+                Expression testfield = list.append( "testfield", Expressions.constant( new BsonInt32( 420 ), BsonValue.class ) );
                 Expression dynamicFields = list.append( "dynamicFields", Expressions.constant( mongoImplementor.dynamicFields, Map.class ) );
                 Expression data = list.append( "data", Expressions.constant( mongoImplementor.getRowType().getFieldNames(), Object.class ) );
                 Expression physicalNames = list.append( "physicalNames", Expressions.constant( mongoImplementor.getLogicalPhysicalNameMapping(), Map.class ) );
-                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_EXECUTE.method, data, physicalNames, dynamicFields, staticFields ) );
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_EXECUTE.method, data, physicalNames, dynamicFields, staticFields, testfield ) );
             } else {
                 Expression results = list.append( "results", constantArrayList( mongoImplementor.getResults(), Object.class ) );
                 enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_GET_RESULT.method, results ) );

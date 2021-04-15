@@ -18,11 +18,12 @@ package org.polypheny.db.adapter.mongodb;
 
 import com.mongodb.client.gridfs.GridFSBucket;
 import java.io.InputStream;
+import java.io.PushbackInputStream;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.Objects;
+import lombok.SneakyThrows;
 import org.apache.calcite.avatica.util.ByteString;
 import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
@@ -39,6 +40,7 @@ import org.polypheny.db.type.PolyTypeFamily;
 
 public class MongoTypeUtil {
 
+    @SneakyThrows
     public static BsonValue getAsBson( Object obj, BasicPolyType type, GridFSBucket bucket ) {
         BsonValue value;
         if ( type.getPolyType() == PolyType.NULL ) {
@@ -63,7 +65,8 @@ public class MongoTypeUtil {
             } else {
                 throw new RuntimeException( "Arrays are not yet fully supported for the MongoDB Adapter" ); // todo dl: add array with content
             }
-        } else if ( Arrays.asList( PolyType.FILE, PolyType.IMAGE, PolyType.VIDEO, PolyType.SOUND ).contains( type.getPolyType() ) ) {
+        } else if ( PolyTypeFamily.MULTIMEDIA == type.getPolyType().getFamily() ) {
+            int length = ((InputStream) obj).available();
             ObjectId id = bucket.uploadFromStream( "test", (InputStream) obj );
             value = new BsonDocument().append( "_id", new BsonString( id.toString() ) );
 
@@ -94,7 +97,7 @@ public class MongoTypeUtil {
             // add array
         } else if ( obj instanceof InputStream ) {
             // the object is a file which need to be handle specially
-            ObjectId id = bucket.uploadFromStream( "test", (InputStream) obj );
+            ObjectId id = bucket.uploadFromStream( "test", (PushbackInputStream) obj );
             return new BsonDocument().append( "_id", new BsonString( id.toString() ) );
         } else {
             return new BsonString( obj.toString() );

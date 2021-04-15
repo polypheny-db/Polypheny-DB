@@ -607,13 +607,6 @@ public class MongoRules {
                 pos++;
             }
 
-            if ( !docs.isEmpty() && implementor.dynamicFields.isEmpty() ) {
-                // only insert if it does not have dynamic
-                implementor.mongoTable.getTransactionProvider().startTransaction();
-                implementor.mongoTable.getCollection().insertOne( implementor.mongoTable.getTransactionProvider().getSession(), docs );
-            }
-
-
         }
 
 

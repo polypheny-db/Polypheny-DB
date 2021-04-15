@@ -37,6 +37,7 @@ package org.polypheny.db.adapter.mongodb;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.gridfs.GridFSBucket;
 import com.mongodb.client.gridfs.GridFSDownloadStream;
+import java.io.PushbackInputStream;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.Date;
@@ -91,10 +92,7 @@ class MongoEnumerator implements Enumerator<Object> {
                 if ( current instanceof Document ) {
                     ObjectId objectId = new ObjectId( (String) ((Document) current).get( "_id" ) );
                     GridFSDownloadStream stream = bucket.openDownloadStream( objectId );
-                    long length = stream.getGridFSFile().getLength();
-                    byte[] bytes = new byte[(int) length];
-                    stream.read( bytes );
-                    current = bytes;
+                    current = new PushbackInputStream( stream );
                 }
                 return true;
             } else {
