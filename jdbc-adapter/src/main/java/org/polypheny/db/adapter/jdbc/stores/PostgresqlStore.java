@@ -19,7 +19,6 @@ package org.polypheny.db.adapter.jdbc.stores;
 
 import com.google.common.collect.ImmutableList;
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +27,7 @@ import org.polypheny.db.adapter.Adapter.AdapterProperties;
 import org.polypheny.db.adapter.Adapter.AdapterSettingInteger;
 import org.polypheny.db.adapter.Adapter.AdapterSettingString;
 import org.polypheny.db.adapter.DeployMode;
+import org.polypheny.db.adapter.DeployMode.DeploySetting;
 import org.polypheny.db.adapter.jdbc.connection.ConnectionFactory;
 import org.polypheny.db.adapter.jdbc.connection.TransactionalConnectionFactory;
 import org.polypheny.db.catalog.Catalog;
@@ -35,10 +35,11 @@ import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
 import org.polypheny.db.catalog.entity.CatalogIndex;
 import org.polypheny.db.catalog.entity.CatalogTable;
+import org.polypheny.db.docker.DockerManager;
+import org.polypheny.db.docker.DockerManager.ContainerBuilder;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.schema.Schema;
 import org.polypheny.db.schema.Table;
-import org.polypheny.db.sql.SqlDialect;
 import org.polypheny.db.sql.dialect.PostgresqlSqlDialect;
 import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeFamily;
@@ -48,36 +49,64 @@ import org.polypheny.db.type.PolyTypeFamily;
 @AdapterProperties(
         name = "PostgreSQL",
         description = "Relational database system optimized for transactional workload that provides an advanced set of features. PostgreSQL is fully ACID compliant and ensures that all requirements are met.",
-        usedModes = DeployMode.REMOTE)
+        usedModes = { DeployMode.REMOTE, DeployMode.DOCKER })
 @AdapterSettingString(name = "host", defaultValue = "localhost", position = 1,
-        description = "Hostname or IP address of the remote PostgreSQL instance.")
+        description = "Hostname or IP address of the remote PostgreSQL instance.", appliesTo = DeploySetting.REMOTE)
 @AdapterSettingInteger(name = "port", defaultValue = 3306, position = 2,
         description = "JDBC port number on the remote PostgreSQL instance.")
 @AdapterSettingString(name = "database", defaultValue = "polypheny", position = 3,
-        description = "Name of the database to connect to.")
+        description = "Name of the database to connect to.", appliesTo = DeploySetting.REMOTE)
 @AdapterSettingString(name = "username", defaultValue = "polypheny", position = 4,
-        description = "Username to be used for authenticating at the remote instance")
+        description = "Username to be used for authenticating at the remote instance.", appliesTo = DeploySetting.REMOTE)
 @AdapterSettingString(name = "password", defaultValue = "polypheny", position = 5,
-        description = "Password to be used for authenticating at the remote instance")
+        description = "Password to be used for authenticating at the remote instance.")
 @AdapterSettingInteger(name = "maxConnections", defaultValue = 25,
         description = "Maximum number of concurrent JDBC connections.")
 public class PostgresqlStore extends AbstractJdbcStore {
 
+    private String host;
+    private String database;
+    private String username;
+
+
     public PostgresqlStore( int storeId, String uniqueName, final Map<String, String> settings ) {
-        super( storeId, uniqueName, settings, createConnectionFactory( settings, PostgresqlSqlDialect.DEFAULT ), PostgresqlSqlDialect.DEFAULT, true );
+        super( storeId, uniqueName, settings, PostgresqlSqlDialect.DEFAULT, true );
     }
 
 
-    public static ConnectionFactory createConnectionFactory( final Map<String, String> settings, SqlDialect dialect ) {
+    @Override
+    public ConnectionFactory deployDocker( int instanceId ) {
+        DockerManager.Container container = new ContainerBuilder( getAdapterId(), "postgres:13.2", getUniqueName(), instanceId )
+                .withMappedPort( 5432, Integer.parseInt( settings.get( "port" ) ) )
+                .withEnvironmentVariable( "POSTGRES_PASSWORD=" + settings.get( "password" ) )
+                .build();
+        DockerManager.getInstance().initialize( container ).start();
+
+        host = "localhost"; // TODO
+        database = "postgres";
+        username = "postgres";
+
+        return createConnectionFactory();
+    }
+
+
+    @Override
+    protected ConnectionFactory deployRemote() {
+        host = settings.get( "host" );
+        database = settings.get( "database" );
+        username = settings.get( "username" );
+        return createConnectionFactory();
+    }
+
+
+    private ConnectionFactory createConnectionFactory() {
         BasicDataSource dataSource = new BasicDataSource();
         dataSource.setDriverClassName( "org.postgresql.Driver" );
 
-        final String connectionUrl = getConnectionUrl( settings.get( "host" ), Integer.parseInt( settings.get( "port" ) ), settings.get( "database" ) );
+        final String connectionUrl = getConnectionUrl( host, Integer.parseInt( settings.get( "port" ) ), database );
         dataSource.setUrl( connectionUrl );
-        if ( log.isInfoEnabled() ) {
-            log.info( "Postgres Connection URL: {}", connectionUrl );
-        }
-        dataSource.setUsername( settings.get( "username" ) );
+        log.info( "Postgres Connection URL: {}", connectionUrl );
+        dataSource.setUsername( username );
         dataSource.setPassword( settings.get( "password" ) );
         dataSource.setDefaultAutoCommit( false );
         dataSource.setDefaultTransactionIsolation( Connection.TRANSACTION_READ_UNCOMMITTED );
@@ -210,17 +239,6 @@ public class PostgresqlStore extends AbstractJdbcStore {
     @Override
     public List<FunctionalIndexInfo> getFunctionalIndexes( CatalogTable catalogTable ) {
         return ImmutableList.of();
-    }
-
-
-    @Override
-    public void shutdown() {
-        try {
-            removeInformationPage();
-            connectionFactory.close();
-        } catch ( SQLException e ) {
-            log.warn( "Exception while shutting down {}", getUniqueName(), e );
-        }
     }
 
 

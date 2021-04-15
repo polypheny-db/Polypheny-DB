@@ -23,7 +23,6 @@ import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.jdbc.Context;
 import org.polypheny.db.schema.Schema;
 import org.polypheny.db.schema.Table;
-import org.polypheny.db.sql.SqlDialect;
 import org.polypheny.db.sql.dialect.HsqldbSqlDialect;
 import org.polypheny.db.transaction.PUID;
 import org.polypheny.db.transaction.PUID.Type;
@@ -37,7 +36,7 @@ import org.polypheny.db.util.FileSystemManager;
 @AdapterProperties(
         name = "HSQLDB",
         description = "Java-based relational database system. It supports an in-memory and a persistent file based mode. Deploying a HSQLDB instance requires no additional dependencies to be installed or servers to be set up.",
-        usedModes = { DeployMode.EMBEDDED, DeployMode.REMOTE })
+        usedModes = DeployMode.EMBEDDED)
 @AdapterSettingList(name = "tableType", options = { "Memory", "Cached" }, position = 1)
 @AdapterSettingInteger(name = "maxConnections", defaultValue = 25)
 @AdapterSettingList(name = "trxControlMode", options = { "locks", "mvlocks", "mvcc" })
@@ -46,11 +45,12 @@ import org.polypheny.db.util.FileSystemManager;
 public class HsqldbStore extends AbstractJdbcStore {
 
     public HsqldbStore( final int storeId, final String uniqueName, final Map<String, String> settings ) {
-        super( storeId, uniqueName, settings, createConnectionFactory( storeId, uniqueName, settings, HsqldbSqlDialect.DEFAULT ), HsqldbSqlDialect.DEFAULT, settings.get( "type" ).equals( "File" ) );
+        super( storeId, uniqueName, settings, HsqldbSqlDialect.DEFAULT, settings.get( "type" ).equals( "File" ) );
     }
 
 
-    public static ConnectionFactory createConnectionFactory( final int storeId, final String uniqueName, final Map<String, String> settings, SqlDialect dialect ) {
+    @Override
+    protected ConnectionFactory deployEmbedded() {
         if ( RuntimeConfig.TWO_PC_MODE.getBoolean() ) {
             // TODO MV: implement
             throw new RuntimeException( "2PC Mode is not implemented" );
@@ -64,9 +64,9 @@ public class HsqldbStore extends AbstractJdbcStore {
                 trxSettings += ";hsqldb.default_table_type=cached";
             }
             if ( settings.get( "type" ).equals( "Memory" ) ) {
-                dataSource.setUrl( "jdbc:hsqldb:mem:" + uniqueName + trxSettings );
+                dataSource.setUrl( "jdbc:hsqldb:mem:" + getUniqueName() + trxSettings );
             } else {
-                File path = FileSystemManager.getInstance().registerNewFolder( "data/hsqldb/" + storeId );
+                File path = FileSystemManager.getInstance().registerNewFolder( "data/hsqldb/" + getAdapterId() );
                 dataSource.setUrl( "jdbc:hsqldb:file:" + path + trxSettings );
             }
             dataSource.setUsername( "sa" );
@@ -75,7 +75,6 @@ public class HsqldbStore extends AbstractJdbcStore {
             dataSource.setDefaultAutoCommit( false );
             return new TransactionalConnectionFactory( dataSource, Integer.parseInt( settings.get( "maxConnections" ) ), dialect );
         }
-
     }
 
 
@@ -156,13 +155,12 @@ public class HsqldbStore extends AbstractJdbcStore {
     @Override
     public void shutdown() {
         try {
-            removeInformationPage();
             // TODO MV: Find better solution then generating random XID
             connectionFactory.getOrCreateConnectionHandler( PolyXid.generateLocalTransactionIdentifier( PUID.randomPUID( Type.NODE ), PUID.randomPUID( Type.TRANSACTION ) ) ).execute( "SHUTDOWN" );
-            connectionFactory.close();
         } catch ( SQLException | ConnectionHandlerException e ) {
             log.warn( "Exception while shutting down {}", getUniqueName(), e );
         }
+        super.shutdown();
     }
 
 
