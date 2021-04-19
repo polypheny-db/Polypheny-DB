@@ -174,17 +174,6 @@ public class PostgresqlStore extends AbstractJdbcStore {
                 .append( "." )
                 .append( dialect.quoteIdentifier( ccps.get( 0 ).physicalTableName ) );
 
-        builder.append( "(" );
-        boolean first = true;
-        for ( long columnId : catalogIndex.key.columnIds ) {
-            if ( !first ) {
-                builder.append( ", " );
-            }
-            first = false;
-            builder.append( dialect.quoteIdentifier( getPhysicalColumnName( columnId ) ) ).append( " " );
-        }
-        builder.append( ")" );
-
         builder.append( " USING " );
         switch ( catalogIndex.method ) {
             case "btree":
@@ -203,6 +192,17 @@ public class PostgresqlStore extends AbstractJdbcStore {
                 builder.append( "gin" );
                 break;
         }
+
+        builder.append( "(" );
+        boolean first = true;
+        for ( long columnId : catalogIndex.key.columnIds ) {
+            if ( !first ) {
+                builder.append( ", " );
+            }
+            first = false;
+            builder.append( dialect.quoteIdentifier( getPhysicalColumnName( columnId ) ) ).append( " " );
+        }
+        builder.append( ")" );
 
         executeUpdate( builder, context );
 
