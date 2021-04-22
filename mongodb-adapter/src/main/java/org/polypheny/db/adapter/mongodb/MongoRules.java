@@ -37,6 +37,7 @@ package org.polypheny.db.adapter.mongodb;
 import com.google.common.collect.ImmutableList;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
+import java.math.BigDecimal;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,7 +48,6 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import org.apache.calcite.avatica.util.ByteString;
-import org.bson.BsonArray;
 import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
 import org.bson.BsonDouble;
@@ -585,8 +585,6 @@ public class MongoRules {
             implementor.setRowType( (RelRecordType) input.getRowType() );
             implementor.setPrepared( true );
             int pos = 0;
-            Document docs = new Document();
-            MongoRowType rowType = (MongoRowType) implementor.getRowType();
             for ( RexNode rexNode : input.getChildExps() ) {
                 if ( rexNode instanceof RexDynamicParam ) {
                     // preparedInsert
@@ -596,9 +594,21 @@ public class MongoRules {
                 } else if ( rexNode instanceof RexCall ) {
                     RexCall call = (RexCall) rexNode;
                     if ( call.op.kind == SqlKind.ARRAY_VALUE_CONSTRUCTOR ) {
-                        BsonArray doc = new BsonArray();
-                        doc.addAll( call.operands.stream().filter( op -> op instanceof RexLiteral ).map( op -> getBsonValue( (RexLiteral) op ) ).collect( Collectors.toList() ) );
-                        docs.append( rowType.getPhysicalName( rowType.getFieldNames().get( pos ) ), doc );
+                        implementor.arrayFields.put( pos, call.operands.stream().map( val -> ((RexLiteral) val).getValueForQueryParameterizer() ).map( el -> {
+                            if ( el instanceof BigDecimal ) {
+                                return el.toString();
+                            } else {
+                                return el;
+                            }
+                        } ).collect( Collectors.toList() ) );
+                        Object clazz = null;
+                        if ( call.operands.size() > 0 ) {
+                            clazz = (((RexLiteral) call.operands.get( 0 )).getValue().getClass());
+                        }
+                        if ( pos == 1 ) {
+                            implementor.literal = rexNode;
+                        }
+                        implementor.arrayClasses.put( pos, clazz );
                     }
                 } else {
                     throw new RuntimeException( "This rexType was not considered" );

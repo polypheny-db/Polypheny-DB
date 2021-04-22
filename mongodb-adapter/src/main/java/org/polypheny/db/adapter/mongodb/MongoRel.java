@@ -48,6 +48,7 @@ import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptTable;
 import org.polypheny.db.rel.RelNode;
 import org.polypheny.db.rel.type.RelRecordType;
+import org.polypheny.db.rex.RexNode;
 import org.polypheny.db.util.Pair;
 
 
@@ -88,9 +89,15 @@ public interface MongoRel extends RelNode {
         final Map<Integer, String> dynamicFields = new HashMap<>();
         @Getter
         final Map<Integer, Object> staticFields = new HashMap<>();
+        @Getter
+        final Map<Integer, Object> arrayFields = new HashMap<>();
+        final Map<Integer, Object> arrayClasses = new HashMap<>();
 
         @Getter
         private RelRecordType rowType;
+
+
+        RexNode literal;
 
 
         public Implementor() {

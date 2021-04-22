@@ -37,6 +37,7 @@ package org.polypheny.db.adapter.mongodb;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -45,12 +46,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import org.apache.calcite.linq4j.AbstractEnumerable;
 import org.apache.calcite.linq4j.Enumerable;
 import org.apache.calcite.linq4j.Enumerator;
 import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.linq4j.function.Function1;
+import org.bson.BsonArray;
 import org.bson.BsonDocument;
 import org.bson.BsonValue;
 import org.bson.Document;
@@ -89,7 +92,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
     @Getter
     private final String collectionName;
-
+    @Getter
     private final RelProtoDataType protoRowType;
     @Getter
     private final MongoSchema mongoSchema;
@@ -308,6 +311,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
         @SuppressWarnings("UnusedDeclaration")
         public Enumerable<Object> getResults( List<Object> results ) {
             MongoTable mongoTable = (MongoTable) table;
+            mongoTable.getTransactionProvider().commit();
             dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
             return new AbstractEnumerable<Object>() {
                 @Override
@@ -319,7 +323,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
 
         @SuppressWarnings("UnusedDeclaration")
-        public Enumerable<Object> preparedExecute( List<String> fieldNames, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, Object> staticValues, BsonValue testfield ) {
+        public Enumerable<Object> preparedExecute( List<String> fieldNames, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, Object> staticValues, Map<Integer, List<Object>> arrayValues, Map<Integer, Class<?>> arrayClasses ) {
             MongoTable mongoTable = (MongoTable) table;
             dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
             List<Document> docs = new ArrayList<>();
@@ -337,6 +341,16 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                     } else if ( dynamicFields.containsKey( pos ) ) {
                         doc.append( logicalPhysicalMapping.get( name ), MongoTypeUtil.getAsBson( values.get( (long) dyn ), (BasicPolyType) dataContext.getParameterType( dyn ), mongoTable.getMongoSchema().getBucket() ) );
                         dyn++;
+                    } else if ( arrayValues.containsKey( pos ) ) {
+                        Class<?> clazz = arrayClasses.get( pos );
+                        BsonValue array = new BsonArray( arrayValues.get( pos ).stream().map( obj -> {
+                            if ( clazz != BigDecimal.class ) {
+                                return MongoTypeUtil.getAsBson( obj, mongoTable.getMongoSchema().getBucket() );
+                            } else {
+                                return MongoTypeUtil.getAsBson( new BigDecimal( (String) obj ), mongoTable.getMongoSchema().getBucket() );
+                            }
+                        } ).collect( Collectors.toList() ) );
+                        doc.append( logicalPhysicalMapping.get( name ), array );
                     }
 
                     pos++;
@@ -344,16 +358,32 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 docs.add( doc );
             }
             if ( this.dataContext.getParameterValues().size() == 0 ) {
-                // single prepared entry with only static values
+                // prepared static entry
                 Document doc = new Document();
                 for ( Entry<Integer, Object> entry : staticValues.entrySet() ) {
                     doc.append( logicalPhysicalMapping.get( fieldNames.get( entry.getKey() ) ), MongoTypeUtil.getAsBson( entry.getValue(), mongoTable.getMongoSchema().getBucket() ) );
                 }
+                for ( Entry<Integer, List<Object>> entry : arrayValues.entrySet() ) {
+                    Class<?> clazz = arrayClasses.get( entry.getKey() );
+                    BsonValue array = new BsonArray( entry.getValue().stream().map( obj -> {
+                        if ( clazz != BigDecimal.class ) {
+                            return MongoTypeUtil.getAsBson( obj, mongoTable.getMongoSchema().getBucket() );
+                        } else if ( obj instanceof String ) {
+                            return MongoTypeUtil.getAsBson( new BigDecimal( (String) obj ), mongoTable.getMongoSchema().getBucket() );
+                        }
+                        return MongoTypeUtil.getAsBson( obj, mongoTable.getMongoSchema().getBucket() );
+
+                    } ).collect( Collectors.toList() ) );
+                    doc.append( logicalPhysicalMapping.get( fieldNames.get( entry.getKey() ) ), array );
+                }
+                docs.add( doc );
+
             }
 
             if ( docs.size() > 0 ) {
                 mongoTable.getTransactionProvider().startTransaction();
                 mongoTable.getCollection().insertMany( mongoTable.transactionProvider.getSession(), docs );
+                mongoTable.getTransactionProvider().commit();
             }
             return new AbstractEnumerable<Object>() {
                 @Override

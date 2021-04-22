@@ -42,8 +42,6 @@ import org.apache.calcite.linq4j.tree.BlockBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.Expressions;
 import org.apache.calcite.linq4j.tree.MethodCallExpression;
-import org.bson.BsonInt32;
-import org.bson.BsonValue;
 import org.polypheny.db.adapter.enumerable.EnumerableRel;
 import org.polypheny.db.adapter.enumerable.EnumerableRelImplementor;
 import org.polypheny.db.adapter.enumerable.JavaRowFormat;
@@ -155,11 +153,14 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         } else {
             if ( mongoImplementor.isPrepared() ) {
                 Expression staticFields = list.append( "staticFields", Expressions.constant( mongoImplementor.staticFields, Map.class ) );
-                Expression testfield = list.append( "testfield", Expressions.constant( new BsonInt32( 420 ), BsonValue.class ) );
                 Expression dynamicFields = list.append( "dynamicFields", Expressions.constant( mongoImplementor.dynamicFields, Map.class ) );
+                Expression arrayFields = list.append( "arrayFields", Expressions.constant( mongoImplementor.arrayFields, Map.class ) );
+
+                Expression arrayClasses = list.append( "arrayClasses", Expressions.constant( mongoImplementor.arrayClasses, Map.class ) );
                 Expression data = list.append( "data", Expressions.constant( mongoImplementor.getRowType().getFieldNames(), Object.class ) );
                 Expression physicalNames = list.append( "physicalNames", Expressions.constant( mongoImplementor.getLogicalPhysicalNameMapping(), Map.class ) );
-                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_EXECUTE.method, data, physicalNames, dynamicFields, staticFields, testfield ) );
+                //Expression b = list.append( "t", Expressions.constant( new BigDecimal( "3.3" ), BigDecimal.class ) );
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_EXECUTE.method, data, physicalNames, dynamicFields, staticFields, arrayFields, arrayClasses ) );
             } else {
                 Expression results = list.append( "results", constantArrayList( mongoImplementor.getResults(), Object.class ) );
                 enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_GET_RESULT.method, results ) );
@@ -182,7 +183,7 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
      * @param clazz Type of values
      * @return expression
      */
-    private static <T> MethodCallExpression constantArrayList( List<T> values, Class clazz ) {
+    protected static <T> MethodCallExpression constantArrayList( List<T> values, Class clazz ) {
         return Expressions.call( BuiltInMethod.ARRAYS_AS_LIST.method, Expressions.newArrayInit( clazz, constantList( values ) ) );
     }
 
@@ -190,7 +191,7 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
     /**
      * E.g. {@code constantList("x", "y")} returns {@code {ConstantExpression("x"), ConstantExpression("y")}}.
      */
-    private static <T> List<Expression> constantList( List<T> values ) {
+    protected static <T> List<Expression> constantList( List<T> values ) {
         return Lists.transform( values, Expressions::constant );
     }
 

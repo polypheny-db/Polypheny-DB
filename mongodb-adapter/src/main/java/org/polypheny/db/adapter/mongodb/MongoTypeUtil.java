@@ -19,6 +19,7 @@ package org.polypheny.db.adapter.mongodb;
 import com.mongodb.client.gridfs.GridFSBucket;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
+import java.math.BigDecimal;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Date;
@@ -26,6 +27,7 @@ import java.util.Objects;
 import lombok.SneakyThrows;
 import org.apache.calcite.avatica.util.ByteString;
 import org.bson.BsonBoolean;
+import org.bson.BsonDecimal128;
 import org.bson.BsonDocument;
 import org.bson.BsonDouble;
 import org.bson.BsonInt32;
@@ -33,6 +35,7 @@ import org.bson.BsonInt64;
 import org.bson.BsonNull;
 import org.bson.BsonString;
 import org.bson.BsonValue;
+import org.bson.types.Decimal128;
 import org.bson.types.ObjectId;
 import org.polypheny.db.type.BasicPolyType;
 import org.polypheny.db.type.PolyType;
@@ -84,6 +87,10 @@ public class MongoTypeUtil {
             return new BsonString( (String) obj );
         } else if ( obj instanceof Integer ) {
             return new BsonInt32( (Integer) obj );
+        } else if ( obj instanceof Long ) {
+            return new BsonInt64( (Long) obj );
+        } else if ( obj instanceof BigDecimal ) {
+            return new BsonDecimal128( new Decimal128( (BigDecimal) obj ) );
         } else if ( obj instanceof Double ) {
             return new BsonDouble( (Double) obj );
         } else if ( obj instanceof Time || obj instanceof Date ) {
