@@ -39,7 +39,12 @@ import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.information.InformationManager;
 import org.polypheny.db.jdbc.JavaTypeFactoryImpl;
 import org.polypheny.db.prepare.PolyphenyDbCatalogReader;
-import org.polypheny.db.processing.*;
+import org.polypheny.db.processing.DataMigrator;
+import org.polypheny.db.processing.DataMigratorImpl;
+import org.polypheny.db.processing.MqlProcessor;
+import org.polypheny.db.processing.MqlProcessorImpl;
+import org.polypheny.db.processing.SqlProcessor;
+import org.polypheny.db.processing.SqlProcessorImpl;
 import org.polypheny.db.schema.PolySchemaBuilder;
 import org.polypheny.db.schema.PolyphenyDbSchema;
 import org.polypheny.db.statistic.StatisticsManager;
@@ -77,7 +82,7 @@ public class TransactionImpl implements Transaction, Comparable {
     @Getter
     private final boolean analyze;
 
-    private final AtomicLong statementCounter = new AtomicLong();
+    private final List<Statement> statements = new ArrayList<>();
 
     private final List<String> changedTables = new ArrayList<>();
 
@@ -158,6 +163,8 @@ public class TransactionImpl implements Transaction, Comparable {
             rollback();
             throw new TransactionException( "Unable to prepare all involved entities for commit. Changes have been rolled back." );
         }
+        // Free resources hold by statements
+        statements.forEach( Statement::close );
 
         // Release locks
         LockManager.INSTANCE.removeTransaction( this );
@@ -179,6 +186,8 @@ public class TransactionImpl implements Transaction, Comparable {
             }
             IndexManager.getInstance().rollback( this.xid );
             Catalog.getInstance().rollback();
+            // Free resources hold by statements
+            statements.forEach( Statement::close );
         } finally {
             // Release locks
             LockManager.INSTANCE.removeTransaction( this );
@@ -223,8 +232,9 @@ public class TransactionImpl implements Transaction, Comparable {
 
     @Override
     public StatementImpl createStatement() {
-        statementCounter.incrementAndGet();
-        return new StatementImpl( this );
+        StatementImpl statement = new StatementImpl( this );
+        statements.add( statement );
+        return statement;
     }
 
 
@@ -287,7 +297,7 @@ public class TransactionImpl implements Transaction, Comparable {
 
     @Override
     public long getNumberOfStatements() {
-        return statementCounter.get();
+        return statements.size();
     }
 
 

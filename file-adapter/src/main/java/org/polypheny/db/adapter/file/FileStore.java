@@ -46,7 +46,10 @@ import org.polypheny.db.util.FileSystemManager;
 
 
 @Slf4j
-@AdapterProperties(name = "File", description = "An adapter that stores all data as files. It is especially suitable for multimedia collections.", usedModes = DeployMode.EMBEDDED)
+@AdapterProperties(
+        name = "File",
+        description = "An adapter that stores all data as files. It is especially suitable for multimedia collections.",
+        usedModes = DeployMode.EMBEDDED)
 public class FileStore extends DataStore {
 
     // Standards
@@ -322,9 +325,8 @@ public class FileStore extends DataStore {
                     return;
                 }
                 try {
-                    //for ( File data : columnFolder.listFiles( f -> !f.isHidden() && f.getName().startsWith( movePrefix ) ) ) {
-                    for ( int i = 0; i < fileList.length; i++ ) {
-                        data = fileList[i];
+                    for ( File file : fileList ) {
+                        data = file;
                         String hash = data.getName().substring( 70 );// 3 + 3 + 64 (three underlines + "ins" + xid hash)
                         target = new File( columnFolder, hash );
                         if ( commit ) {
@@ -332,7 +334,6 @@ public class FileStore extends DataStore {
                         } else {
                             Files.move( data.toPath(), target.toPath() );
                         }
-                        i++;
                     }
                 } catch ( IOException e ) {
                     if ( target == null ) {

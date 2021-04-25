@@ -75,6 +75,8 @@ import org.polypheny.db.type.PolyTypeFamily;
 @AdapterSettingString(name = "host", defaultValue = "localhost", appliesTo = DeploySetting.REMOTE)
 public class MongoStore extends DataStore {
 
+    private final String host;
+    private final int port;
     private MongoClient client;
     private TransactionProvider transactionProvider;
     private MongoSchema currentSchema;
@@ -85,17 +87,22 @@ public class MongoStore extends DataStore {
     public MongoStore( int adapterId, String uniqueName, Map<String, String> settings ) {
         super( adapterId, uniqueName, settings, Boolean.parseBoolean( settings.get( "persistent" ) ) );
 
+        this.port = Integer.parseInt( settings.get( "port" ) );
+
         DockerManager.Container container = new ContainerBuilder( getAdapterId(), "mongo:latest", getUniqueName(), Integer.parseInt( settings.get( "instanceId" ) ) )
-                .withMappedPort( 27017, Integer.parseInt( settings.get( "port" ) ) )
+                .withMappedPort( 27017, port )
                 .withInitCommands( Arrays.asList( "mongod", "--replSet", "test" ) )
-                .withAfterCommands( Arrays.asList( "mongo", "--eval", "rs.initiate()" ), 2000 )
+                .withReadyTest( this::testConnection, 20000 )
+                .withAfterCommands( Arrays.asList( "mongo", "--eval", "rs.initiate()" ) )
                 .build();
+        this.host = container.getHost();
+
         DockerManager.getInstance().initialize( container ).start();
 
         addInformationPhysicalNames();
         enableInformationPage();
 
-        dockerInstanceId = Integer.parseInt( settings.get( "instanceId" ) );
+        dockerInstanceId = container.getDockerInstanceId();
 
         resetDockerConnection( RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, Integer.parseInt( settings.get( "instanceId" ) ) ) );
 
@@ -346,5 +353,27 @@ public class MongoStore extends DataStore {
         return "tab-" + id;
     }
 
+
+    private boolean testConnection() {
+        MongoClient client = null;
+        try {
+            MongoClientSettings mongoSettings = MongoClientSettings
+                    .builder()
+                    .applyToClusterSettings( builder ->
+                            builder.hosts( Collections.singletonList( new ServerAddress( host, port ) ) )
+                    )
+                    .build();
+
+            client = MongoClients.create( mongoSettings );
+            client.listDatabaseNames();
+            client.close();
+            return true;
+        } catch ( Exception e ) {
+            if ( client != null ) {
+                client.close();
+            }
+            return false;
+        }
+    }
 
 }

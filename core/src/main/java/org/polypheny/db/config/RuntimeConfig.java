@@ -310,6 +310,12 @@ public enum RuntimeConfig {
             ConfigType.INSTANCE_LIST,
             "dockerGroup" ),
 
+    FILE_HANDLE_CACHE_SIZE( "runtime/fileHandleCacheSize",
+            "Size (in Bytes) up to which media files are cached in-memory instead of creating a temporary file. Needs to be >= 0 and smaller than Integer.MAX_SIZE. Setting to zero disables caching of media files.",
+            0,
+            ConfigType.INTEGER,
+            "runtimExecutionGroup" ),
+
     DEFAULT_SCHEMA_MODEL( "runtime/defaultSchemaModel",
             "Define default schema model, which is used when none is provided.",
             SchemaType.RELATIONAL,
