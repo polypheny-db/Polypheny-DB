@@ -44,11 +44,13 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.calcite.avatica.util.DateTimeUtils;
 import org.apache.calcite.linq4j.Enumerator;
 import org.apache.calcite.linq4j.function.Function1;
 import org.apache.calcite.linq4j.tree.Primitive;
 import org.bson.Document;
+import org.bson.types.Decimal128;
 import org.bson.types.ObjectId;
 
 
@@ -88,6 +90,15 @@ class MongoEnumerator implements Enumerator<Object> {
             if ( cursor.hasNext() ) {
                 Document map = cursor.next();
                 current = getter.apply( map );
+                if ( current instanceof List ) {
+                    current = ((List<?>) current).stream().map( el -> {
+                        if ( el instanceof Decimal128 ) {
+                            return ((Decimal128) el).bigDecimalValue();
+                        } else {
+                            return el;
+                        }
+                    } ).collect( Collectors.toList() );
+                }
                 // if we have inserted a document we have distributed chunks which we have to fetch
                 if ( current instanceof Document ) {
                     ObjectId objectId = new ObjectId( (String) ((Document) current).get( "_id" ) );

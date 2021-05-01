@@ -20,6 +20,7 @@ import com.mongodb.MongoClientSettings;
 import com.mongodb.ServerAddress;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.IndexOptions;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -77,9 +78,9 @@ public class MongoStore extends DataStore {
 
     private final String host;
     private final int port;
-    private MongoClient client;
-    private TransactionProvider transactionProvider;
-    private MongoSchema currentSchema;
+    private transient MongoClient client;
+    private transient TransactionProvider transactionProvider;
+    private transient MongoSchema currentSchema;
     private String currentUrl;
     private final int dockerInstanceId;
 
@@ -365,7 +366,10 @@ public class MongoStore extends DataStore {
                     .build();
 
             client = MongoClients.create( mongoSettings );
-            client.listDatabaseNames();
+            MongoDatabase database = client.getDatabase( "admin" );
+            Document serverStatus = database.runCommand( new Document( "serverStatus", 1 ) );
+            Map<?, ?> connections = (Map<?, ?>) serverStatus.get( "connections" );
+            connections.get( "current" );
             client.close();
             return true;
         } catch ( Exception e ) {

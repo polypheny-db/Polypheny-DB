@@ -368,10 +368,16 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                     BsonValue array = new BsonArray( entry.getValue().stream().map( obj -> {
                         if ( clazz != BigDecimal.class ) {
                             return MongoTypeUtil.getAsBson( obj, mongoTable.getMongoSchema().getBucket() );
-                        } else if ( obj instanceof String ) {
-                            return MongoTypeUtil.getAsBson( new BigDecimal( (String) obj ), mongoTable.getMongoSchema().getBucket() );
+                        } else {
+                            if ( obj instanceof String ) {
+                                return MongoTypeUtil.getAsBson( new BigDecimal( (String) obj ), mongoTable.getMongoSchema().getBucket() );
+                            } else if ( obj instanceof Integer ) {
+                                return MongoTypeUtil.getAsBson( new BigDecimal( (Integer) obj ), mongoTable.getMongoSchema().getBucket() );
+                            } else if ( obj instanceof Long ) {
+                                return MongoTypeUtil.getAsBson( new BigDecimal( (Long) obj ), mongoTable.getMongoSchema().getBucket() );
+                            }
+                            return MongoTypeUtil.getAsBson( obj, mongoTable.getMongoSchema().getBucket() );
                         }
-                        return MongoTypeUtil.getAsBson( obj, mongoTable.getMongoSchema().getBucket() );
 
                     } ).collect( Collectors.toList() ) );
                     doc.append( logicalPhysicalMapping.get( fieldNames.get( entry.getKey() ) ), array );

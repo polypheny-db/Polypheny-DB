@@ -603,7 +603,7 @@ public class MongoRules {
                         } ).collect( Collectors.toList() ) );
                         Object clazz = null;
                         if ( call.operands.size() > 0 ) {
-                            clazz = (((RexLiteral) call.operands.get( 0 )).getValue().getClass());
+                            clazz = (((RexLiteral) call.operands.get( 0 )).getValueForQueryParameterizer().getClass());
                         }
                         if ( pos == 1 ) {
                             implementor.literal = rexNode;
