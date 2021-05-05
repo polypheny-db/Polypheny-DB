@@ -94,7 +94,7 @@ public interface MongoRel extends RelNode {
         final Map<Integer, Object> arrayClasses = new HashMap<>();
 
         @Getter
-        private RelRecordType rowType;
+        private RelRecordType staticRowType;
 
 
         RexNode literal;
@@ -121,17 +121,17 @@ public interface MongoRel extends RelNode {
         }
 
 
-        public void setRowType( RelRecordType rowType ) {
+        public void setStaticRowType( RelRecordType staticRowType ) {
             if ( mongoTable != null ) {
-                this.rowType = MongoRowType.fromRecordType( rowType, mongoTable );
+                this.staticRowType = MongoRowType.fromRecordType( staticRowType, mongoTable );
             } else {
-                this.rowType = rowType;
+                this.staticRowType = staticRowType;
             }
         }
 
 
         public Map<String, String> getLogicalPhysicalNameMapping() {
-            if ( rowType == null ) {
+            if ( staticRowType == null ) {
                 throw new RuntimeException( "Could no come up with mapping as rowtype was not specified" );
             }
             Catalog catalog = Catalog.getInstance();

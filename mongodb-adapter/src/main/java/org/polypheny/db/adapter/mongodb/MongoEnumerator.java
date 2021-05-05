@@ -39,6 +39,7 @@ import com.mongodb.client.gridfs.GridFSBucket;
 import com.mongodb.client.gridfs.GridFSDownloadStream;
 import java.io.PushbackInputStream;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
@@ -90,21 +91,9 @@ class MongoEnumerator implements Enumerator<Object> {
             if ( cursor.hasNext() ) {
                 Document map = cursor.next();
                 current = getter.apply( map );
-                if ( current instanceof List ) {
-                    current = ((List<?>) current).stream().map( el -> {
-                        if ( el instanceof Decimal128 ) {
-                            return ((Decimal128) el).bigDecimalValue();
-                        } else {
-                            return el;
-                        }
-                    } ).collect( Collectors.toList() );
-                }
-                // if we have inserted a document we have distributed chunks which we have to fetch
-                if ( current instanceof Document ) {
-                    ObjectId objectId = new ObjectId( (String) ((Document) current).get( "_id" ) );
-                    GridFSDownloadStream stream = bucket.openDownloadStream( objectId );
-                    current = new PushbackInputStream( stream );
-                }
+
+                current = handleTransforms( current );
+
                 return true;
             } else {
                 current = null;
@@ -113,6 +102,54 @@ class MongoEnumerator implements Enumerator<Object> {
         } catch ( Exception e ) {
             throw new RuntimeException( e );
         }
+    }
+
+
+    private Object handleTransforms( Object current ) {
+        if ( current == null ) {
+            return null;
+        }
+        if ( current.getClass().isArray() ) {
+            List<Object> temp = new ArrayList<>();
+            for ( Object el : (Object[]) current ) {
+                temp.add( handleTransforms( el ) );
+            }
+            return temp.toArray();
+        } else {
+            if ( this.current instanceof List ) {
+                return ((List<?>) this.current).stream().map( el -> {
+                    // one possible solution // TODO DL: discuss
+                    if ( el instanceof Document ) {
+                        return handleDocument( (Document) el );
+                    }
+                    if ( el instanceof Decimal128 ) {
+                        return ((Decimal128) el).bigDecimalValue();
+                    } else {
+                        return el;
+                    }
+                } ).collect( Collectors.toList() );
+            }
+            if ( this.current instanceof Document ) {
+                return handleDocument( (Document) this.current );
+            }
+        }
+        return current;
+    }
+
+
+    // s -> stream
+    // f -> float
+    private Object handleDocument( Document el ) {
+        String type = el.getString( "_type" );
+        if ( type.equals( "f" ) ) {
+            return el.getDouble( "_obj" ).floatValue();
+        } else if ( type.equals( "s" ) ) {
+            // if we have inserted a document and have distributed chunks which we have to fetch
+            ObjectId objectId = new ObjectId( (String) ((Document) current).get( "_id" ) );
+            GridFSDownloadStream stream = bucket.openDownloadStream( objectId );
+            return new PushbackInputStream( stream );
+        }
+        throw new RuntimeException( "The document type was not recognized" );
     }
 
 

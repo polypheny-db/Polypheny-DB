@@ -145,6 +145,9 @@ public class MongoRules {
                 && ((RexLiteral) op1).getValue2() instanceof String ) {
             return (String) ((RexLiteral) op1).getValue2();
         }
+        if ( op0.getType().getPolyType() == PolyType.ARRAY & op1 instanceof RexLiteral && op0 instanceof RexInputRef ) {
+            return null;
+        }
         return null;
     }
 
@@ -524,10 +527,10 @@ public class MongoRules {
                 break;
                 case UPDATE:
                     MongoRel.Implementor condImplementor = new Implementor( true );
-                    condImplementor.setRowType( implementor.getRowType() );
+                    condImplementor.setStaticRowType( implementor.getStaticRowType() );
                     ((MongoRel) input).implement( condImplementor );
-                    assert condImplementor.getRowType() instanceof MongoRowType;
-                    MongoRowType rowType = (MongoRowType) condImplementor.getRowType();
+                    assert condImplementor.getStaticRowType() instanceof MongoRowType;
+                    MongoRowType rowType = (MongoRowType) condImplementor.getStaticRowType();
                     int pos = 0;
                     BsonDocument doc = new BsonDocument();
                     for ( RexNode el : getSourceExpressionList() ) {
@@ -554,7 +557,7 @@ public class MongoRules {
                     break;
                 case DELETE: {
                     MongoRel.Implementor filterCollector = new Implementor( true );
-                    filterCollector.setRowType( implementor.getRowType() );
+                    filterCollector.setStaticRowType( implementor.getStaticRowType() );
                     ((MongoRel) input).implement( filterCollector );
                     List<String> docs = new ArrayList<>();
                     for ( Pair<String, String> el : filterCollector.list ) {
@@ -582,7 +585,7 @@ public class MongoRules {
             if ( !(input.getInput() instanceof MongoValues && input.getInput().getRowType().getFieldList().size() == 1) ) {
                 return;
             }
-            implementor.setRowType( (RelRecordType) input.getRowType() );
+            implementor.setStaticRowType( (RelRecordType) input.getRowType() );
             implementor.setPrepared( true );
             int pos = 0;
             for ( RexNode rexNode : input.getChildExps() ) {
@@ -594,21 +597,24 @@ public class MongoRules {
                 } else if ( rexNode instanceof RexCall ) {
                     RexCall call = (RexCall) rexNode;
                     if ( call.op.kind == SqlKind.ARRAY_VALUE_CONSTRUCTOR ) {
-                        implementor.arrayFields.put( pos, call.operands.stream().map( val -> ((RexLiteral) val).getValueForQueryParameterizer() ).map( el -> {
-                            if ( el instanceof BigDecimal ) {
-                                return el.toString();
-                            } else {
-                                return el;
+                        PolyType type = null;
+                        RelDataType relType;
+                        // TODO DL refactor
+                        relType = ((RelOptTableImpl) table).getTable().getRowType( getCluster().getTypeFactory() ).getFieldList().get( pos ).getType();
+                        type = relType.getComponentType().getPolyType();
+
+                        implementor.arrayClasses.put( pos, type );
+                        PolyType finalType = type;
+                        implementor.arrayFields.put( pos, call.operands.stream().map( el -> {
+                            if ( el instanceof RexLiteral ) {
+                                return getMongoComparable( finalType, (RexLiteral) el );
+                            } else if ( el instanceof RexCall ) {
+                                return getMongoComparableArray( finalType, (RexCall) el );
                             }
+                            throw new RuntimeException( "The given rexcall could not be transformed correctly." );
+
                         } ).collect( Collectors.toList() ) );
-                        Object clazz = null;
-                        if ( call.operands.size() > 0 ) {
-                            clazz = (((RexLiteral) call.operands.get( 0 )).getValueForQueryParameterizer().getClass());
-                        }
-                        if ( pos == 1 ) {
-                            implementor.literal = rexNode;
-                        }
-                        implementor.arrayClasses.put( pos, clazz );
+
                     }
                 } else {
                     throw new RuntimeException( "This rexType was not considered" );
@@ -617,6 +623,61 @@ public class MongoRules {
                 pos++;
             }
 
+        }
+
+
+        private Object getMongoComparableArray( PolyType finalType, RexCall el ) {
+            if ( el.op.kind == SqlKind.ARRAY_VALUE_CONSTRUCTOR ) {
+                return el.operands.stream().map( operand -> {
+                    if ( operand instanceof RexLiteral ) {
+                        return getMongoComparable( finalType, (RexLiteral) operand );
+                    } else if ( operand instanceof RexCall ) {
+                        return getMongoComparableArray( finalType, (RexCall) operand );
+                    }
+                    throw new RuntimeException( "The given RexCall could not be transformed correctly." );
+                } ).collect( Collectors.toList() );
+            }
+            throw new RuntimeException( "The given RexCall could not be transformed correctly." );
+        }
+
+
+        private Comparable<?> getMongoComparable( PolyType finalType, RexLiteral el ) {
+            switch ( finalType ) {
+
+                case BOOLEAN:
+                    return el.getValueAs( Boolean.class );
+                case TINYINT:
+                    return el.getValueAs( Byte.class );
+                case SMALLINT:
+                    return el.getValueAs( Short.class );
+                case INTEGER:
+                    return el.getValueAs( Integer.class );
+                case BIGINT:
+                    return el.getValueAs( Long.class );
+                case DECIMAL:
+                    return el.getValueAs( BigDecimal.class ).toString();
+                case FLOAT:
+                case REAL:
+                    return el.getValueAs( Float.class );
+                case DOUBLE:
+                    return el.getValueAs( Double.class );
+                case DATE:
+                case TIME:
+                    return el.getValueAs( Integer.class );
+                case TIMESTAMP:
+                    return el.getValueAs( Long.class );
+                case CHAR:
+                case VARCHAR:
+                    return el.getValueAs( String.class );
+                case GEOMETRY:
+                case FILE:
+                case IMAGE:
+                case VIDEO:
+                case SOUND:
+                    return el.getValueAs( ByteString.class ).toBase64String();
+                default:
+                    return el.getValue();
+            }
         }
 
 

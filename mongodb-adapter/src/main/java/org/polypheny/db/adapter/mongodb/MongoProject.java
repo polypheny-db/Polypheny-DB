@@ -82,8 +82,8 @@ public class MongoProject extends Project implements MongoRel {
         final List<String> items = new ArrayList<>();
         // we us our specialized rowType to derive the mapped underlying column identifiers
         MongoRowType mongoRowType = null;
-        if ( implementor.getRowType() instanceof MongoRowType ) {
-            mongoRowType = ((MongoRowType) implementor.getRowType());
+        if ( implementor.getStaticRowType() instanceof MongoRowType ) {
+            mongoRowType = ((MongoRowType) implementor.getStaticRowType());
         }
 
         for ( Pair<RexNode, String> pair : getNamedProjects() ) {
@@ -95,7 +95,27 @@ public class MongoProject extends Project implements MongoRel {
                 phyName = "\"$" + mongoRowType.getPhysicalName( name ) + "\"";
             }
 
-            final String expr = pair.left.accept( translator );
+            String expr = pair.left.accept( translator );
+            StringBuilder blankExpr = new StringBuilder( expr.replace( "'", "" ) );
+            if ( blankExpr.toString().startsWith( "$" ) && blankExpr.toString().endsWith( "]" ) && blankExpr.toString().contains( "[" ) ) {
+                // we want to access an array element and have to get the correct table and the specified array element
+                String[] splits = blankExpr.toString().split( "\\[" );
+                if ( splits.length >= 2 && splits[1].contains( "]" ) && mongoRowType != null ) {
+                    String arrayName = splits[0].replace( "$", "" );
+                    arrayName = "\"$" + mongoRowType.getPhysicalName( arrayName ) + "\"";
+
+                    // we can have multidimensional arrays and have to take care here
+                    blankExpr = new StringBuilder( arrayName );
+                    for ( int i = 1; i < splits.length; i++ ) {
+                        // we have to adjust as sql arrays start at 1
+                        int pos = Integer.parseInt( splits[i].replace( "]", "" ) ) - 1;
+                        blankExpr = new StringBuilder( "{$arrayElemAt:[" + blankExpr + ", " + pos + "]}" );
+                    }
+                    expr = blankExpr.toString();
+
+                }
+
+            }
             items.add( expr.equals( "'$" + name + "'" )
                     ? MongoRules.maybeQuote( name ) + ": " + phyName//1"
                     : MongoRules.maybeQuote( name ) + ": " + expr );

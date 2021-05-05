@@ -111,7 +111,7 @@ public class MongoTableScan extends TableScan implements MongoRel {
     public void implement( Implementor implementor ) {
         implementor.mongoTable = mongoTable;
         implementor.table = table;
-        implementor.setRowType( (RelRecordType) rowType );
+        implementor.setStaticRowType( (RelRecordType) rowType );
     }
 }
 

@@ -87,8 +87,8 @@ public class MongoFilter extends Filter implements MongoRel {
         implementor.visitChild( 0, getInput() );
         // to not break the existing functionality for now we have to handle it this way
         Translator translator = null;
-        if ( implementor.getRowType() != null && implementor.getRowType() instanceof MongoRowType ) {
-            translator = new Translator( MongoRules.mongoFieldNames( getRowType() ), (MongoRowType) implementor.getRowType() );
+        if ( implementor.getStaticRowType() != null && implementor.getStaticRowType() instanceof MongoRowType ) {
+            translator = new Translator( MongoRules.mongoFieldNames( getRowType() ), (MongoRowType) implementor.getStaticRowType() );
         } else {
             translator = new Translator( MongoRules.mongoFieldNames( getRowType() ) );
         }
@@ -241,6 +241,12 @@ public class MongoFilter extends Filter implements MongoRel {
             if ( b ) {
                 return null;
             }
+            if ( right instanceof RexCall ) {
+                return null;
+            }
+            if ( left instanceof RexCall ) {
+                return null;
+            }
             throw new AssertionError( "cannot translate op " + op + " call " + call );
         }
 
@@ -270,6 +276,7 @@ public class MongoFilter extends Filter implements MongoRel {
                 case CAST:
                     return translateBinary2( op, ((RexCall) left).operands.get( 0 ), right );
                 case OTHER_FUNCTION:
+
                     String itemName = MongoRules.isItem( (RexCall) left );
                     if ( itemName != null ) {
                         translateOp2( op, itemName, rightLiteral );

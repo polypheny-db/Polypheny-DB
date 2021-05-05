@@ -23,9 +23,11 @@ import java.math.BigDecimal;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 import lombok.SneakyThrows;
 import org.apache.calcite.avatica.util.ByteString;
+import org.bson.BsonArray;
 import org.bson.BsonBoolean;
 import org.bson.BsonDecimal128;
 import org.bson.BsonDocument;
@@ -37,22 +39,41 @@ import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.bson.types.Decimal128;
 import org.bson.types.ObjectId;
-import org.polypheny.db.type.BasicPolyType;
 import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeFamily;
 
 public class MongoTypeUtil {
 
     @SneakyThrows
-    public static BsonValue getAsBson( Object obj, BasicPolyType type, GridFSBucket bucket ) {
+    public static BsonValue getAsBson( Object obj, PolyType type, GridFSBucket bucket ) {
         BsonValue value;
-        if ( type.getPolyType() == PolyType.NULL ) {
+        if ( obj instanceof List ) { // TODO DL: reevaluate
+            BsonArray array = new BsonArray();
+            ((List<?>) obj).forEach( el -> array.add( getAsBson( el, type, bucket ) ) );
+            value = array;
+        } else if ( type == PolyType.NULL ) {
             value = new BsonNull();
         } else if ( type.getFamily() == PolyTypeFamily.CHARACTER ) {
             value = new BsonString( Objects.requireNonNull( obj.toString() ) );
-        } else if ( PolyType.INT_TYPES.contains( type.getPolyType() ) ) {
+        } else if ( type == PolyType.BIGINT ) {
+            value = new BsonInt64( (Long) obj );
+        } else if ( type == PolyType.DECIMAL ) {
+            if ( obj instanceof String ) {
+                value = new BsonDecimal128( new Decimal128( new BigDecimal( (String) obj ) ) );
+            } else {
+                value = new BsonDecimal128( new Decimal128( new BigDecimal( String.valueOf( obj ) ) ) );
+            }
+        } else if ( type == PolyType.TINYINT ) {
+            value = new BsonInt32( (Byte) obj );
+        } else if ( type == PolyType.SMALLINT ) {
+            value = new BsonInt32( (Short) obj );
+        } else if ( PolyType.INT_TYPES.contains( type ) ) {
             value = new BsonInt32( (Integer) obj );
-        } else if ( PolyType.FRACTIONAL_TYPES.contains( type.getPolyType() ) ) {
+        } else if ( type == PolyType.FLOAT || type == PolyType.REAL ) {
+            value = new BsonDocument()
+                    .append( "_obj", new BsonDouble( (Float) obj ) )
+                    .append( "_type", new BsonString( "f" ) );
+        } else if ( PolyType.FRACTIONAL_TYPES.contains( type ) ) {
             value = new BsonDouble( (Double) obj );
         } else if ( type.getFamily() == PolyTypeFamily.DATE || type.getFamily() == PolyTypeFamily.TIME ) {
             value = new BsonInt32( (Integer) obj );
@@ -62,17 +83,11 @@ public class MongoTypeUtil {
             value = new BsonBoolean( (Boolean) obj );
         } else if ( type.getFamily() == PolyTypeFamily.BINARY ) {
             value = new BsonString( ((ByteString) obj).toBase64String() );
-        } else if ( type.getFamily() == PolyTypeFamily.ARRAY ) {
-            if ( obj == null ) {
-                value = new BsonNull();
-            } else {
-                throw new RuntimeException( "Arrays are not yet fully supported for the MongoDB Adapter" ); // todo dl: add array with content
-            }
-        } else if ( PolyTypeFamily.MULTIMEDIA == type.getPolyType().getFamily() ) {
-            int length = ((InputStream) obj).available();
-            ObjectId id = bucket.uploadFromStream( "test", (InputStream) obj );
-            value = new BsonDocument().append( "_id", new BsonString( id.toString() ) );
-
+        } else if ( PolyTypeFamily.MULTIMEDIA == type.getFamily() ) {
+            ObjectId id = bucket.uploadFromStream( "_", (InputStream) obj );
+            value = new BsonDocument()
+                    .append( "_type", new BsonString( "s" ) )
+                    .append( "_id", new BsonString( id.toString() ) );
         } else {
             value = new BsonString( obj.toString() );
         }
@@ -101,7 +116,6 @@ public class MongoTypeUtil {
             return new BsonBoolean( (Boolean) obj );
         } else if ( obj instanceof ByteString ) {
             return new BsonString( ((ByteString) obj).toBase64String() );
-            // add array
         } else if ( obj instanceof InputStream ) {
             // the object is a file which need to be handle specially
             ObjectId id = bucket.uploadFromStream( "test", (PushbackInputStream) obj );

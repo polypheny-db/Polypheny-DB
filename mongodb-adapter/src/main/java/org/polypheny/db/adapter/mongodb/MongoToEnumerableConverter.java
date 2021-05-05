@@ -157,7 +157,7 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
                 Expression arrayFields = list.append( "arrayFields", Expressions.constant( mongoImplementor.arrayFields, Map.class ) );
 
                 Expression arrayClasses = list.append( "arrayClasses", Expressions.constant( mongoImplementor.arrayClasses, Map.class ) );
-                Expression data = list.append( "data", Expressions.constant( mongoImplementor.getRowType().getFieldNames(), Object.class ) );
+                Expression data = list.append( "data", Expressions.constant( mongoImplementor.getStaticRowType().getFieldNames(), Object.class ) );
                 Expression physicalNames = list.append( "physicalNames", Expressions.constant( mongoImplementor.getLogicalPhysicalNameMapping(), Map.class ) );
                 //Expression b = list.append( "t", Expressions.constant( new BigDecimal( "3.3" ), BigDecimal.class ) );
                 enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_EXECUTE.method, data, physicalNames, dynamicFields, staticFields, arrayFields, arrayClasses ) );
