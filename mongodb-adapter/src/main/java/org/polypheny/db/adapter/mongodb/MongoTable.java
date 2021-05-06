@@ -34,6 +34,7 @@
 package org.polypheny.db.adapter.mongodb;
 
 
+import com.mongodb.client.ClientSession;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -52,8 +53,10 @@ import org.apache.calcite.linq4j.Enumerable;
 import org.apache.calcite.linq4j.Enumerator;
 import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.linq4j.function.Function1;
+import org.apache.calcite.linq4j.tree.Expression;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
+import org.bson.BsonNull;
 import org.bson.BsonValue;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -80,6 +83,7 @@ import org.polypheny.db.schema.ModifiableTable;
 import org.polypheny.db.schema.SchemaPlus;
 import org.polypheny.db.schema.TranslatableTable;
 import org.polypheny.db.schema.impl.AbstractTableQueryable;
+import org.polypheny.db.transaction.PolyXid;
 import org.polypheny.db.type.PolyType;
 import org.polypheny.db.util.Util;
 
@@ -180,12 +184,13 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
      * "{$group: {_id: '$city', c: {$sum: 1}, p: {$sum: '$pop'}}}")
      * </code>
      *
+     * @param session
      * @param mongoDb MongoDB connection
      * @param fields List of fields to project; or null to return map
      * @param operations One or more JSON strings
      * @return Enumerator of results
      */
-    private Enumerable<Object> aggregate( final MongoDatabase mongoDb, MongoTable table, final List<Map.Entry<String, Class>> fields, final List<String> operations ) {
+    private Enumerable<Object> aggregate( ClientSession session, final MongoDatabase mongoDb, MongoTable table, final List<Entry<String, Class>> fields, final List<String> operations ) {
         final List<Bson> list = new ArrayList<>();
         for ( String operation : operations ) {
             list.add( BsonDocument.parse( operation ) );
@@ -197,7 +202,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 final Iterator<Document> resultIterator;
                 try {
                     if ( list.size() != 0 ) {
-                        resultIterator = mongoDb.getCollection( collectionName ).aggregate( list ).iterator();
+                        resultIterator = mongoDb.getCollection( collectionName ).aggregate( session, list ).iterator();
                     } else {
                         resultIterator = Collections.emptyIterator();
                     }
@@ -288,7 +293,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
          */
         @SuppressWarnings("UnusedDeclaration")
         public Enumerable<Object> aggregate( List<Map.Entry<String, Class>> fields, List<String> operations ) {
-            return getTable().aggregate( getMongoDb(), getTable(), fields, operations );
+            return getTable().aggregate( getTable().getTransactionProvider().getSession( dataContext.getStatement().getTransaction().getXid() ), getMongoDb(), getTable(), fields, operations );
         }
 
 
@@ -310,8 +315,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
         @SuppressWarnings("UnusedDeclaration")
         public Enumerable<Object> getResults( List<Object> results ) {
             MongoTable mongoTable = (MongoTable) table;
-            mongoTable.getTransactionProvider().commit();
-            dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
+
             return new AbstractEnumerable<Object>() {
                 @Override
                 public Enumerator<Object> enumerator() {
@@ -322,8 +326,9 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
 
         @SuppressWarnings("UnusedDeclaration")
-        public Enumerable<Object> preparedExecute( List<String> fieldNames, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, Object> staticValues, Map<Integer, List<Object>> arrayValues, Map<Integer, PolyType> types ) {
+        public Enumerable<Object> preparedExecute( List<String> fieldNames, List<Integer> nullFields, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, Expression> staticValues, Map<Integer, List<Object>> arrayValues, Map<Integer, PolyType> types ) {
             MongoTable mongoTable = (MongoTable) table;
+            PolyXid xid = dataContext.getStatement().getTransaction().getXid();
             dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
             List<Document> docs = new ArrayList<>();
 
@@ -344,11 +349,6 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                         PolyType type = types.get( pos );
                         BsonValue array = new BsonArray( arrayValues.get( pos ).stream().map( obj -> {
                             return MongoTypeUtil.getAsBson( obj, type, mongoTable.getMongoSchema().getBucket() );
-                            /*if ( clazz != BigDecimal.class ) {
-                                return MongoTypeUtil.getAsBson( obj, mongoTable.getMongoSchema().getBucket() );
-                            } else {
-                                return MongoTypeUtil.getAsBson( new BigDecimal( (String) obj ), mongoTable.getMongoSchema().getBucket() );
-                            }*/
                         } ).collect( Collectors.toList() ) );
                         doc.append( logicalPhysicalMapping.get( name ), array );
                     }
@@ -360,25 +360,16 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             if ( this.dataContext.getParameterValues().size() == 0 ) {
                 // prepared static entry
                 Document doc = new Document();
-                for ( Entry<Integer, Object> entry : staticValues.entrySet() ) {
+                for ( Entry<Integer, Expression> entry : staticValues.entrySet() ) {
                     doc.append( logicalPhysicalMapping.get( fieldNames.get( entry.getKey() ) ), MongoTypeUtil.getAsBson( entry.getValue(), mongoTable.getMongoSchema().getBucket() ) );
+                }
+                for ( Integer key : nullFields ) {
+                    doc.append( logicalPhysicalMapping.get( fieldNames.get( key ) ), new BsonNull() );
                 }
                 for ( Entry<Integer, List<Object>> entry : arrayValues.entrySet() ) {
                     PolyType type = types.get( entry.getKey() );
                     BsonValue array = new BsonArray( entry.getValue().stream().map( obj -> {
                         return MongoTypeUtil.getAsBson( obj, type, mongoTable.getMongoSchema().getBucket() );
-                        /*if ( clazz != BigDecimal.class ) {
-                            return MongoTypeUtil.getAsBson( obj, mongoTable.getMongoSchema().getBucket() );
-                        } else {
-                            if ( obj instanceof String ) {
-                                return MongoTypeUtil.getAsBson( new BigDecimal( (String) obj ), mongoTable.getMongoSchema().getBucket() );
-                            } else if ( obj instanceof Integer ) {
-                                return MongoTypeUtil.getAsBson( new BigDecimal( (Integer) obj ), mongoTable.getMongoSchema().getBucket() );
-                            } else if ( obj instanceof Long ) {
-                                return MongoTypeUtil.getAsBson( new BigDecimal( (Long) obj ), mongoTable.getMongoSchema().getBucket() );
-                            }
-                            return MongoTypeUtil.getAsBson( obj, mongoTable.getMongoSchema().getBucket() );
-                        }*/
 
                     } ).collect( Collectors.toList() ) );
                     doc.append( logicalPhysicalMapping.get( fieldNames.get( entry.getKey() ) ), array );
@@ -388,9 +379,8 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             }
 
             if ( docs.size() > 0 ) {
-                mongoTable.getTransactionProvider().startTransaction();
-                mongoTable.getCollection().insertMany( mongoTable.transactionProvider.getSession(), docs );
-                mongoTable.getTransactionProvider().commit();
+                ClientSession session = mongoTable.getTransactionProvider().startTransaction( xid );
+                mongoTable.getCollection().insertMany( session, docs );
             }
             return new AbstractEnumerable<Object>() {
                 @Override
@@ -410,7 +400,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
         @SuppressWarnings("UnusedDeclaration")
         public Enumerable<Object> preparedWrapper( DataContext context ) {
             MongoTable mongoTable = (MongoTable) table;
-            context.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
+            PolyXid xid = context.getStatement().getTransaction().getXid();
             List<Document> docs = new ArrayList<>();
             Map<Long, String> names = new HashMap<>();
 
@@ -426,13 +416,59 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 docs.add( doc );
             }
             if ( docs.size() > 0 ) {
-                mongoTable.transactionProvider.startTransaction();
-                mongoTable.getCollection().insertMany( mongoTable.transactionProvider.getSession(), docs );
+                mongoTable.transactionProvider.startTransaction( xid );
+
+                context.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
+
+                mongoTable.getCollection().insertMany( mongoTable.transactionProvider.getSession( xid ), docs );
             }
             return new AbstractEnumerable<Object>() {
                 @Override
                 public Enumerator<Object> enumerator() {
                     return new IterWrapper( Collections.singletonList( (Object) docs.size() ).iterator() );
+                }
+            };
+        }
+
+
+        /**
+         * This methods handles direct DMLs(which already have the values) in Mongodb for now TODO DL: reevaluate
+         *
+         * @return
+         */
+        @SuppressWarnings("UnusedDeclaration")
+        public Enumerable<Object> handleDirectDML( Operation operation, String filter, List<String> operations ) {
+            MongoTable mongoTable = (MongoTable) table;
+            PolyXid xid = dataContext.getStatement().getTransaction().getXid();
+            dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
+            ClientSession session = mongoTable.getTransactionProvider().startTransaction( xid );
+
+            long changes = 0;
+
+            switch ( operation ) {
+
+                case INSERT:
+                    List<Document> docs = operations.stream().map( Document::parse ).collect( Collectors.toList() );
+                    mongoTable.getCollection().insertMany( session, docs );
+                    changes = docs.size();
+                    break;
+                case UPDATE:
+                    assert operations.size() == 1;
+                    changes = mongoTable.getCollection().updateMany( session, BsonDocument.parse( filter ), BsonDocument.parse( operations.get( 0 ) ) ).getModifiedCount();
+                    break;
+                case DELETE:
+                    assert operations.size() == 1;
+                    changes = mongoTable.getCollection().deleteMany( session, BsonDocument.parse( operations.get( 0 ) ) ).getDeletedCount();
+                    break;
+                case MERGE:
+                    throw new RuntimeException( "MERGE IS NOT SUPPORTED" );
+            }
+
+            long finalChanges = changes;
+            return new AbstractEnumerable<Object>() {
+                @Override
+                public Enumerator<Object> enumerator() {
+                    return new IterWrapper( Collections.singletonList( (Object) finalChanges ).iterator() );
                 }
             };
         }

@@ -35,7 +35,6 @@ package org.polypheny.db.adapter.mongodb;
 
 
 import com.google.common.collect.ImmutableList;
-import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import java.math.BigDecimal;
 import java.util.AbstractList;
@@ -44,16 +43,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import org.apache.calcite.avatica.util.ByteString;
-import org.bson.BsonBoolean;
+import org.bson.BsonArray;
 import org.bson.BsonDocument;
-import org.bson.BsonDouble;
-import org.bson.BsonInt32;
-import org.bson.BsonInt64;
-import org.bson.BsonNull;
 import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.bson.Document;
@@ -99,7 +93,6 @@ import org.polypheny.db.sql.SqlOperator;
 import org.polypheny.db.sql.fun.SqlStdOperatorTable;
 import org.polypheny.db.sql.validate.SqlValidatorUtil;
 import org.polypheny.db.type.PolyType;
-import org.polypheny.db.type.PolyTypeFamily;
 import org.polypheny.db.util.Bug;
 import org.polypheny.db.util.Pair;
 import org.polypheny.db.util.Util;
@@ -297,6 +290,11 @@ public class MongoRules {
                 }
                 sb.append( finish );
                 return sb.toString();
+            }
+            if ( call.getType().getPolyType() == PolyType.ARRAY ) {
+                BsonArray array = new BsonArray();
+                array.addAll( visitList( call.operands ).stream().map( BsonString::new ).collect( Collectors.toList() ) );
+                return array.toString();
             }
             throw new IllegalArgumentException( "Translation of " + call.toString() + " is not supported by MongoProject" );
         }
@@ -503,7 +501,7 @@ public class MongoRules {
 
         @Override
         public void implement( Implementor implementor ) {
-            implementor.setDDL( true );
+            implementor.setDML( true );
             implementor.results = new ArrayList<>();
 
             Table preTable = ((RelOptTableImpl) table).getTable();
@@ -513,6 +511,7 @@ public class MongoRules {
             }
             implementor.mongoTable = (MongoTable) preTable;
             implementor.table = table;
+            implementor.setOperation( this.getOperation() );
 
             switch ( this.getOperation() ) {
                 case INSERT: {
@@ -535,22 +534,26 @@ public class MongoRules {
                     BsonDocument doc = new BsonDocument();
                     for ( RexNode el : getSourceExpressionList() ) {
                         if ( el instanceof RexLiteral ) {
-                            doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), getBsonValue( (RexLiteral) el ) );
+                            doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), MongoTypeUtil.getBsonValue( (RexLiteral) el ) );
+                        } else if ( el instanceof RexCall ) {
+                            doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), MongoTypeUtil.getBsonArray( (RexCall) el ) );
                         }
                         pos++;
                     }
-                    BsonDocument update = new BsonDocument();
-                    update.append( "$set", doc );
-                    UpdateResult res = null;
-                    implementor.mongoTable.getTransactionProvider().startTransaction();
-                    if ( condImplementor.list.size() == 1 ) {
-                        res = implementor.mongoTable.getCollection().updateMany( implementor.mongoTable.getTransactionProvider().getSession(), BsonDocument.parse( condImplementor.list.get( 0 ).right ), update );
-                    } else {
-                        res = implementor.mongoTable.getCollection().updateMany( implementor.mongoTable.getTransactionProvider().getSession(), new BsonDocument(), update );
-                    }
+                    BsonDocument update = new BsonDocument().append( "$set", doc );
 
-                    implementor.setDDL( true );
-                    implementor.results = Collections.singletonList( res.getModifiedCount() );
+                    UpdateResult res = null;
+                    //implementor.mongoTable.getTransactionProvider().startTransaction();
+                    if ( condImplementor.list.size() == 1 ) {
+                        implementor.filter = condImplementor.list.get( 0 ).right;
+                        //res = implementor.mongoTable.getCollection().updateMany( implementor.mongoTable.getTransactionProvider().getSession(), BsonDocument.parse( condImplementor.list.get( 0 ).right ), update );
+                    } else {
+                        implementor.filter = new BsonDocument().toJson();
+                        //res = implementor.mongoTable.getCollection().updateMany( implementor.mongoTable.getTransactionProvider().getSession(), new BsonDocument(), update );
+                    }
+                    implementor.operations = Collections.singletonList( update.toString() );
+
+                    //implementor.results = Collections.singletonList( res.getModifiedCount() );
 
                     break;
                 case MERGE:
@@ -569,11 +572,12 @@ public class MongoRules {
                     } else {
                         // TODO DL: evaluate if this is even possible
                     }
-                    implementor.mongoTable.getTransactionProvider().startTransaction();
-                    DeleteResult result = implementor.mongoTable.getCollection().deleteMany( implementor.mongoTable.getTransactionProvider().getSession(), BsonDocument.parse( docString ) );
+                    //implementor.mongoTable.getTransactionProvider().startTransaction();
+                    implementor.operations = Collections.singletonList( docString );
 
-                    implementor.setDDL( true );
-                    implementor.results = Collections.singletonList( result.getDeletedCount() );
+                    //DeleteResult result = implementor.mongoTable.getCollection().deleteMany( implementor.mongoTable.getTransactionProvider().getSession(), BsonDocument.parse( docString ) );
+
+                    //implementor.results = Collections.singletonList( result.getDeletedCount() );
                 }
 
             }
@@ -593,7 +597,11 @@ public class MongoRules {
                     // preparedInsert
                     implementor.dynamicFields.put( pos, rexNode.getType().getPolyType().getTypeName() );
                 } else if ( rexNode instanceof RexLiteral ) {
-                    implementor.staticFields.put( pos, rexNode );
+                    if ( !((RexLiteral) rexNode).isNull() ) {
+                        implementor.staticFields.put( pos, rexNode );
+                    } else {
+                        implementor.nullFields.add( pos );
+                    }
                 } else if ( rexNode instanceof RexCall ) {
                     RexCall call = (RexCall) rexNode;
                     if ( call.op.kind == SqlKind.ARRAY_VALUE_CONSTRUCTOR ) {
@@ -611,7 +619,7 @@ public class MongoRules {
                             } else if ( el instanceof RexCall ) {
                                 return getMongoComparableArray( finalType, (RexCall) el );
                             }
-                            throw new RuntimeException( "The given rexcall could not be transformed correctly." );
+                            throw new RuntimeException( "The given RexCall could not be transformed correctly." );
 
                         } ).collect( Collectors.toList() ) );
 
@@ -682,61 +690,31 @@ public class MongoRules {
 
 
         private void handleDirectInsert( Implementor implementor, MongoValues values ) {
-            List<Document> docs = new ArrayList<>();
+            List<String> docs = new ArrayList<>();
             for ( ImmutableList<RexLiteral> literals : values.tuples ) {
                 Document doc = new Document();
                 int pos = 0;
                 for ( RexLiteral literal : literals ) {
-                    if ( literal.getValue() != null ) {
-                        BsonValue value;
-                        // might needs some adjustment later on TODO DL
-                        //http://mongodb.github.io/mongo-java-driver/3.4/bson/documents/#document
-                        value = getBsonValue( literal );
-                        try {
-                            doc.append( MongoStore.getPhysicalColumnName( Catalog.getInstance().getColumn( implementor.mongoTable.getCatalogTable().id, values.getRowType().getFieldNames().get( pos ) ).id ), value );
-                        } catch ( UnknownColumnException e ) {
-                            e.printStackTrace();
-                        }
+
+                    BsonValue value;
+                    // might needs some adjustment later on TODO DL
+                    //http://mongodb.github.io/mongo-java-driver/3.4/bson/documents/#document
+                    value = MongoTypeUtil.getBsonValue( literal );
+                    try {
+                        doc.append( MongoStore.getPhysicalColumnName( Catalog.getInstance().getColumn( implementor.mongoTable.getCatalogTable().id, values.getRowType().getFieldNames().get( pos ) ).id ), value );
+                    } catch ( UnknownColumnException e ) {
+                        e.printStackTrace();
                     }
+
                     pos++;
                 }
-                docs.add( doc );
+                docs.add( doc.toJson() );
 
             }
-            implementor.mongoTable.getTransactionProvider().startTransaction();
-            implementor.mongoTable.getCollection().insertMany( implementor.mongoTable.getTransactionProvider().getSession(), docs );
-            implementor.results = Collections.singletonList( docs.size() );
-        }
-
-
-        private BsonValue getBsonValue( RexLiteral literal ) {
-            BsonValue value;
-            if ( literal.getTypeName() == PolyType.NULL ) {
-                value = new BsonNull();
-            } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
-                value = new BsonString( Objects.requireNonNull( RexLiteral.stringValue( literal ) ) );
-            } else if ( PolyType.INT_TYPES.contains( literal.getType().getPolyType() ) ) {
-                value = new BsonInt32( RexLiteral.intValue( literal ) );
-            } else if ( PolyType.FRACTIONAL_TYPES.contains( literal.getType().getPolyType() ) ) {
-                value = new BsonDouble( literal.getValueAs( Double.class ) );
-            } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.DATE || literal.getTypeName().getFamily() == PolyTypeFamily.TIME ) {
-                value = new BsonInt32( (Integer) literal.getValue2() );
-            } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.TIMESTAMP ) {
-                value = new BsonInt64( (Long) literal.getValue2() );
-            } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BOOLEAN ) {
-                value = new BsonBoolean( (Boolean) literal.getValue2() );
-            } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BINARY ) {
-                value = new BsonString( ((ByteString) literal.getValue2()).toBase64String() );
-            } else if ( literal.getType().getPolyType().getFamily() == PolyTypeFamily.ARRAY ) {
-                if ( literal.getValue2() == null ) {
-                    value = new BsonNull();
-                } else {
-                    throw new RuntimeException( "Arrays are not yet fully supported for the MongoDB Adapter" ); // todo dl: add array with content
-                }
-            } else {
-                value = new BsonString( RexLiteral.value( literal ).toString() );
-            }
-            return value;
+            implementor.operations = docs;
+            // implementor.mongoTable.getTransactionProvider().startTransaction();
+            // implementor.mongoTable.getCollection().insertMany( implementor.mongoTable.getTransactionProvider().getSession(), docs );
+            // implementor.results = Collections.singletonList( docs.size() );
         }
 
     }

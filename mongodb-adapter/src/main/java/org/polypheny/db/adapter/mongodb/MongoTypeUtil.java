@@ -39,6 +39,9 @@ import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.bson.types.Decimal128;
 import org.bson.types.ObjectId;
+import org.polypheny.db.rex.RexCall;
+import org.polypheny.db.rex.RexLiteral;
+import org.polypheny.db.rex.RexNode;
 import org.polypheny.db.type.PolyType;
 import org.polypheny.db.type.PolyTypeFamily;
 
@@ -123,6 +126,44 @@ public class MongoTypeUtil {
         } else {
             return new BsonString( obj.toString() );
         }
+    }
+
+
+    public static BsonValue getBsonValue( RexLiteral literal ) {
+        BsonValue value;
+        if ( literal.getValue() == null ) {
+            value = new BsonNull();
+        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
+            value = new BsonString( Objects.requireNonNull( RexLiteral.stringValue( literal ) ) );
+        } else if ( PolyType.INT_TYPES.contains( literal.getType().getPolyType() ) ) {
+            value = new BsonInt32( RexLiteral.intValue( literal ) );
+        } else if ( PolyType.FRACTIONAL_TYPES.contains( literal.getType().getPolyType() ) ) {
+            value = new BsonDouble( literal.getValueAs( Double.class ) );
+        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.DATE || literal.getTypeName().getFamily() == PolyTypeFamily.TIME ) {
+            value = new BsonInt32( (Integer) literal.getValue2() );
+        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.TIMESTAMP ) {
+            value = new BsonInt64( (Long) literal.getValue2() );
+        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BOOLEAN ) {
+            value = new BsonBoolean( (Boolean) literal.getValue2() );
+        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BINARY ) {
+            value = new BsonString( ((ByteString) literal.getValue2()).toBase64String() );
+        } else {
+            value = new BsonString( RexLiteral.value( literal ).toString() );
+        }
+        return value;
+    }
+
+
+    public static BsonArray getBsonArray( RexCall call ) {
+        BsonArray array = new BsonArray();
+        for ( RexNode op : call.operands ) {
+            if ( op instanceof RexCall ) {
+                array.add( getBsonArray( (RexCall) op ) );
+            } else {
+                array.add( getBsonValue( (RexLiteral) op ) );
+            }
+        }
+        return array;
     }
 
 }

@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.calcite.linq4j.tree.Types;
 import org.polypheny.db.adapter.DataContext;
+import org.polypheny.db.rel.core.TableModify.Operation;
 
 
 /**
@@ -50,7 +51,8 @@ public enum MongoMethod {
     MONGO_QUERYABLE_AGGREGATE( MongoTable.MongoQueryable.class, "aggregate", List.class, List.class ),
     MONGO_GET_RESULT( MongoTable.MongoQueryable.class, "getResults", List.class ),
     PREPARED_WRAPPER( MongoTable.MongoQueryable.class, "preparedWrapper", DataContext.class ),
-    PREPARED_EXECUTE( MongoTable.MongoQueryable.class, "preparedExecute", List.class, Map.class, Map.class, Map.class, Map.class, Map.class );
+    PREPARED_EXECUTE( MongoTable.MongoQueryable.class, "preparedExecute", List.class, List.class, Map.class, Map.class, Map.class, Map.class, Map.class ),
+    HANDLE_DIRECT_DML( MongoTable.MongoQueryable.class, "handleDirectDML", Operation.class, String.class, List.class );
 
     public final Method method;
 

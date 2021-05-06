@@ -123,7 +123,7 @@ public class MongoProject extends Project implements MongoRel {
         final String findString = Util.toString( items, "{", ", ", "}" );
         final String aggregateString = "{$project: " + findString + "}";
         final Pair<String, String> op = Pair.of( findString, aggregateString );
-        if ( !implementor.isDDL() ) {
+        if ( !implementor.isDML() ) {
             implementor.add( op.left, op.right );
         }
     }

@@ -44,6 +44,7 @@ import org.polypheny.db.adapter.Adapter.AdapterProperties;
 import org.polypheny.db.adapter.Adapter.AdapterSettingBoolean;
 import org.polypheny.db.adapter.Adapter.AdapterSettingInteger;
 import org.polypheny.db.adapter.Adapter.AdapterSettingString;
+import org.polypheny.db.adapter.AdapterManager;
 import org.polypheny.db.adapter.DataStore;
 import org.polypheny.db.adapter.DeployMode;
 import org.polypheny.db.adapter.DeployMode.DeploySetting;
@@ -107,6 +108,7 @@ public class MongoStore extends DataStore {
 
         resetDockerConnection( RuntimeConfig.DOCKER_INSTANCES.getWithId( ConfigDocker.class, Integer.parseInt( settings.get( "instanceId" ) ) ) );
 
+        this.transactionProvider = new TransactionProvider( this.client );
     }
 
 
@@ -124,7 +126,9 @@ public class MongoStore extends DataStore {
                 .build();
 
         this.client = MongoClients.create( mongoSettings );
-        this.transactionProvider = new TransactionProvider( this.client );
+        if ( transactionProvider != null ) {
+            transactionProvider.setClient( client );
+        }
         this.currentUrl = c.getHost();
     }
 
@@ -153,8 +157,8 @@ public class MongoStore extends DataStore {
     @Override
     public void truncate( Context context, CatalogTable table ) {
         context.getStatement().getTransaction().registerInvolvedAdapter( this );
-        transactionProvider.startTransaction();
-        currentSchema.database.getCollection( getPhysicalTableName( table.id ) ).deleteMany( transactionProvider.getSession(), new Document() );
+        // DDL is auto-committed
+        currentSchema.database.getCollection( getPhysicalTableName( table.id ) ).deleteMany( new Document() );
     }
 
 
@@ -166,13 +170,13 @@ public class MongoStore extends DataStore {
 
     @Override
     public void commit( PolyXid xid ) {
-        transactionProvider.commit();
+        transactionProvider.commit( xid );
     }
 
 
     @Override
     public void rollback( PolyXid xid ) {
-        transactionProvider.rollback();
+        transactionProvider.rollback( xid );
     }
 
 
@@ -195,9 +199,7 @@ public class MongoStore extends DataStore {
         Catalog catalog = Catalog.getInstance();
 
         context.getStatement().getTransaction().registerInvolvedAdapter( this );
-
-        transactionProvider.startTransaction();
-        this.currentSchema.database.createCollection( transactionProvider.getSession(), getPhysicalTableName( catalogTable.id ) );
+        this.currentSchema.database.createCollection( getPhysicalTableName( catalogTable.id ) );
 
         for ( CatalogColumnPlacement placement : catalog.getColumnPlacementsOnAdapter( getAdapterId(), catalogTable.id ) ) {
             catalog.updateColumnPlacementPhysicalNames(
@@ -221,6 +223,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void addColumn( Context context, CatalogTable catalogTable, CatalogColumn catalogColumn ) {
+        context.getStatement().getTransaction().registerInvolvedAdapter( this );
         // updates all columns with this field if a default value is provided
         Document field;
         if ( catalogColumn.defaultValue != null ) {
@@ -259,9 +262,8 @@ public class MongoStore extends DataStore {
         }
         Document update = new Document().append( "$set", field );
 
-        context.getStatement().getTransaction().registerInvolvedAdapter( this );
-        transactionProvider.startTransaction();
-        this.currentSchema.database.getCollection( getPhysicalTableName( catalogTable.id ) ).updateMany( transactionProvider.getSession(), new Document(), update );
+        // DDL is auto-commit
+        this.currentSchema.database.getCollection( getPhysicalTableName( catalogTable.id ) ).updateMany( new Document(), update );
 
         // Add physical name to placement
         catalog.updateColumnPlacementPhysicalNames(
@@ -280,9 +282,9 @@ public class MongoStore extends DataStore {
         Document field = new Document().append( getPhysicalColumnName( columnPlacement.columnId ), 1 );
         Document filter = new Document().append( "$unset", field );
 
-        context.getStatement().getTransaction().registerInvolvedAdapter( this );
-        transactionProvider.startTransaction();
-        this.currentSchema.database.getCollection( getPhysicalTableName( columnPlacement.tableId ) ).updateMany( transactionProvider.getSession(), new Document(), filter );
+        context.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( getAdapterId() ) );
+        // DDL is auto-commit
+        this.currentSchema.database.getCollection( getPhysicalTableName( columnPlacement.tableId ) ).updateMany( new Document(), filter );
     }
 
 
@@ -295,7 +297,6 @@ public class MongoStore extends DataStore {
             }
 
             context.getStatement().getTransaction().registerInvolvedAdapter( this );
-            transactionProvider.startTransaction();
             // creation of indexes is auto-commit
             this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).createIndex( doc, new IndexOptions().name( catalogIndex.name ) );
         }

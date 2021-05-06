@@ -56,6 +56,7 @@ import org.polypheny.db.plan.RelTraitSet;
 import org.polypheny.db.rel.AbstractRelNode;
 import org.polypheny.db.rel.RelNode;
 import org.polypheny.db.rel.convert.ConverterImpl;
+import org.polypheny.db.rel.core.TableModify.Operation;
 import org.polypheny.db.rel.metadata.RelMetadataQuery;
 import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.runtime.Hook;
@@ -148,22 +149,30 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         List<String> opList = Pair.right( mongoImplementor.list );
         final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );
         Expression enumerable;
-        if ( !mongoImplementor.isDDL() ) {
+        if ( !mongoImplementor.isDML() ) {
             enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, ops ) );
         } else {
             if ( mongoImplementor.isPrepared() ) {
+                Expression data = list.append( "data", Expressions.constant( mongoImplementor.getStaticRowType().getFieldNames(), Object.class ) );
+                Expression nullFields = list.append( "nullFields", constantArrayList( mongoImplementor.nullFields, Integer.class ) );
                 Expression staticFields = list.append( "staticFields", Expressions.constant( mongoImplementor.staticFields, Map.class ) );
                 Expression dynamicFields = list.append( "dynamicFields", Expressions.constant( mongoImplementor.dynamicFields, Map.class ) );
                 Expression arrayFields = list.append( "arrayFields", Expressions.constant( mongoImplementor.arrayFields, Map.class ) );
 
                 Expression arrayClasses = list.append( "arrayClasses", Expressions.constant( mongoImplementor.arrayClasses, Map.class ) );
-                Expression data = list.append( "data", Expressions.constant( mongoImplementor.getStaticRowType().getFieldNames(), Object.class ) );
                 Expression physicalNames = list.append( "physicalNames", Expressions.constant( mongoImplementor.getLogicalPhysicalNameMapping(), Map.class ) );
                 //Expression b = list.append( "t", Expressions.constant( new BigDecimal( "3.3" ), BigDecimal.class ) );
-                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_EXECUTE.method, data, physicalNames, dynamicFields, staticFields, arrayFields, arrayClasses ) );
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_EXECUTE.method, data, nullFields, physicalNames, dynamicFields, staticFields, arrayFields, arrayClasses ) );
             } else {
-                Expression results = list.append( "results", constantArrayList( mongoImplementor.getResults(), Object.class ) );
-                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_GET_RESULT.method, results ) );
+                // Expression results = list.append( "results", constantArrayList( mongoImplementor.getResults(), Object.class ) );
+                //enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_GET_RESULT.method, results ) );
+                // DIRECT INSERTS WHICH ARE ALREADY PREPARED
+                Expression filter = list.append( "filter", Expressions.constant( mongoImplementor.filter, String.class ) );
+                Expression operations = list.append( "operations", constantArrayList( mongoImplementor.operations, String.class ) );
+                Expression operation = list.append( "operation", Expressions.constant( mongoImplementor.getOperation(), Operation.class ) );
+
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.HANDLE_DIRECT_DML.method, operation, filter, operations ) );
+
             }
         }
 

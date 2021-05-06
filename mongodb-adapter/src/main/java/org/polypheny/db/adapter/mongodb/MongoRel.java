@@ -47,8 +47,8 @@ import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptTable;
 import org.polypheny.db.rel.RelNode;
+import org.polypheny.db.rel.core.TableModify.Operation;
 import org.polypheny.db.rel.type.RelRecordType;
-import org.polypheny.db.rex.RexNode;
 import org.polypheny.db.util.Pair;
 
 
@@ -71,16 +71,23 @@ public interface MongoRel extends RelNode {
     class Implementor {
 
         final List<Pair<String, String>> list = new ArrayList<>();
+        public String filter = "";
+        public List<String> operations = new ArrayList<>();
+        public List<Integer> nullFields = new ArrayList<>();
 
         RelOptTable table;
 
         MongoTable mongoTable;
         @Setter
         @Getter
-        private boolean isDDL;
+        private boolean isDML;
         @Setter
         @Getter
         private boolean isPrepared;
+
+        @Getter
+        @Setter
+        private Operation operation;
 
         @Getter
         @Setter
@@ -97,16 +104,13 @@ public interface MongoRel extends RelNode {
         private RelRecordType staticRowType;
 
 
-        RexNode literal;
-
-
         public Implementor() {
-            isDDL = false;
+            isDML = false;
         }
 
 
-        public Implementor( boolean isDDL ) {
-            this.isDDL = isDDL;
+        public Implementor( boolean isDML ) {
+            this.isDML = isDML;
         }
 
 

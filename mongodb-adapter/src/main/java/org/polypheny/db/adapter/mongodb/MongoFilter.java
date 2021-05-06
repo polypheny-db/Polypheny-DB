@@ -38,9 +38,12 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.stream.Collectors;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptCost;
 import org.polypheny.db.plan.RelOptPlanner;
@@ -92,7 +95,7 @@ public class MongoFilter extends Filter implements MongoRel {
         } else {
             translator = new Translator( MongoRules.mongoFieldNames( getRowType() ) );
         }
-        String match = translator.translateMatch( condition, implementor.isDDL() );
+        String match = translator.translateMatch( condition, implementor.isDML() );
         implementor.add( null, match );
     }
 
@@ -107,6 +110,7 @@ public class MongoFilter extends Filter implements MongoRel {
         final Map<String, RexLiteral> eqMap = new LinkedHashMap<>();
         private final List<String> fieldNames;
         private final MongoRowType rowType;
+        private final Map<String, List<RexNode>> arrayMap = new HashMap<>();
 
 
         Translator( List<String> fieldNames ) {
@@ -169,6 +173,10 @@ public class MongoFilter extends Filter implements MongoRel {
                 }
                 map.put( entry.getKey(), map2 );
             }
+            for ( Entry<String, List<RexNode>> entry : arrayMap.entrySet() ) {
+                map.put( entry.getKey(), entry.getValue().stream().map( el -> literalValue( (RexLiteral) el ) ).collect( Collectors.toList() ) );
+            }
+
             return map;
         }
 
@@ -241,13 +249,36 @@ public class MongoFilter extends Filter implements MongoRel {
             if ( b ) {
                 return null;
             }
-            if ( right instanceof RexCall ) {
+            b = translateArray( op, right, left );
+            if ( b ) {
                 return null;
             }
-            if ( left instanceof RexCall ) {
+            b = translateArray( op, left, right );
+            if ( b ) {
                 return null;
             }
             throw new AssertionError( "cannot translate op " + op + " call " + call );
+        }
+
+
+        private boolean translateArray( String op, RexNode right, RexNode left ) {
+            if ( right instanceof RexCall && left instanceof RexInputRef ) {
+                // $9 ( index ) -> [el1, el2]
+                String name = getPhysicalName( (RexInputRef) left );
+                arrayMap.put( name, ((RexCall) right).operands );
+
+                return true;
+            } else if ( right instanceof RexCall && left instanceof RexLiteral ) {
+                // $9[1] -> el1
+                String name = getPhysicalName( (RexInputRef) ((RexCall) right).operands.get( 0 ) );
+                // we have to adjust as mongodb arrays start at 0 and sql at 1
+                int pos = ((RexLiteral) ((RexCall) right).operands.get( 1 )).getValueAs( Integer.class ) - 1;
+
+                eqMap.put( name + "." + pos, (RexLiteral) left );
+
+                return true;
+            }
+            return false;
         }
 
 
@@ -266,12 +297,7 @@ public class MongoFilter extends Filter implements MongoRel {
             final RexLiteral rightLiteral = (RexLiteral) right;
             switch ( left.getKind() ) {
                 case INPUT_REF:
-                    final RexInputRef left1 = (RexInputRef) left;
-                    String name = fieldNames.get( left1.getIndex() );
-                    if ( rowType != null && rowType.getId( name ) != null ) {
-                        name = rowType.getPhysicalName( name );
-                    }
-                    translateOp2( op, name, rightLiteral );
+                    translateOp2( op, getPhysicalName( (RexInputRef) left ), rightLiteral );
                     return true;
                 case CAST:
                     return translateBinary2( op, ((RexCall) left).operands.get( 0 ), right );
@@ -286,6 +312,16 @@ public class MongoFilter extends Filter implements MongoRel {
                 default:
                     return false;
             }
+        }
+
+
+        private String getPhysicalName( RexInputRef left ) {
+            final RexInputRef left1 = left;
+            String name = fieldNames.get( left1.getIndex() );
+            if ( rowType != null && rowType.getId( name ) != null ) {
+                name = rowType.getPhysicalName( name );
+            }
+            return name;
         }
 
 

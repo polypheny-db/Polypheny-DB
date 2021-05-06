@@ -16,58 +16,83 @@
 
 package org.polypheny.db.adapter.mongodb;
 
+import static org.reflections.Reflections.log;
+
 import com.mongodb.MongoClientException;
+import com.mongodb.ReadPreference;
+import com.mongodb.TransactionOptions;
 import com.mongodb.client.ClientSession;
 import com.mongodb.client.MongoClient;
+import java.util.HashMap;
+import java.util.Map;
 import lombok.Setter;
+import org.polypheny.db.transaction.PolyXid;
 
 public class TransactionProvider {
 
-    private final MongoClient client;
     @Setter
-    private ClientSession session;
+    private MongoClient client;
+
+    private final Map<PolyXid, ClientSession> sessions = new HashMap<>();
 
 
     public TransactionProvider( MongoClient client ) {
         this.client = client;
-        this.session = client.startSession();
     }
 
 
-    public void startTransaction() {
-        if ( session.hasActiveTransaction() ) {
-            throw new RuntimeException( "There is an uncommitted transaction in the store." );
+    public ClientSession startTransaction( PolyXid xid ) {
+        if ( !sessions.containsKey( xid ) ) {
+
+            ClientSession session = client.startSession();
+            TransactionOptions options = TransactionOptions.builder().readPreference( ReadPreference.primary() ).build();
+            session.startTransaction( options );
+            sessions.put( xid, session );
         }
-
-        session = client.startSession();
-        session.startTransaction();
+        return sessions.get( xid );
     }
 
 
-    public void commit() {
-        if ( session.hasActiveTransaction() ) {
+    public void commit( PolyXid xid ) {
+        if ( sessions.containsKey( xid ) ) {
+            ClientSession session = sessions.get( xid );
             try {
-                session.commitTransaction();
+                if ( session.hasActiveTransaction() ) {
+                    session.commitTransaction();
+                }
             } catch ( MongoClientException e ) {
                 session.abortTransaction();
             } finally {
                 session.close();
+                sessions.remove( xid );
             }
+        } else {
+            log.info( "No-op commit" );
         }
     }
 
 
-    public void rollback() {
-        if ( session.hasActiveTransaction() ) {
-            session.abortTransaction();
+    public void rollback( PolyXid xid ) {
+        if ( sessions.containsKey( xid ) ) {
+            ClientSession session = sessions.get( xid );
+            try {
+                session.abortTransaction();
+            } catch ( MongoClientException e ) {
+                session.close();
+                sessions.remove( xid );
+            }
+        } else {
+            log.info( "No-op rollback" );
         }
 
-        session.close();
     }
 
 
-    public ClientSession getSession() {
-        return session;
+    public ClientSession getSession( PolyXid xid ) {
+        if ( !sessions.containsKey( xid ) ) {
+            startTransaction( xid );
+        }
+        return sessions.get( xid );
     }
 
 }
