@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.calcite.avatica.util.ByteString;
+import org.bson.BsonBinary;
 import org.bson.BsonBoolean;
 import org.bson.BsonDouble;
 import org.bson.BsonInt32;
@@ -80,7 +81,7 @@ public class MongoStore extends DataStore {
     private final String host;
     private final int port;
     private transient MongoClient client;
-    private transient TransactionProvider transactionProvider;
+    private final transient TransactionProvider transactionProvider;
     private transient MongoSchema currentSchema;
     private String currentUrl;
     private final int dockerInstanceId;
@@ -156,6 +157,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void truncate( Context context, CatalogTable table ) {
+        commitAll();
         context.getStatement().getTransaction().registerInvolvedAdapter( this );
         // DDL is auto-committed
         currentSchema.database.getCollection( getPhysicalTableName( table.id ) ).deleteMany( new Document() );
@@ -171,6 +173,11 @@ public class MongoStore extends DataStore {
     @Override
     public void commit( PolyXid xid ) {
         transactionProvider.commit( xid );
+    }
+
+
+    public void commitAll() {
+        transactionProvider.commitAll();
     }
 
 
@@ -215,6 +222,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void dropTable( Context context, CatalogTable combinedTable ) {
+        commitAll();
         context.getStatement().getTransaction().registerInvolvedAdapter( this );
         //transactionProvider.startTransaction();
         this.currentSchema.database.getCollection( getPhysicalTableName( combinedTable.id ) ).drop();
@@ -223,6 +231,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void addColumn( Context context, CatalogTable catalogTable, CatalogColumn catalogColumn ) {
+        commitAll();
         context.getStatement().getTransaction().registerInvolvedAdapter( this );
         // updates all columns with this field if a default value is provided
         Document field;
@@ -248,7 +257,7 @@ public class MongoStore extends DataStore {
             } else if ( catalogColumn.type.getFamily() == PolyTypeFamily.TIMESTAMP ) {
                 value = new BsonInt64( Timestamp.valueOf( defaultValue.value ).getTime() );
             } else if ( catalogColumn.type.getFamily() == PolyTypeFamily.BINARY ) {
-                value = new BsonString( ByteString.toString( ByteString.parseBase64( defaultValue.value ), 64 ) );
+                value = new BsonBinary( ByteString.parseBase64( defaultValue.value ) );
             } else {
                 value = new BsonString( defaultValue.value );
             }
@@ -279,6 +288,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void dropColumn( Context context, CatalogColumnPlacement columnPlacement ) {
+        commitAll();
         Document field = new Document().append( getPhysicalColumnName( columnPlacement.columnId ), 1 );
         Document filter = new Document().append( "$unset", field );
 
@@ -290,6 +300,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void addIndex( Context context, CatalogIndex catalogIndex ) {
+        commitAll();
         if ( catalogIndex.method.equals( "multikey" ) ) {
             Document doc = new Document();
             for ( String name : catalogIndex.key.getColumnNames() ) {
@@ -305,6 +316,7 @@ public class MongoStore extends DataStore {
 
     @Override
     public void dropIndex( Context context, CatalogIndex catalogIndex ) {
+        commitAll();
         if ( catalogIndex.method.equals( "multikey" ) ) {
             Document doc = new Document();
             for ( String name : catalogIndex.key.getColumnNames() ) {

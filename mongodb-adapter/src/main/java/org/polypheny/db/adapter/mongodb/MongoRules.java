@@ -516,7 +516,7 @@ public class MongoRules {
             switch ( this.getOperation() ) {
                 case INSERT: {
                     if ( input instanceof MongoValues ) {
-                        handleDirectInsert( implementor, ((MongoValues) input) );
+                        handleDirectInsert( implementor, ((MongoValues) input), implementor.mongoTable );
                     } else if ( input instanceof MongoProject ) {
                         handlePreparedInsert( implementor, ((MongoProject) input) );
                     } else {
@@ -681,17 +681,14 @@ public class MongoRules {
         }
 
 
-        private void handleDirectInsert( Implementor implementor, MongoValues values ) {
+        private void handleDirectInsert( Implementor implementor, MongoValues values, MongoTable mongoTable ) {
             List<String> docs = new ArrayList<>();
             for ( ImmutableList<RexLiteral> literals : values.tuples ) {
                 Document doc = new Document();
                 int pos = 0;
                 for ( RexLiteral literal : literals ) {
 
-                    BsonValue value;
-                    // might needs some adjustment later on TODO DL
-                    //http://mongodb.github.io/mongo-java-driver/3.4/bson/documents/#document
-                    value = MongoTypeUtil.getBsonValue( literal );
+                    BsonValue value = MongoTypeUtil.getAsBson( literal, mongoTable.getMongoSchema().getBucket() );
                     try {
                         doc.append( MongoStore.getPhysicalColumnName( Catalog.getInstance().getColumn( implementor.mongoTable.getCatalogTable().id, values.getRowType().getFieldNames().get( pos ) ).id ), value );
                     } catch ( UnknownColumnException e ) {
@@ -704,9 +701,6 @@ public class MongoRules {
 
             }
             implementor.operations = docs;
-            // implementor.mongoTable.getTransactionProvider().startTransaction();
-            // implementor.mongoTable.getCollection().insertMany( implementor.mongoTable.getTransactionProvider().getSession(), docs );
-            // implementor.results = Collections.singletonList( docs.size() );
         }
 
     }

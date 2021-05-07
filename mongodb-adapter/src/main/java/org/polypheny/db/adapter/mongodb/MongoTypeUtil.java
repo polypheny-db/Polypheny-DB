@@ -54,7 +54,7 @@ public class MongoTypeUtil {
             BsonArray array = new BsonArray();
             ((List<?>) obj).forEach( el -> array.add( getAsBson( el, type, bucket ) ) );
             value = array;
-        } else if ( type == PolyType.NULL ) {
+        } else if ( type == PolyType.NULL || obj == null ) {
             value = new BsonNull();
         } else if ( type.getFamily() == PolyTypeFamily.CHARACTER ) {
             value = new BsonString( Objects.requireNonNull( obj.toString() ) );
@@ -95,6 +95,11 @@ public class MongoTypeUtil {
             value = new BsonString( obj.toString() );
         }
         return value;
+    }
+
+
+    public static BsonValue getAsBson( RexLiteral literal, GridFSBucket bucket ) {
+        return getAsBson( literal.getValue3(), literal.getTypeName(), bucket );
     }
 
 

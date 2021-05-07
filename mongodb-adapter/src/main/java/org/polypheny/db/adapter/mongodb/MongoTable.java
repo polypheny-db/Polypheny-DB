@@ -349,7 +349,12 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                         }
                         doc.append( logicalPhysicalMapping.get( name ), value );
                     } else if ( dynamicFields.containsKey( pos ) ) {
-                        doc.append( logicalPhysicalMapping.get( name ), MongoTypeUtil.getAsBson( values.get( (long) dyn ), dataContext.getParameterType( dyn ).getPolyType(), mongoTable.getMongoSchema().getBucket() ) );
+                        if ( dataContext.getParameterType( dyn ) != null ) {
+                            doc.append( logicalPhysicalMapping.get( name ), MongoTypeUtil.getAsBson( values.get( (long) dyn ), dataContext.getParameterType( dyn ).getPolyType(), mongoTable.getMongoSchema().getBucket() ) );
+                        } else {
+                            doc.append( logicalPhysicalMapping.get( name ), new BsonNull() );
+                        }
+
                         dyn++;
                     } else if ( arrayValues.containsKey( pos ) ) {
                         PolyType type = types.get( pos );
