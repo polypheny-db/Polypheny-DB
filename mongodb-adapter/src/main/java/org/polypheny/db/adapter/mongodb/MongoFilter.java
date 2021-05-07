@@ -119,6 +119,7 @@ public class MongoFilter extends Filter implements MongoRel {
 
 
         Translator( List<String> fieldNames, MongoRowType rowType ) {
+            this.builder.setMongo( true );
             this.fieldNames = fieldNames;
             this.rowType = rowType;
         }
@@ -211,7 +212,7 @@ public class MongoFilter extends Filter implements MongoRel {
 
 
         private static Object literalValue( RexLiteral literal ) {
-            return literal.getValue2();
+            return literal.getValue3();
         }
 
 

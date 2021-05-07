@@ -35,7 +35,7 @@ package org.polypheny.db.adapter.mongodb;
 
 
 import com.google.common.collect.ImmutableList;
-import com.mongodb.client.result.UpdateResult;
+import com.mongodb.client.gridfs.GridFSBucket;
 import java.math.BigDecimal;
 import java.util.AbstractList;
 import java.util.ArrayList;
@@ -532,28 +532,23 @@ public class MongoRules {
                     MongoRowType rowType = (MongoRowType) condImplementor.getStaticRowType();
                     int pos = 0;
                     BsonDocument doc = new BsonDocument();
+                    GridFSBucket bucket = implementor.mongoTable.getMongoSchema().getBucket();
                     for ( RexNode el : getSourceExpressionList() ) {
                         if ( el instanceof RexLiteral ) {
-                            doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), MongoTypeUtil.getBsonValue( (RexLiteral) el ) );
+                            doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), MongoTypeUtil.getAsBson( ((RexLiteral) el).getValue3(), ((RexLiteral) el).getTypeName(), bucket ) );
                         } else if ( el instanceof RexCall ) {
-                            doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), MongoTypeUtil.getBsonArray( (RexCall) el ) );
+                            doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), MongoTypeUtil.getBsonArray( (RexCall) el, bucket ) );
                         }
                         pos++;
                     }
                     BsonDocument update = new BsonDocument().append( "$set", doc );
 
-                    UpdateResult res = null;
-                    //implementor.mongoTable.getTransactionProvider().startTransaction();
                     if ( condImplementor.list.size() == 1 ) {
                         implementor.filter = condImplementor.list.get( 0 ).right;
-                        //res = implementor.mongoTable.getCollection().updateMany( implementor.mongoTable.getTransactionProvider().getSession(), BsonDocument.parse( condImplementor.list.get( 0 ).right ), update );
                     } else {
                         implementor.filter = new BsonDocument().toJson();
-                        //res = implementor.mongoTable.getCollection().updateMany( implementor.mongoTable.getTransactionProvider().getSession(), new BsonDocument(), update );
                     }
-                    implementor.operations = Collections.singletonList( update.toString() );
-
-                    //implementor.results = Collections.singletonList( res.getModifiedCount() );
+                    implementor.operations = Collections.singletonList( update.toJson() );
 
                     break;
                 case MERGE:
@@ -572,12 +567,7 @@ public class MongoRules {
                     } else {
                         // TODO DL: evaluate if this is even possible
                     }
-                    //implementor.mongoTable.getTransactionProvider().startTransaction();
-                    implementor.operations = Collections.singletonList( docString );
-
-                    //DeleteResult result = implementor.mongoTable.getCollection().deleteMany( implementor.mongoTable.getTransactionProvider().getSession(), BsonDocument.parse( docString ) );
-
-                    //implementor.results = Collections.singletonList( result.getDeletedCount() );
+                    implementor.filter = docString;
                 }
 
             }
@@ -598,7 +588,9 @@ public class MongoRules {
                     implementor.dynamicFields.put( pos, rexNode.getType().getPolyType().getTypeName() );
                 } else if ( rexNode instanceof RexLiteral ) {
                     if ( !((RexLiteral) rexNode).isNull() ) {
-                        implementor.staticFields.put( pos, rexNode );
+                        PolyType type = ((RexLiteral) rexNode).getTypeName();
+                        implementor.staticFields.put( pos, getMongoComparable( type, (RexLiteral) rexNode ) );
+                        implementor.arrayClasses.put( pos, type );
                     } else {
                         implementor.nullFields.add( pos );
                     }

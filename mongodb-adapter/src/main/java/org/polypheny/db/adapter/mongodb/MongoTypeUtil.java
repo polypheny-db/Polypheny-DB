@@ -154,13 +154,13 @@ public class MongoTypeUtil {
     }
 
 
-    public static BsonArray getBsonArray( RexCall call ) {
+    public static BsonArray getBsonArray( RexCall call, GridFSBucket bucket ) {
         BsonArray array = new BsonArray();
         for ( RexNode op : call.operands ) {
             if ( op instanceof RexCall ) {
-                array.add( getBsonArray( (RexCall) op ) );
+                array.add( getBsonArray( (RexCall) op, bucket ) );
             } else {
-                array.add( getBsonValue( (RexLiteral) op ) );
+                array.add( getAsBson( ((RexLiteral) op).getValue3(), ((RexLiteral) op).getTypeName(), bucket ) );
             }
         }
         return array;

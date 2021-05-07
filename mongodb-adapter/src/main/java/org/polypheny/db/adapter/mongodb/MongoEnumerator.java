@@ -109,15 +109,17 @@ class MongoEnumerator implements Enumerator<Object> {
         if ( current == null ) {
             return null;
         }
-        if ( current.getClass().isArray() ) {
+        if ( current instanceof Decimal128 ) {
+            return ((Decimal128) current).bigDecimalValue();
+        } else if ( current.getClass().isArray() ) {
             List<Object> temp = new ArrayList<>();
             for ( Object el : (Object[]) current ) {
                 temp.add( handleTransforms( el ) );
             }
             return temp.toArray();
         } else {
-            if ( this.current instanceof List ) {
-                return ((List<?>) this.current).stream().map( el -> {
+            if ( current instanceof List ) {
+                return ((List<?>) current).stream().map( el -> {
                     // one possible solution // TODO DL: discuss
                     if ( el instanceof Document ) {
                         return handleDocument( (Document) el );
@@ -128,9 +130,8 @@ class MongoEnumerator implements Enumerator<Object> {
                         return el;
                     }
                 } ).collect( Collectors.toList() );
-            }
-            if ( this.current instanceof Document ) {
-                return handleDocument( (Document) this.current );
+            } else if ( current instanceof Document ) {
+                return handleDocument( (Document) current );
             }
         }
         return current;
@@ -225,8 +226,13 @@ class MongoEnumerator implements Enumerator<Object> {
         }
 
         if ( clazz.getName().equals( BigDecimal.class.getName() ) ) {
-            assert o instanceof Double;
-            return BigDecimal.valueOf( (Double) o );
+            //assert o instanceof Double; // todo dl maybe use to correct types -> ARRAY
+            if ( o instanceof Double ) { // this should not happen anymore
+                return BigDecimal.valueOf( (Double) o );
+            } else {
+                assert o instanceof Decimal128;
+                return ((Decimal128) o).bigDecimalValue();
+            }
         }
 
         return o;

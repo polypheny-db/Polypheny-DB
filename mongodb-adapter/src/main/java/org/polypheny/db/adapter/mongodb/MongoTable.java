@@ -38,6 +38,7 @@ import com.mongodb.client.ClientSession;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -53,13 +54,13 @@ import org.apache.calcite.linq4j.Enumerable;
 import org.apache.calcite.linq4j.Enumerator;
 import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.linq4j.function.Function1;
-import org.apache.calcite.linq4j.tree.Expression;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
 import org.bson.BsonNull;
 import org.bson.BsonValue;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.bson.types.Decimal128;
 import org.polypheny.db.adapter.AdapterManager;
 import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.java.AbstractQueryableTable;
@@ -326,7 +327,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
 
         @SuppressWarnings("UnusedDeclaration")
-        public Enumerable<Object> preparedExecute( List<String> fieldNames, List<Integer> nullFields, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, Expression> staticValues, Map<Integer, List<Object>> arrayValues, Map<Integer, PolyType> types ) {
+        public Enumerable<Object> preparedExecute( List<String> fieldNames, List<Integer> nullFields, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, Object> staticValues, Map<Integer, List<Object>> arrayValues, Map<Integer, PolyType> types ) {
             MongoTable mongoTable = (MongoTable) table;
             PolyXid xid = dataContext.getStatement().getTransaction().getXid();
             dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
@@ -341,7 +342,12 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 for ( String name : fieldNames ) {
 
                     if ( staticValues.containsKey( pos ) ) {
-                        doc.append( logicalPhysicalMapping.get( name ), staticValues.get( pos ) );
+                        Object value = staticValues.get( pos );
+                        if ( types.get( pos ) == PolyType.DECIMAL ) {
+                            assert value instanceof String;
+                            value = new Decimal128( new BigDecimal( (String) value ) );
+                        }
+                        doc.append( logicalPhysicalMapping.get( name ), value );
                     } else if ( dynamicFields.containsKey( pos ) ) {
                         doc.append( logicalPhysicalMapping.get( name ), MongoTypeUtil.getAsBson( values.get( (long) dyn ), dataContext.getParameterType( dyn ).getPolyType(), mongoTable.getMongoSchema().getBucket() ) );
                         dyn++;
@@ -360,18 +366,20 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             if ( this.dataContext.getParameterValues().size() == 0 ) {
                 // prepared static entry
                 Document doc = new Document();
-                for ( Entry<Integer, Expression> entry : staticValues.entrySet() ) {
-                    doc.append( logicalPhysicalMapping.get( fieldNames.get( entry.getKey() ) ), MongoTypeUtil.getAsBson( entry.getValue(), mongoTable.getMongoSchema().getBucket() ) );
+                for ( Entry<Integer, Object> entry : staticValues.entrySet() ) {
+                    Object value = entry.getValue();
+                    if ( types.get( entry.getKey() ) == PolyType.DECIMAL ) {
+                        assert value instanceof String;
+                        value = new Decimal128( new BigDecimal( (String) value ) );
+                    }
+                    doc.append( logicalPhysicalMapping.get( fieldNames.get( entry.getKey() ) ), value );
                 }
                 for ( Integer key : nullFields ) {
                     doc.append( logicalPhysicalMapping.get( fieldNames.get( key ) ), new BsonNull() );
                 }
                 for ( Entry<Integer, List<Object>> entry : arrayValues.entrySet() ) {
                     PolyType type = types.get( entry.getKey() );
-                    BsonValue array = new BsonArray( entry.getValue().stream().map( obj -> {
-                        return MongoTypeUtil.getAsBson( obj, type, mongoTable.getMongoSchema().getBucket() );
-
-                    } ).collect( Collectors.toList() ) );
+                    BsonValue array = new BsonArray( entry.getValue().stream().map( obj -> MongoTypeUtil.getAsBson( obj, type, mongoTable.getMongoSchema().getBucket() ) ).collect( Collectors.toList() ) );
                     doc.append( logicalPhysicalMapping.get( fieldNames.get( entry.getKey() ) ), array );
                 }
                 docs.add( doc );
@@ -457,8 +465,8 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                     changes = mongoTable.getCollection().updateMany( session, BsonDocument.parse( filter ), BsonDocument.parse( operations.get( 0 ) ) ).getModifiedCount();
                     break;
                 case DELETE:
-                    assert operations.size() == 1;
-                    changes = mongoTable.getCollection().deleteMany( session, BsonDocument.parse( operations.get( 0 ) ) ).getDeletedCount();
+                    assert filter != null;
+                    changes = mongoTable.getCollection().deleteMany( session, BsonDocument.parse( filter ) ).getDeletedCount();
                     break;
                 case MERGE:
                     throw new RuntimeException( "MERGE IS NOT SUPPORTED" );
