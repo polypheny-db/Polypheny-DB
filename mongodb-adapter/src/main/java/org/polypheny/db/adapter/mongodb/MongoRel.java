@@ -93,7 +93,7 @@ public interface MongoRel extends RelNode {
         @Setter
         List<Object> results;
         @Getter
-        final Map<Integer, String> dynamicFields = new HashMap<>();
+        final Map<Integer, Object> dynamicFields = new HashMap<>();
         @Getter
         final Map<Integer, Object> staticFields = new HashMap<>();
         @Getter

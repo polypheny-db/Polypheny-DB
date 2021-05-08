@@ -26,11 +26,12 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.calcite.avatica.util.ByteString;
 import org.bson.BsonBinary;
@@ -301,32 +302,51 @@ public class MongoStore extends DataStore {
     @Override
     public void addIndex( Context context, CatalogIndex catalogIndex ) {
         commitAll();
-        if ( catalogIndex.method.equals( "multikey" ) ) {
-            Document doc = new Document();
-            for ( String name : catalogIndex.key.getColumnNames() ) {
-                doc.append( name, 1 );
-            }
+        context.getStatement().getTransaction().registerInvolvedAdapter( this );
+        HASH_FUNCTION type = HASH_FUNCTION.valueOf( catalogIndex.method.toUpperCase( Locale.ROOT ) );
+        switch ( type ) {
 
-            context.getStatement().getTransaction().registerInvolvedAdapter( this );
-            // creation of indexes is auto-commit
-            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).createIndex( doc, new IndexOptions().name( catalogIndex.name ) );
+            case SINGLE:
+                List<String> columns = catalogIndex.key.getColumnNames();
+                if ( columns.size() > 1 ) {
+                    throw new RuntimeException( "A \"SINGLE INDEX\" can not have multiple columns." );
+                }
+                addCompositeIndex( catalogIndex, columns );
+
+                break;
+            case DEFAULT:
+                addCompositeIndex( catalogIndex, catalogIndex.key.getColumnNames() );
+                break;
+            case MULTIKEY:
+                //array
+            case GEOSPATIAL:
+            case TEXT:
+                // stemd and stop words removed
+            case HASHED:
+                throw new UnsupportedOperationException( "The mongodb adapter does not yet support this index" );
         }
+    }
+
+
+    private void addCompositeIndex( CatalogIndex catalogIndex, List<String> columns ) {
+        Document doc = new Document();
+        columns.forEach( name -> doc.append( name, 1 ) );
+
+        IndexOptions options = new IndexOptions();
+        options.unique( catalogIndex.unique );
+        options.name( catalogIndex.name );
+
+        this.currentSchema.database
+                .getCollection( getPhysicalTableName( catalogIndex.key.tableId ) )
+                .createIndex( doc, options );
     }
 
 
     @Override
     public void dropIndex( Context context, CatalogIndex catalogIndex ) {
         commitAll();
-        if ( catalogIndex.method.equals( "multikey" ) ) {
-            Document doc = new Document();
-            for ( String name : catalogIndex.key.getColumnNames() ) {
-                doc.append( name, 1 );
-            }
-
-            context.getStatement().getTransaction().registerInvolvedAdapter( this );
-            //transactionProvider.startTransaction();
-            this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).dropIndex( catalogIndex.name );
-        }
+        context.getStatement().getTransaction().registerInvolvedAdapter( this );
+        this.currentSchema.database.getCollection( getPhysicalTableName( catalogIndex.key.tableId ) ).dropIndex( catalogIndex.name );
     }
 
 
@@ -338,16 +358,15 @@ public class MongoStore extends DataStore {
 
     @Override
     public List<AvailableIndexMethod> getAvailableIndexMethods() {
-        List<AvailableIndexMethod> indexMethods = new ArrayList<>();
-        indexMethods.add( new AvailableIndexMethod( "multikey", "Multikey Index" ) );
-        return indexMethods;
+        return Arrays.stream( HASH_FUNCTION.values() )
+                .map( HASH_FUNCTION::asMethod )
+                .collect( Collectors.toList() );
     }
 
 
     @Override
     public AvailableIndexMethod getDefaultIndexMethod() {
-        // TODO DL: add more index types
-        return new AvailableIndexMethod( "multikey", "Multikey Index" );
+        return HASH_FUNCTION.DEFAULT.asMethod();
     }
 
 
@@ -390,6 +409,21 @@ public class MongoStore extends DataStore {
                 client.close();
             }
             return false;
+        }
+    }
+
+
+    private enum HASH_FUNCTION {
+        DEFAULT, //COMPOUND
+        SINGLE,
+        MULTIKEY,
+        GEOSPATIAL,
+        TEXT,
+        HASHED;
+
+
+        public AvailableIndexMethod asMethod() {
+            return new AvailableIndexMethod( name().toLowerCase( Locale.ROOT ), name() + " INDEX" );
         }
     }
 

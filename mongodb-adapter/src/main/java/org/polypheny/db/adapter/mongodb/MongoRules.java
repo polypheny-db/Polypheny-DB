@@ -585,7 +585,7 @@ public class MongoRules {
             for ( RexNode rexNode : input.getChildExps() ) {
                 if ( rexNode instanceof RexDynamicParam ) {
                     // preparedInsert
-                    implementor.dynamicFields.put( pos, rexNode.getType().getPolyType().getTypeName() );
+                    implementor.dynamicFields.put( pos, rexNode.getType().getPolyType() );
                 } else if ( rexNode instanceof RexLiteral ) {
                     if ( !((RexLiteral) rexNode).isNull() ) {
                         PolyType type = ((RexLiteral) rexNode).getTypeName();

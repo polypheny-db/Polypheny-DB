@@ -327,7 +327,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
 
         @SuppressWarnings("UnusedDeclaration")
-        public Enumerable<Object> preparedExecute( List<String> fieldNames, List<Integer> nullFields, Map<String, String> logicalPhysicalMapping, Map<Integer, String> dynamicFields, Map<Integer, Object> staticValues, Map<Integer, List<Object>> arrayValues, Map<Integer, PolyType> types ) {
+        public Enumerable<Object> preparedExecute( List<String> fieldNames, List<Integer> nullFields, Map<String, String> logicalPhysicalMapping, Map<Integer, PolyType> dynamicFields, Map<Integer, Object> staticValues, Map<Integer, List<Object>> arrayValues, Map<Integer, PolyType> types ) {
             MongoTable mongoTable = (MongoTable) table;
             PolyXid xid = dataContext.getStatement().getTransaction().getXid();
             dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
@@ -349,18 +349,18 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                         }
                         doc.append( logicalPhysicalMapping.get( name ), value );
                     } else if ( dynamicFields.containsKey( pos ) ) {
-                        if ( dataContext.getParameterType( dyn ) != null ) {
+                        /*if ( dataContext.getParameterType( dyn ) != null ) {
                             doc.append( logicalPhysicalMapping.get( name ), MongoTypeUtil.getAsBson( values.get( (long) dyn ), dataContext.getParameterType( dyn ).getPolyType(), mongoTable.getMongoSchema().getBucket() ) );
-                        } else {
+                        } else if (dynamicFields.containsKey( dyn )){*/
+                        doc.append( logicalPhysicalMapping.get( name ), MongoTypeUtil.getAsBson( values.get( (long) dyn ), dynamicFields.get( pos ), mongoTable.getMongoSchema().getBucket() ) );
+                        /*}else {
                             doc.append( logicalPhysicalMapping.get( name ), new BsonNull() );
-                        }
+                        }*/
 
                         dyn++;
                     } else if ( arrayValues.containsKey( pos ) ) {
                         PolyType type = types.get( pos );
-                        BsonValue array = new BsonArray( arrayValues.get( pos ).stream().map( obj -> {
-                            return MongoTypeUtil.getAsBson( obj, type, mongoTable.getMongoSchema().getBucket() );
-                        } ).collect( Collectors.toList() ) );
+                        BsonValue array = new BsonArray( arrayValues.get( pos ).stream().map( obj -> MongoTypeUtil.getAsBson( obj, type, mongoTable.getMongoSchema().getBucket() ) ).collect( Collectors.toList() ) );
                         doc.append( logicalPhysicalMapping.get( name ), array );
                     }
 
