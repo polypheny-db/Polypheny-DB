@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
+import org.polypheny.db.adapter.mongodb.util.MongoPair;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptCost;
 import org.polypheny.db.plan.RelOptPlanner;
@@ -53,9 +54,11 @@ import org.polypheny.db.rel.RelNode;
 import org.polypheny.db.rel.core.Filter;
 import org.polypheny.db.rel.metadata.RelMetadataQuery;
 import org.polypheny.db.rex.RexCall;
+import org.polypheny.db.rex.RexDynamicParam;
 import org.polypheny.db.rex.RexInputRef;
 import org.polypheny.db.rex.RexLiteral;
 import org.polypheny.db.rex.RexNode;
+import org.polypheny.db.sql.SqlKind;
 import org.polypheny.db.util.JsonBuilder;
 import org.polypheny.db.util.Pair;
 
@@ -96,6 +99,10 @@ public class MongoFilter extends Filter implements MongoRel {
             translator = new Translator( MongoRules.mongoFieldNames( getRowType() ) );
         }
         String match = translator.translateMatch( condition, implementor.isDML() );
+        if ( translator.dynamics.size() > 0 ) {
+            implementor.dynamicConditions.addAll( translator.dynamics );
+            implementor.staticConditions.addAll( translator.statics );
+        }
         implementor.add( null, match );
     }
 
@@ -111,6 +118,8 @@ public class MongoFilter extends Filter implements MongoRel {
         private final List<String> fieldNames;
         private final MongoRowType rowType;
         private final Map<String, List<RexNode>> arrayMap = new HashMap<>();
+        private final List<MongoPair<String, Long, String>> dynamics = new ArrayList<>();
+        public final List<MongoPair<String, Object, String>> statics = new ArrayList<>();
 
 
         Translator( List<String> fieldNames ) {
@@ -291,6 +300,7 @@ public class MongoFilter extends Filter implements MongoRel {
                 case LITERAL:
                     break;
                 case DYNAMIC_PARAM:
+                    attachDynamic( left, (RexDynamicParam) right, op );
                     return true;
                 default:
                     return false;
@@ -316,6 +326,13 @@ public class MongoFilter extends Filter implements MongoRel {
         }
 
 
+        private void attachDynamic( RexNode left, RexDynamicParam right, String op ) {
+            if ( left.getKind() == SqlKind.INPUT_REF ) {
+                this.dynamics.add( new MongoPair<>( getPhysicalName( (RexInputRef) left ), right.getIndex(), op ) );
+            }
+        }
+
+
         private String getPhysicalName( RexInputRef left ) {
             final RexInputRef left1 = left;
             String name = fieldNames.get( left1.getIndex() );
@@ -334,6 +351,7 @@ public class MongoFilter extends Filter implements MongoRel {
                 // E.g. {deptno: {$lt: 100}} which may later be combined with other conditions: E.g. {deptno: [$lt: 100, $gt: 50]}
                 multimap.put( name, Pair.of( op, right ) );
             }
+            statics.add( new MongoPair<>( name, right.getValue3(), op ) );
         }
 
     }

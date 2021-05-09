@@ -45,6 +45,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import org.apache.calcite.avatica.util.DateTimeUtils;
 import org.apache.calcite.linq4j.Enumerator;
@@ -111,6 +112,8 @@ class MongoEnumerator implements Enumerator<Object> {
         }
         if ( current instanceof Decimal128 ) {
             return ((Decimal128) current).bigDecimalValue();
+        } else if ( current instanceof Double ) {
+
         } else if ( current.getClass().isArray() ) {
             List<Object> temp = new ArrayList<>();
             for ( Object el : (Object[]) current ) {
@@ -119,17 +122,7 @@ class MongoEnumerator implements Enumerator<Object> {
             return temp.toArray();
         } else {
             if ( current instanceof List ) {
-                return ((List<?>) current).stream().map( el -> {
-                    // one possible solution // TODO DL: discuss
-                    if ( el instanceof Document ) {
-                        return handleDocument( (Document) el );
-                    }
-                    if ( el instanceof Decimal128 ) {
-                        return ((Decimal128) el).bigDecimalValue();
-                    } else {
-                        return el;
-                    }
-                } ).collect( Collectors.toList() );
+                return ((List<?>) current).stream().map( this::handleTransforms ).collect( Collectors.toList() );
             } else if ( current instanceof Document ) {
                 return handleDocument( (Document) current );
             }
@@ -142,9 +135,7 @@ class MongoEnumerator implements Enumerator<Object> {
     // f -> float
     private Object handleDocument( Document el ) {
         String type = el.getString( "_type" );
-        if ( type.equals( "f" ) ) {
-            return el.getDouble( "_obj" ).floatValue();
-        } else if ( type.equals( "s" ) ) {
+        if ( type.equals( "s" ) ) {
             // if we have inserted a document and have distributed chunks which we have to fetch
             ObjectId objectId = new ObjectId( (String) ((Document) current).get( "_id" ) );
             GridFSDownloadStream stream = bucket.openDownloadStream( objectId );
@@ -174,34 +165,62 @@ class MongoEnumerator implements Enumerator<Object> {
     }
 
 
-    static Function1<Document, Object> singletonGetter( final String fieldName, final Class fieldClass ) {
-        return a0 -> convert( a0.get( fieldName ), fieldClass );
+    /**
+     * This method is needed to translate the special types back to their initial ones in Arrays,
+     * for example Float is not available in MongoDB and has to be stored as Double,
+     * This needs to be fixed when retrieving.
+     *
+     * @param objects
+     * @param arrayFieldClass
+     * @return
+     */
+    static List<Object> arrayGetter( List<Object> objects, Class arrayFieldClass ) {
+        if ( arrayFieldClass == Float.class || arrayFieldClass == float.class ) {
+            return objects.stream().map( obj -> ((Double) obj).floatValue() ).collect( Collectors.toList() );
+        } else {
+            return objects;
+        }
+    }
+
+
+    static Function1<Document, Object> singletonGetter( final String fieldName, final Class fieldClass, Class arrayFieldClass ) {
+        return a0 -> {
+            Object obj = convert( a0.get( fieldName ), fieldClass );
+            if ( fieldClass == List.class ) {
+                return arrayGetter( (List) obj, arrayFieldClass );
+            }
+            return obj;
+        };
     }
 
 
     /**
      * @param fields List of fields to project; or null to return map
+     * @param arrayFields
      */
-    static Function1<Document, Object[]> listGetter( final List<Map.Entry<String, Class>> fields ) {
+    static Function1<Document, Object[]> listGetter( final List<Entry<String, Class>> fields, List<Entry<String, Class>> arrayFields ) {
         return a0 -> {
             Object[] objects = new Object[fields.size()];
             for ( int i = 0; i < fields.size(); i++ ) {
                 final Map.Entry<String, Class> field = fields.get( i );
                 final String name = field.getKey();
                 objects[i] = convert( a0.get( name ), field.getValue() );
+                if ( field.getValue() == List.class ) {
+                    objects[i] = arrayGetter( (List) objects[i], arrayFields.get( i ).getValue() );
+                }
             }
             return objects;
         };
     }
 
 
-    static Function1<Document, Object> getter( List<Map.Entry<String, Class>> fields ) {
+    static Function1<Document, Object> getter( List<Entry<String, Class>> fields, List<Entry<String, Class>> arrayFields ) {
         //noinspection unchecked
         return fields == null
                 ? (Function1) mapGetter()
                 : fields.size() == 1
-                        ? singletonGetter( fields.get( 0 ).getKey(), fields.get( 0 ).getValue() )
-                        : (Function1) listGetter( fields );
+                        ? singletonGetter( fields.get( 0 ).getKey(), fields.get( 0 ).getValue(), arrayFields.get( 0 ).getValue() )
+                        : (Function1) listGetter( fields, arrayFields );
     }
 
 

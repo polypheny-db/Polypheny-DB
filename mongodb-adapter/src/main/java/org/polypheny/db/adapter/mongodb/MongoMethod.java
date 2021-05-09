@@ -47,12 +47,12 @@ import org.polypheny.db.rel.core.TableModify.Operation;
  * Builtin methods in the MongoDB adapter.
  */
 public enum MongoMethod {
-    MONGO_QUERYABLE_FIND( MongoTable.MongoQueryable.class, "find", String.class, String.class, List.class ),
-    MONGO_QUERYABLE_AGGREGATE( MongoTable.MongoQueryable.class, "aggregate", List.class, List.class ),
-    MONGO_GET_RESULT( MongoTable.MongoQueryable.class, "getResults", List.class ),
+    MONGO_QUERYABLE_FIND( MongoTable.MongoQueryable.class, "find", String.class, String.class, List.class, List.class ),
+    MONGO_QUERYABLE_AGGREGATE( MongoTable.MongoQueryable.class, "aggregate", List.class, List.class, List.class ),
     PREPARED_WRAPPER( MongoTable.MongoQueryable.class, "preparedWrapper", DataContext.class ),
     PREPARED_EXECUTE( MongoTable.MongoQueryable.class, "preparedExecute", List.class, List.class, Map.class, Map.class, Map.class, Map.class, Map.class ),
-    HANDLE_DIRECT_DML( MongoTable.MongoQueryable.class, "handleDirectDML", Operation.class, String.class, List.class );
+    HANDLE_DIRECT_DML( MongoTable.MongoQueryable.class, "handleDirectDML", Operation.class, String.class, List.class ),
+    MONGO_QUERYABLE_AGGREGATE_PREPARED( MongoTable.MongoQueryable.class, "preparedAggregate", List.class, List.class, List.class, List.class, List.class );
 
     public final Method method;
 

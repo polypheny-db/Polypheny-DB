@@ -73,9 +73,7 @@ public class MongoTypeUtil {
         } else if ( PolyType.INT_TYPES.contains( type ) ) {
             value = new BsonInt32( (Integer) obj );
         } else if ( type == PolyType.FLOAT || type == PolyType.REAL ) {
-            value = new BsonDocument()
-                    .append( "_obj", new BsonDouble( (Float) obj ) )
-                    .append( "_type", new BsonString( "f" ) );
+            value = new BsonDouble( (Float) obj );
         } else if ( PolyType.FRACTIONAL_TYPES.contains( type ) ) {
             value = new BsonDouble( (Double) obj );
         } else if ( type.getFamily() == PolyTypeFamily.DATE || type.getFamily() == PolyTypeFamily.TIME ) {
@@ -116,10 +114,12 @@ public class MongoTypeUtil {
             return new BsonDecimal128( new Decimal128( (BigDecimal) obj ) );
         } else if ( obj instanceof Double ) {
             return new BsonDouble( (Double) obj );
-        } else if ( obj instanceof Time || obj instanceof Date ) {
-            return new BsonInt32( (Integer) obj );
         } else if ( obj instanceof Timestamp ) {
-            return new BsonInt64( (Long) obj );
+            return new BsonInt64( ((Timestamp) obj).getTime() );
+        } else if ( obj instanceof Time ) {
+            return new BsonInt64( ((Time) obj).getTime() );
+        } else if ( obj instanceof Date ) {
+            return new BsonInt64( ((Date) obj).getTime() );
         } else if ( obj instanceof Boolean ) {
             return new BsonBoolean( (Boolean) obj );
         } else if ( obj instanceof ByteString ) {
@@ -134,28 +134,24 @@ public class MongoTypeUtil {
     }
 
 
-    public static BsonValue getBsonValue( RexLiteral literal ) {
-        BsonValue value;
-        if ( literal.getValue() == null ) {
-            value = new BsonNull();
-        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.CHARACTER ) {
-            value = new BsonString( Objects.requireNonNull( RexLiteral.stringValue( literal ) ) );
-        } else if ( PolyType.INT_TYPES.contains( literal.getType().getPolyType() ) ) {
-            value = new BsonInt32( RexLiteral.intValue( literal ) );
-        } else if ( PolyType.FRACTIONAL_TYPES.contains( literal.getType().getPolyType() ) ) {
-            value = new BsonDouble( literal.getValueAs( Double.class ) );
-        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.DATE || literal.getTypeName().getFamily() == PolyTypeFamily.TIME ) {
-            value = new BsonInt32( (Integer) literal.getValue2() );
-        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.TIMESTAMP ) {
-            value = new BsonInt64( (Long) literal.getValue2() );
-        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BOOLEAN ) {
-            value = new BsonBoolean( (Boolean) literal.getValue2() );
-        } else if ( literal.getTypeName().getFamily() == PolyTypeFamily.BINARY ) {
-            value = new BsonString( ((ByteString) literal.getValue2()).toBase64String() );
+    public static String getAsString( Object obj ) {
+        if ( obj == null ) {
+            return "{}";
+        } else if ( obj instanceof String ) {
+            return "\"" + obj + "\"";
+        } else if ( obj instanceof BigDecimal ) {
+            return "NumberDecimal(\"" + obj + "\")";
+        } else if ( obj instanceof ByteString ) {
+            return ((ByteString) obj).toBase64String();
+        } else if ( obj instanceof Timestamp ) {
+            return String.valueOf( ((Timestamp) obj).getTime() );
+        } else if ( obj instanceof Time ) {
+            return String.valueOf( ((Time) obj).getTime() );
+        } else if ( obj instanceof Date ) {
+            return String.valueOf( ((Date) obj).getTime() );
         } else {
-            value = new BsonString( RexLiteral.value( literal ).toString() );
+            return obj.toString();
         }
-        return value;
     }
 
 
@@ -170,5 +166,6 @@ public class MongoTypeUtil {
         }
         return array;
     }
+
 
 }

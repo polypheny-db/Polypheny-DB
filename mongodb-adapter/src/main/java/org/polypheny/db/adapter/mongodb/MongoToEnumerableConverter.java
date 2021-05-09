@@ -38,15 +38,18 @@ import com.google.common.collect.Lists;
 import java.util.AbstractList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.calcite.linq4j.tree.BlockBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.Expressions;
 import org.apache.calcite.linq4j.tree.MethodCallExpression;
+import org.polypheny.db.adapter.enumerable.EnumUtils;
 import org.polypheny.db.adapter.enumerable.EnumerableRel;
 import org.polypheny.db.adapter.enumerable.EnumerableRelImplementor;
 import org.polypheny.db.adapter.enumerable.JavaRowFormat;
 import org.polypheny.db.adapter.enumerable.PhysType;
 import org.polypheny.db.adapter.enumerable.PhysTypeImpl;
+import org.polypheny.db.adapter.mongodb.util.MongoPair;
 import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.plan.ConventionTraitDef;
 import org.polypheny.db.plan.RelOptCluster;
@@ -59,6 +62,7 @@ import org.polypheny.db.rel.convert.ConverterImpl;
 import org.polypheny.db.rel.core.TableModify.Operation;
 import org.polypheny.db.rel.metadata.RelMetadataQuery;
 import org.polypheny.db.rel.type.RelDataType;
+import org.polypheny.db.rel.type.RelDataTypeField;
 import org.polypheny.db.runtime.Hook;
 import org.polypheny.db.util.BuiltInMethod;
 import org.polypheny.db.util.Pair;
@@ -133,6 +137,7 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
                         constantArrayList(
                                 Pair.zip( MongoRules.mongoFieldNames( rowType ),
                                         new AbstractList<Class>() {
+
                                             @Override
                                             public Class get( int index ) {
                                                 return physType.fieldClass( index );
@@ -145,12 +150,47 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
                                             }
                                         } ),
                                 Pair.class ) );
+
+        List<RelDataTypeField> fieldList = rowType.getFieldList();
+
+        final Expression arrayClassFields =
+                list.append( "arrayClassFields",
+                        constantArrayList(
+                                Pair.zip( MongoRules.mongoFieldNames( rowType ),
+                                        new AbstractList<Class>() {
+
+                                            @Override
+                                            public Class get( int index ) {
+                                                Class clazz = physType.fieldClass( index );
+                                                if ( clazz != List.class ) {
+                                                    return physType.fieldClass( index );
+                                                } else {
+                                                    return EnumUtils.javaRowClass( implementor.getTypeFactory(), fieldList.get( index ).getType().getComponentType() );
+                                                }
+
+                                            }
+
+
+                                            @Override
+                                            public int size() {
+                                                return rowType.getFieldCount();
+                                            }
+                                        } ),
+                                Pair.class ) );
+
         final Expression table = list.append( "table", mongoImplementor.table.getExpression( MongoTable.MongoQueryable.class ) );
         List<String> opList = Pair.right( mongoImplementor.list );
         final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );
         Expression enumerable;
         if ( !mongoImplementor.isDML() ) {
-            enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, ops ) );
+            if ( mongoImplementor.dynamicConditions.size() > 0 ) {
+                Expression dynamics = list.append( "dynamics", constantArrayList( mongoImplementor.dynamicConditions.stream().map( MongoPair::asEntry ).collect( Collectors.toList() ), Pair.class ) );
+                Expression statics = list.append( "statics", constantArrayList( mongoImplementor.staticConditions.stream().map( MongoPair::asEntry ).collect( Collectors.toList() ), Pair.class ) );
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE_PREPARED.method, fields, arrayClassFields, ops, statics, dynamics ) );
+            } else {
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, arrayClassFields, ops ) );
+            }
+
         } else {
             if ( mongoImplementor.isPrepared() ) {
                 Expression data = list.append( "data", Expressions.constant( mongoImplementor.getStaticRowType().getFieldNames(), Object.class ) );
@@ -164,8 +204,6 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
                 //Expression b = list.append( "t", Expressions.constant( new BigDecimal( "3.3" ), BigDecimal.class ) );
                 enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_EXECUTE.method, data, nullFields, physicalNames, dynamicFields, staticFields, arrayFields, arrayClasses ) );
             } else {
-                // Expression results = list.append( "results", constantArrayList( mongoImplementor.getResults(), Object.class ) );
-                //enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_GET_RESULT.method, results ) );
                 // DIRECT INSERTS WHICH ARE ALREADY PREPARED
                 Expression filter = list.append( "filter", Expressions.constant( mongoImplementor.filter, String.class ) );
                 Expression operations = list.append( "operations", constantArrayList( mongoImplementor.operations, String.class ) );
