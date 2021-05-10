@@ -516,7 +516,7 @@ public class MongoRules {
             switch ( this.getOperation() ) {
                 case INSERT: {
                     if ( input instanceof MongoValues ) {
-                        handleDirectInsert( implementor, ((MongoValues) input), implementor.mongoTable );
+                        handleDirectInsert( implementor, ((MongoValues) input) );
                     } else if ( input instanceof MongoProject ) {
                         handlePreparedInsert( implementor, ((MongoProject) input) );
                     } else {
@@ -576,9 +576,18 @@ public class MongoRules {
 
 
         private void handlePreparedInsert( Implementor implementor, MongoProject input ) {
-            if ( !(input.getInput() instanceof MongoValues && input.getInput().getRowType().getFieldList().size() == 1) ) {
+            if ( !(input.getInput() instanceof MongoValues) && input.getInput().getRowType().getFieldList().size() == 1 ) {
                 return;
             }
+            // TODO DL: REFACTOR
+            if ( ((MongoValues) input.getInput()).tuples.size() > 0
+                    && input.getInput().getRowType().getFieldList().size() != 1
+                    && input.getInput().getRowType().getFieldList().get( 0 ).getName().equals( "ZERO" ) ) {
+                // we have a partitioned table
+                handleDirectInsert( implementor, (MongoValues) input.getInput() );
+                return;
+            }
+
             implementor.setStaticRowType( (RelRecordType) input.getRowType() );
             implementor.setPrepared( true );
             int pos = 0;
@@ -687,14 +696,14 @@ public class MongoRules {
         }
 
 
-        private void handleDirectInsert( Implementor implementor, MongoValues values, MongoTable mongoTable ) {
+        private void handleDirectInsert( Implementor implementor, MongoValues values ) {
             List<String> docs = new ArrayList<>();
             for ( ImmutableList<RexLiteral> literals : values.tuples ) {
                 Document doc = new Document();
                 int pos = 0;
                 for ( RexLiteral literal : literals ) {
 
-                    BsonValue value = MongoTypeUtil.getAsBson( literal, mongoTable.getMongoSchema().getBucket() );
+                    BsonValue value = MongoTypeUtil.getAsBson( literal, implementor.mongoTable.getMongoSchema().getBucket() );
                     try {
                         doc.append( MongoStore.getPhysicalColumnName( Catalog.getInstance().getColumn( implementor.mongoTable.getCatalogTable().id, values.getRowType().getFieldNames().get( pos ) ).id ), value );
                     } catch ( UnknownColumnException e ) {

@@ -132,7 +132,6 @@ class MongoEnumerator implements Enumerator<Object> {
 
 
     // s -> stream
-    // f -> float
     private Object handleDocument( Document el ) {
         String type = el.getString( "_type" );
         if ( type.equals( "s" ) ) {
@@ -168,7 +167,7 @@ class MongoEnumerator implements Enumerator<Object> {
     /**
      * This method is needed to translate the special types back to their initial ones in Arrays,
      * for example Float is not available in MongoDB and has to be stored as Double,
-     * This needs to be fixed when retrieving.
+     * This needs to be fixed when retrieving the arrays.
      *
      * @param objects
      * @param arrayFieldClass

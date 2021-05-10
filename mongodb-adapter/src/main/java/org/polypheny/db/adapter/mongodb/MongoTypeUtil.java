@@ -77,9 +77,20 @@ public class MongoTypeUtil {
         } else if ( PolyType.FRACTIONAL_TYPES.contains( type ) ) {
             value = new BsonDouble( (Double) obj );
         } else if ( type.getFamily() == PolyTypeFamily.DATE || type.getFamily() == PolyTypeFamily.TIME ) {
-            value = new BsonInt32( (Integer) obj );
+            if ( obj instanceof Integer ) {
+                value = new BsonInt64( (Integer) obj );
+            } else if ( obj instanceof Date ) {
+                value = new BsonInt64( ((Date) obj).getTime() );
+            } else {
+                value = new BsonInt64( ((Time) obj).getTime() );
+            }
+
         } else if ( type.getFamily() == PolyTypeFamily.TIMESTAMP ) {
-            value = new BsonInt64( (Long) obj );
+            if ( obj instanceof Timestamp ) {
+                value = new BsonInt64( ((Timestamp) obj).getTime() );
+            } else {
+                value = new BsonInt64( (Long) obj );
+            }
         } else if ( type.getFamily() == PolyTypeFamily.BOOLEAN ) {
             value = new BsonBoolean( (Boolean) obj );
         } else if ( type.getFamily() == PolyTypeFamily.BINARY ) {
