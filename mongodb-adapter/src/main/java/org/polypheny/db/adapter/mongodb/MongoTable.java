@@ -55,8 +55,10 @@ import org.apache.calcite.linq4j.Enumerator;
 import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.linq4j.function.Function1;
 import org.bson.BsonArray;
+import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
 import org.bson.BsonNull;
+import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -87,6 +89,7 @@ import org.polypheny.db.schema.TranslatableTable;
 import org.polypheny.db.schema.impl.AbstractTableQueryable;
 import org.polypheny.db.transaction.PolyXid;
 import org.polypheny.db.type.PolyType;
+import org.polypheny.db.util.Pair;
 import org.polypheny.db.util.Util;
 
 
@@ -200,7 +203,11 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             list.add( MongoDynamicUtil.initReplace( BsonDocument.parse( operation ), parameterValues, getMongoSchema().getBucket() ) );
         }
 
-        list.forEach( el -> System.out.println( el.toBsonDocument().toJson() ) );
+        // do we need to add all if nothing is selected?
+        if ( list.size() == 0 ) {
+            projectMatchAll( fields, list );
+        }
+
         final Function1<Document, Object> getter = MongoEnumerator.getter( fields, arrayFields );
         return new AbstractEnumerable<Object>() {
             @Override
@@ -218,6 +225,20 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 return new MongoEnumerator( resultIterator, getter, table.getMongoSchema().getBucket() );
             }
         };
+    }
+
+
+    private void projectMatchAll( List<Entry<String, Class>> fields, List<Bson> list ) {
+        // project all
+        BsonDocument projects = new BsonDocument();
+        for ( String name : Pair.left( fields ) ) {
+            int index = catalogTable.getColumnNames().indexOf( name );
+            projects.append( name, new BsonString( "$" + MongoStore.getPhysicalColumnName( catalogTable.columnIds.get( index ) ) ) );
+        }
+        list.add( new BsonDocument().append( "$project", projects ) );
+
+        // match all
+        list.add( new BsonDocument().append( "$match", new BsonDocument().append( "_id", new BsonDocument().append( "$exists", new BsonBoolean( true ) ) ) ) );
     }
 
 
@@ -304,39 +325,6 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             } else {
                 return getTable().aggregate( getTable().getTransactionProvider().getSession( dataContext.getStatement().getTransaction().getXid() ), getMongoDb(), getTable(), fields, arrayClass, operations, new HashMap<>() );
             }
-        }
-
-
-        @SuppressWarnings("UnusedDeclaration")
-        public Enumerable<Object> preparedAggregate( List<Map.Entry<String, Class>> fields, List<Map.Entry<String, Class>> arrayClasses, List<String> operations, List<Map.Entry<String, Map.Entry<String, Object>>> statics ) {
-
-            /*for ( Entry<String, Entry<String, Long>> entry : dynamics ) {
-                String filter;
-                String val = MongoTypeUtil.getAsString( dataContext.getParameterValues().get( 0 ).get( dyn ) );
-                if ( entry.getKey() == null ) {
-                    filter = "\"" + entry.getValue().getKey() + "\":" + val;
-                } else {
-                    filter = entry.getValue().getKey() + ":{\"" + entry.getKey() + "\":" + val + "}";
-                }
-                filters.add( filter );
-                dyn++;
-            }
-
-            statics.forEach( entry -> {
-                String val = MongoTypeUtil.getAsString( entry.getValue().getValue() );
-                if ( entry.getKey() == null ) {
-                    filters.add( "\"" + entry.getValue().getKey() + "\":" + val );
-                } else {
-                    filters.add( entry.getValue().getKey() + ":{\"" + entry.getKey() + "\":" + val + "}" );
-                }
-            } );
-
-            String mergedFilter = "{\n $match:\n{" + String.join( ",", filters ) + "}\n}";*/
-
-            // mongodb allows to chain multiple $matches so we join our dynamic filters with
-            // the predefined operations which results in $match:{}, $match:{[dynamic filter]}
-
-            return aggregate( fields, arrayClasses, operations );
         }
 
 

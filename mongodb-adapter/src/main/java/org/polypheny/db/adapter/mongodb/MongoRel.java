@@ -43,7 +43,6 @@ import java.util.stream.IntStream;
 import lombok.Getter;
 import lombok.Setter;
 import org.bson.BsonDocument;
-import org.polypheny.db.adapter.mongodb.util.MongoPair;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.plan.Convention;
@@ -76,9 +75,7 @@ public interface MongoRel extends RelNode {
         public String filter = new BsonDocument().toJson();
         public List<String> operations = new ArrayList<>();
         public List<Integer> nullFields = new ArrayList<>();
-        //public List<MongoPair<String, Long, String>> dynamicConditions = new ArrayList<>();
         public BsonDocument dynamicConditions = new BsonDocument();
-        public List<MongoPair<String, Object, String>> staticConditions = new ArrayList<>();
 
         RelOptTable table;
 

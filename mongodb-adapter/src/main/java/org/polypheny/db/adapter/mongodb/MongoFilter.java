@@ -47,7 +47,6 @@ import java.util.stream.Collectors;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
 import org.polypheny.db.adapter.mongodb.bson.BsonDynamic;
-import org.polypheny.db.adapter.mongodb.util.MongoPair;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptCost;
 import org.polypheny.db.plan.RelOptPlanner;
@@ -112,7 +111,6 @@ public class MongoFilter extends Filter implements MongoRel {
             }
             implementor.filter = implementor.dynamicConditions.toJson();
             match = implementor.filter;
-            //implementor.filter = match;
         }
         implementor.add( null, match );
     }
@@ -129,9 +127,7 @@ public class MongoFilter extends Filter implements MongoRel {
         private final List<String> fieldNames;
         private final MongoRowType rowType;
         private final Map<String, List<RexNode>> arrayMap = new HashMap<>();
-        //private final List<MongoPair<String, Long, String>> dynamics = new ArrayList<>();
         private final BsonArray dynamics = new BsonArray();
-        public final List<MongoPair<String, Object, String>> statics = new ArrayList<>();
 
 
         Translator( List<String> fieldNames ) {
@@ -380,7 +376,6 @@ public class MongoFilter extends Filter implements MongoRel {
                 multimap.put( name, Pair.of( op, right ) );
                 dynamics.add( new BsonDocument().append( name, new BsonDocument().append( op, MongoTypeUtil.getAsBson( right, null ) ) ) );
             }
-            statics.add( new MongoPair<>( name, right.getValue3(), op ) );
         }
 
     }

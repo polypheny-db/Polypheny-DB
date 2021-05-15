@@ -28,6 +28,10 @@ public class BsonDynamic extends BsonDocument {
     private final String polyTypeName;
 
 
+    /**
+     * @param id
+     * @param polyTypeName
+     */
     public BsonDynamic( long id, String polyTypeName ) {
         super();
         this.id = id;

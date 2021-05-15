@@ -38,7 +38,6 @@ import com.google.common.collect.Lists;
 import java.util.AbstractList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.calcite.linq4j.tree.BlockBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.Expressions;
@@ -49,7 +48,6 @@ import org.polypheny.db.adapter.enumerable.EnumerableRelImplementor;
 import org.polypheny.db.adapter.enumerable.JavaRowFormat;
 import org.polypheny.db.adapter.enumerable.PhysType;
 import org.polypheny.db.adapter.enumerable.PhysTypeImpl;
-import org.polypheny.db.adapter.mongodb.util.MongoPair;
 import org.polypheny.db.config.RuntimeConfig;
 import org.polypheny.db.plan.ConventionTraitDef;
 import org.polypheny.db.plan.RelOptCluster;
@@ -183,15 +181,7 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );
         Expression enumerable;
         if ( !mongoImplementor.isDML() ) {
-            if ( mongoImplementor.dynamicConditions.size() > 0 ) {
-                //Expression dynamics = list.append( "dynamics", Expressions.constant( mongoImplementor.dynamicConditions.toJson(), String.class ) );
-
-                Expression statics = list.append( "statics", constantArrayList( mongoImplementor.staticConditions.stream().map( MongoPair::asEntry ).collect( Collectors.toList() ), Pair.class ) );
-                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE_PREPARED.method, fields, arrayClassFields, ops, statics ) );
-            } else {
-                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, arrayClassFields, ops ) );
-            }
-
+            enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, arrayClassFields, ops ) );
         } else {
             if ( mongoImplementor.isPrepared() ) {
                 Expression data = list.append( "data", Expressions.constant( mongoImplementor.getStaticRowType().getFieldNames(), Object.class ) );

@@ -545,6 +545,8 @@ public class MongoRules {
                             } else {
                                 doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), MongoTypeUtil.getBsonArray( (RexCall) el, bucket ) );
                             }
+                        } else if ( el instanceof RexDynamicParam ) {
+                            doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), new BsonDynamic( ((RexDynamicParam) el).getIndex(), el.getType().getPolyType().getTypeName() ) );
                         }
                         pos++;
                     }

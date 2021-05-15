@@ -96,6 +96,10 @@ public class MongoProject extends Project implements MongoRel {
             }
 
             String expr = pair.left.accept( translator );
+            if ( expr == null ) {
+                continue;
+            }
+
             StringBuilder blankExpr = new StringBuilder( expr.replace( "'", "" ) );
             if ( blankExpr.toString().startsWith( "$" ) && blankExpr.toString().endsWith( "]" ) && blankExpr.toString().contains( "[" ) ) {
                 // we want to access an array element and have to get the correct table and the specified array element
@@ -116,6 +120,7 @@ public class MongoProject extends Project implements MongoRel {
                 }
 
             }
+
             items.add( expr.equals( "'$" + name + "'" )
                     ? MongoRules.maybeQuote( name ) + ": " + phyName//1"
                     : MongoRules.maybeQuote( name ) + ": " + expr );

@@ -57,9 +57,11 @@ public class DataMigratorTest {
                     // Add placement
                     statement.executeUpdate( "ALTER TABLE \"datamigratortest\" ADD PLACEMENT ON STORE \"store1\"" );
 
+                    connection.commit();
                     // Remove placement on initial store
                     statement.executeUpdate( "ALTER TABLE \"datamigratortest\" DROP PLACEMENT ON STORE \"hsqldb\"" );
 
+                    connection.commit();
                     // Checks
                     TestHelper.checkResultSet(
                             statement.executeQuery( "SELECT * FROM datamigratortest" ),
