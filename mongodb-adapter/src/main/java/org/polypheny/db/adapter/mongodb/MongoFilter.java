@@ -44,6 +44,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
+import org.bson.BsonArray;
+import org.bson.BsonDocument;
+import org.polypheny.db.adapter.mongodb.bson.BsonDynamic;
 import org.polypheny.db.adapter.mongodb.util.MongoPair;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptCost;
@@ -99,9 +102,17 @@ public class MongoFilter extends Filter implements MongoRel {
             translator = new Translator( MongoRules.mongoFieldNames( getRowType() ) );
         }
         String match = translator.translateMatch( condition, implementor.isDML() );
+
         if ( translator.dynamics.size() > 0 ) {
-            implementor.dynamicConditions.addAll( translator.dynamics );
-            implementor.staticConditions.addAll( translator.statics );
+            //implementor.dynamicConditions.putAll( translator.dynamics );
+            // we merge the dynamic BsonDocument with the static conditions
+            implementor.dynamicConditions = new BsonDocument().append( "$or", translator.dynamics );
+            if ( !implementor.isDML() ) {
+                implementor.dynamicConditions = new BsonDocument().append( "$match", implementor.dynamicConditions );
+            }
+            implementor.filter = implementor.dynamicConditions.toJson();
+            match = implementor.filter;
+            //implementor.filter = match;
         }
         implementor.add( null, match );
     }
@@ -118,7 +129,8 @@ public class MongoFilter extends Filter implements MongoRel {
         private final List<String> fieldNames;
         private final MongoRowType rowType;
         private final Map<String, List<RexNode>> arrayMap = new HashMap<>();
-        private final List<MongoPair<String, Long, String>> dynamics = new ArrayList<>();
+        //private final List<MongoPair<String, Long, String>> dynamics = new ArrayList<>();
+        private final BsonArray dynamics = new BsonArray();
         public final List<MongoPair<String, Object, String>> statics = new ArrayList<>();
 
 
@@ -328,7 +340,22 @@ public class MongoFilter extends Filter implements MongoRel {
 
         private void attachDynamic( RexNode left, RexDynamicParam right, String op ) {
             if ( left.getKind() == SqlKind.INPUT_REF ) {
-                this.dynamics.add( new MongoPair<>( getPhysicalName( (RexInputRef) left ), right.getIndex(), op ) );
+                if ( op == null ) {
+                    this.dynamics
+                            .add(
+                                    new BsonDocument()
+                                            .append(
+                                                    getPhysicalName( (RexInputRef) left ),
+                                                    new BsonDynamic( right.getIndex(), right.getType().getPolyType().getTypeName() ) ) );
+                } else {
+                    this.dynamics
+                            .add(
+                                    new BsonDocument()
+                                            .append(
+                                                    getPhysicalName( (RexInputRef) left ),
+                                                    new BsonDocument().append( op, new BsonDynamic( right.getIndex(), right.getType().getPolyType().getTypeName() ) ) ) );
+                }
+                //this.dynamics.add( new MongoPair<>( getPhysicalName( (RexInputRef) left ), right.getIndex(), op ) );
             }
         }
 
@@ -347,9 +374,11 @@ public class MongoFilter extends Filter implements MongoRel {
             if ( op == null ) {
                 // E.g.: {deptno: 100}
                 eqMap.put( name, right );
+                dynamics.add( new BsonDocument().append( name, MongoTypeUtil.getAsBson( right, null ) ) );
             } else {
                 // E.g. {deptno: {$lt: 100}} which may later be combined with other conditions: E.g. {deptno: [$lt: 100, $gt: 50]}
                 multimap.put( name, Pair.of( op, right ) );
+                dynamics.add( new BsonDocument().append( name, new BsonDocument().append( op, MongoTypeUtil.getAsBson( right, null ) ) ) );
             }
             statics.add( new MongoPair<>( name, right.getValue3(), op ) );
         }

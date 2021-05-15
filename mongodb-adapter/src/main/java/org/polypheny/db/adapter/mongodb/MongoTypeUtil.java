@@ -20,9 +20,9 @@ import com.mongodb.client.gridfs.GridFSBucket;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
 import java.math.BigDecimal;
+import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import lombok.SneakyThrows;
@@ -69,25 +69,37 @@ public class MongoTypeUtil {
         } else if ( type == PolyType.TINYINT ) {
             value = new BsonInt32( (Byte) obj );
         } else if ( type == PolyType.SMALLINT ) {
-            value = new BsonInt32( (Short) obj );
+            if ( obj instanceof Integer ) {
+                value = new BsonInt32( (Integer) obj );
+            } else {
+                value = new BsonInt32( (Short) obj );
+            }
+
         } else if ( PolyType.INT_TYPES.contains( type ) ) {
             value = new BsonInt32( (Integer) obj );
         } else if ( type == PolyType.FLOAT || type == PolyType.REAL ) {
-            value = new BsonDouble( (Float) obj );
+            value = new BsonDouble( Double.parseDouble( obj.toString() ) );
         } else if ( PolyType.FRACTIONAL_TYPES.contains( type ) ) {
             value = new BsonDouble( (Double) obj );
-        } else if ( type.getFamily() == PolyTypeFamily.DATE || type.getFamily() == PolyTypeFamily.TIME ) {
+        } else if ( type.getFamily() == PolyTypeFamily.DATE ) {
             if ( obj instanceof Integer ) {
                 value = new BsonInt64( (Integer) obj );
             } else if ( obj instanceof Date ) {
-                value = new BsonInt64( ((Date) obj).getTime() );
+                value = new BsonInt64( ((Date) obj).toLocalDate().toEpochDay() );
             } else {
-                value = new BsonInt64( ((Time) obj).getTime() );
+                value = new BsonInt64( new Date( ((Time) obj).getTime() ).toLocalDate().toEpochDay() );
             }
-
+        } else if ( type.getFamily() == PolyTypeFamily.TIME ) {
+            //value = new BsonTimestamp( ((Time) obj).getTime() );
+            if ( obj instanceof Integer ) {
+                value = new BsonInt64( ((Integer) obj) );
+            } else {
+                value = new BsonInt64( ((Time) obj).toLocalTime().toNanoOfDay() / 1000000 ); // TODO DL: why not getEpoch?
+            }
         } else if ( type.getFamily() == PolyTypeFamily.TIMESTAMP ) {
             if ( obj instanceof Timestamp ) {
-                value = new BsonInt64( ((Timestamp) obj).getTime() );
+                //value = new BsonTimestamp( ((Timestamp) obj).getTime() );
+                value = new BsonInt64( ((Timestamp) obj).toInstant().toEpochMilli() + 3600000 ); // todo dl fix
             } else {
                 value = new BsonInt64( (Long) obj );
             }
@@ -110,9 +122,8 @@ public class MongoTypeUtil {
     public static BsonValue getAsBson( RexLiteral literal, GridFSBucket bucket ) {
         return getAsBson( literal.getValue3(), literal.getTypeName(), bucket );
     }
-
-
-    public static BsonValue getAsBson( Object obj, GridFSBucket bucket ) {
+    
+    /*public static BsonValue getAsBson( Object obj, GridFSBucket bucket ) {
         if ( obj == null ) {
             return new BsonNull();
         } else if ( obj instanceof String ) {
@@ -130,7 +141,7 @@ public class MongoTypeUtil {
         } else if ( obj instanceof Time ) {
             return new BsonInt64( ((Time) obj).getTime() );
         } else if ( obj instanceof Date ) {
-            return new BsonInt64( ((Date) obj).getTime() );
+            return new BsonInt64( ((Date) obj).toLocalDate().toEpochDay() );
         } else if ( obj instanceof Boolean ) {
             return new BsonBoolean( (Boolean) obj );
         } else if ( obj instanceof ByteString ) {
@@ -142,7 +153,7 @@ public class MongoTypeUtil {
         } else {
             return new BsonString( obj.toString() );
         }
-    }
+    }*/
 
 
     public static String getAsString( Object obj ) {
@@ -155,11 +166,11 @@ public class MongoTypeUtil {
         } else if ( obj instanceof ByteString ) {
             return ((ByteString) obj).toBase64String();
         } else if ( obj instanceof Timestamp ) {
-            return String.valueOf( ((Timestamp) obj).getTime() );
+            return String.valueOf( ((Timestamp) obj).toInstant().toEpochMilli() + 3600000 );
         } else if ( obj instanceof Time ) {
-            return String.valueOf( ((Time) obj).getTime() );
+            return String.valueOf( ((Time) obj).toLocalTime().toNanoOfDay() / 1000000 );
         } else if ( obj instanceof Date ) {
-            return String.valueOf( ((Date) obj).getTime() );
+            return String.valueOf( ((Date) obj).toLocalDate().toEpochDay() );
         } else {
             return obj.toString();
         }
@@ -178,5 +189,62 @@ public class MongoTypeUtil {
         return array;
     }
 
+
+    public static Class<?> getClassFromType( PolyType type ) {
+        switch ( type ) {
+
+            case BOOLEAN:
+                return Boolean.class;
+            case TINYINT:
+                return Short.class;
+            case SMALLINT:
+            case INTEGER:
+                return Integer.class;
+            case BIGINT:
+                return Long.class;
+            case DECIMAL:
+                return BigDecimal.class;
+            case FLOAT:
+            case REAL:
+                return Float.class;
+            case DOUBLE:
+                return Double.class;
+            case DATE:
+                return Date.class;
+            case TIME:
+            case TIME_WITH_LOCAL_TIME_ZONE:
+                return Time.class;
+            case TIMESTAMP:
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return Timestamp.class;
+            case INTERVAL_YEAR:
+            case INTERVAL_YEAR_MONTH:
+            case INTERVAL_MONTH:
+            case INTERVAL_DAY:
+            case INTERVAL_DAY_HOUR:
+            case INTERVAL_DAY_MINUTE:
+            case INTERVAL_DAY_SECOND:
+            case INTERVAL_HOUR:
+            case INTERVAL_HOUR_MINUTE:
+            case INTERVAL_HOUR_SECOND:
+            case INTERVAL_MINUTE:
+            case INTERVAL_MINUTE_SECOND:
+            case INTERVAL_SECOND:
+                throw new RuntimeException( "Interval is not supported yet" );
+            case CHAR:
+            case VARCHAR:
+                return String.class;
+            case BINARY:
+            case VARBINARY:
+                return String.class;
+            case FILE:
+            case IMAGE:
+            case VIDEO:
+            case SOUND:
+                return PushbackInputStream.class;
+            default:
+                throw new IllegalStateException( "Unexpected value: " + type );
+        }
+    }
 
 }

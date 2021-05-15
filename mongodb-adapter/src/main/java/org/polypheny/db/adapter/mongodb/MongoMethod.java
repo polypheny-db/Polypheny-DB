@@ -52,7 +52,8 @@ public enum MongoMethod {
     PREPARED_WRAPPER( MongoTable.MongoQueryable.class, "preparedWrapper", DataContext.class ),
     PREPARED_EXECUTE( MongoTable.MongoQueryable.class, "preparedExecute", List.class, List.class, Map.class, Map.class, Map.class, Map.class, Map.class ),
     HANDLE_DIRECT_DML( MongoTable.MongoQueryable.class, "handleDirectDML", Operation.class, String.class, List.class ),
-    MONGO_QUERYABLE_AGGREGATE_PREPARED( MongoTable.MongoQueryable.class, "preparedAggregate", List.class, List.class, List.class, List.class, List.class );
+    HANDLE_PREPARED_DML( MongoTable.MongoQueryable.class, "handlePreparedDML", Operation.class, String.class ),
+    MONGO_QUERYABLE_AGGREGATE_PREPARED( MongoTable.MongoQueryable.class, "preparedAggregate", List.class, List.class, List.class, List.class );
 
     public final Method method;
 

@@ -54,6 +54,7 @@ import org.bson.Document;
 import org.polypheny.db.adapter.enumerable.RexImpTable;
 import org.polypheny.db.adapter.enumerable.RexToLixTranslator;
 import org.polypheny.db.adapter.java.JavaTypeFactory;
+import org.polypheny.db.adapter.mongodb.bson.BsonDynamic;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.exceptions.UnknownColumnException;
 import org.polypheny.db.plan.Convention;
@@ -82,6 +83,7 @@ import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.rel.type.RelRecordType;
 import org.polypheny.db.rex.RexCall;
 import org.polypheny.db.rex.RexDynamicParam;
+import org.polypheny.db.rex.RexFieldAccess;
 import org.polypheny.db.rex.RexInputRef;
 import org.polypheny.db.rex.RexLiteral;
 import org.polypheny.db.rex.RexNode;
@@ -528,6 +530,7 @@ public class MongoRules {
                     MongoRel.Implementor condImplementor = new Implementor( true );
                     condImplementor.setStaticRowType( implementor.getStaticRowType() );
                     ((MongoRel) input).implement( condImplementor );
+                    implementor.filter = condImplementor.filter;
                     assert condImplementor.getStaticRowType() instanceof MongoRowType;
                     MongoRowType rowType = (MongoRowType) condImplementor.getStaticRowType();
                     int pos = 0;
@@ -535,19 +538,26 @@ public class MongoRules {
                     GridFSBucket bucket = implementor.mongoTable.getMongoSchema().getBucket();
                     for ( RexNode el : getSourceExpressionList() ) {
                         if ( el instanceof RexLiteral ) {
-                            doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), MongoTypeUtil.getAsBson( ((RexLiteral) el).getValue3(), ((RexLiteral) el).getTypeName(), bucket ) );
+                            doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), MongoTypeUtil.getAsBson( (RexLiteral) el, bucket ) );
                         } else if ( el instanceof RexCall ) {
-                            doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), MongoTypeUtil.getBsonArray( (RexCall) el, bucket ) );
+                            if ( ((RexCall) el).op.kind == SqlKind.PLUS ) {
+                                doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), visitCall( implementor, (RexCall) el, SqlKind.PLUS, el.getType().getPolyType() ) );
+                            } else {
+                                doc.append( rowType.getPhysicalName( getUpdateColumnList().get( pos ) ), MongoTypeUtil.getBsonArray( (RexCall) el, bucket ) );
+                            }
                         }
                         pos++;
                     }
                     BsonDocument update = new BsonDocument().append( "$set", doc );
 
-                    if ( condImplementor.list.size() == 1 ) {
+                    //implementor.filter = condImplementor.getMergedConditions();
+
+                    /*if ( condImplementor.list.size() == 1 ) {
                         implementor.filter = condImplementor.list.get( 0 ).right;
                     } else {
                         implementor.filter = new BsonDocument().toJson();
-                    }
+                    }*/
+
                     implementor.operations = Collections.singletonList( update.toJson() );
 
                     break;
@@ -572,6 +582,36 @@ public class MongoRules {
 
             }
 
+        }
+
+
+        private BsonValue visitCall( Implementor implementor, RexCall call, SqlKind op, PolyType type ) {
+            BsonDocument doc = new BsonDocument();
+
+            BsonArray array = new BsonArray();
+            for ( RexNode operand : call.operands ) {
+                if ( operand.getKind() == SqlKind.FIELD_ACCESS ) {
+                    String physicalName = "$" + implementor.getPhysicalName( ((RexFieldAccess) operand).getField().getName() );
+                    array.add( new BsonString( physicalName ) );
+                } else if ( operand instanceof RexCall ) {
+                    array.add( visitCall( implementor, (RexCall) operand, ((RexCall) operand).op.getKind(), type ) );
+                } else if ( operand.getKind() == SqlKind.LITERAL ) {
+                    array.add( MongoTypeUtil.getAsBson( ((RexLiteral) operand).getValueAs( MongoTypeUtil.getClassFromType( type ) ), type, implementor.mongoTable.getMongoSchema().getBucket() ) );
+                } else if ( operand.getKind() == SqlKind.DYNAMIC_PARAM ) {
+                    array.add( new BsonDynamic( ((RexDynamicParam) operand).getIndex(), operand.getType().getPolyType().getTypeName() ) );
+                } else {
+                    throw new RuntimeException( "Not implemented yet" );
+                }
+            }
+            if ( op == SqlKind.PLUS ) {
+                doc.append( "$add", array );
+            } else if ( op == SqlKind.MINUS ) {
+                doc.append( "$subtract", array );
+            } else {
+                throw new RuntimeException( "Not implemented yet" );
+            }
+
+            return doc;
         }
 
 

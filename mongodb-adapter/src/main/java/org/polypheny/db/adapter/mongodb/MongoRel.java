@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.Getter;
 import lombok.Setter;
+import org.bson.BsonDocument;
 import org.polypheny.db.adapter.mongodb.util.MongoPair;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogTable;
@@ -72,10 +73,11 @@ public interface MongoRel extends RelNode {
     class Implementor {
 
         final List<Pair<String, String>> list = new ArrayList<>();
-        public String filter = "";
+        public String filter = new BsonDocument().toJson();
         public List<String> operations = new ArrayList<>();
         public List<Integer> nullFields = new ArrayList<>();
-        public List<MongoPair<String, Long, String>> dynamicConditions = new ArrayList<>();
+        //public List<MongoPair<String, Long, String>> dynamicConditions = new ArrayList<>();
+        public BsonDocument dynamicConditions = new BsonDocument();
         public List<MongoPair<String, Object, String>> staticConditions = new ArrayList<>();
 
         RelOptTable table;
@@ -148,6 +150,30 @@ public interface MongoRel extends RelNode {
                     .range( 0, table.columnIds.size() )
                     .boxed()
                     .collect( Collectors.toMap( key -> table.getColumnNames().get( key ), physicalNames::get ) );
+
+
+        }
+
+
+        public String getPhysicalName( String name ) {
+            int index = mongoTable.getCatalogTable().getColumnNames().indexOf( name );
+            if ( index != -1 ) {
+                return MongoStore.getPhysicalColumnName( mongoTable.getCatalogTable().columnIds.get( index ) );
+            }
+            throw new RuntimeException( "This column is not part of the table." );
+        }
+
+
+        public String getMergedConditions() {
+            BsonDocument doc = new BsonDocument();
+            for ( Pair<String, String> pair : list ) {
+                doc.putAll( BsonDocument.parse( pair.right ) );
+            }
+
+            doc.putAll( BsonDocument.parse( filter ) );
+            doc.putAll( dynamicConditions );
+
+            return doc.toJson();
 
 
         }

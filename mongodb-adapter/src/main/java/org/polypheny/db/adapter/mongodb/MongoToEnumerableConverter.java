@@ -87,7 +87,7 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
     @Override
     public RelOptCost computeSelfCost( RelOptPlanner planner, RelMetadataQuery mq ) {
         // TODO DL: on mixed placements this enumerable is us used for wrong tables if cost is not adjusted
-        return super.computeSelfCost( planner, mq ).multiplyBy( .15 );
+        return super.computeSelfCost( planner, mq ).multiplyBy( .1 );
     }
 
 
@@ -184,9 +184,10 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         Expression enumerable;
         if ( !mongoImplementor.isDML() ) {
             if ( mongoImplementor.dynamicConditions.size() > 0 ) {
-                Expression dynamics = list.append( "dynamics", constantArrayList( mongoImplementor.dynamicConditions.stream().map( MongoPair::asEntry ).collect( Collectors.toList() ), Pair.class ) );
+                //Expression dynamics = list.append( "dynamics", Expressions.constant( mongoImplementor.dynamicConditions.toJson(), String.class ) );
+
                 Expression statics = list.append( "statics", constantArrayList( mongoImplementor.staticConditions.stream().map( MongoPair::asEntry ).collect( Collectors.toList() ), Pair.class ) );
-                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE_PREPARED.method, fields, arrayClassFields, ops, statics, dynamics ) );
+                enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE_PREPARED.method, fields, arrayClassFields, ops, statics ) );
             } else {
                 enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, arrayClassFields, ops ) );
             }
@@ -201,7 +202,6 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
 
                 Expression arrayClasses = list.append( "arrayClasses", Expressions.constant( mongoImplementor.arrayClasses, Map.class ) );
                 Expression physicalNames = list.append( "physicalNames", Expressions.constant( mongoImplementor.getLogicalPhysicalNameMapping(), Map.class ) );
-                //Expression b = list.append( "t", Expressions.constant( new BigDecimal( "3.3" ), BigDecimal.class ) );
                 enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.PREPARED_EXECUTE.method, data, nullFields, physicalNames, dynamicFields, staticFields, arrayFields, arrayClasses ) );
             } else {
                 // DIRECT INSERTS WHICH ARE ALREADY PREPARED
