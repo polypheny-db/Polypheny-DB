@@ -35,7 +35,6 @@ package org.polypheny.db.adapter.mongodb;
 
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -74,7 +73,6 @@ public interface MongoRel extends RelNode {
         final List<Pair<String, String>> list = new ArrayList<>();
         public String filter = new BsonDocument().toJson();
         public List<String> operations = new ArrayList<>();
-        public List<Integer> nullFields = new ArrayList<>();
         public BsonDocument dynamicConditions = new BsonDocument();
 
         RelOptTable table;
@@ -83,9 +81,6 @@ public interface MongoRel extends RelNode {
         @Setter
         @Getter
         private boolean isDML;
-        @Setter
-        @Getter
-        private boolean isPrepared;
 
         @Getter
         @Setter
@@ -94,13 +89,6 @@ public interface MongoRel extends RelNode {
         @Getter
         @Setter
         List<Object> results;
-        @Getter
-        final Map<Integer, Object> dynamicFields = new HashMap<>();
-        @Getter
-        final Map<Integer, Object> staticFields = new HashMap<>();
-        @Getter
-        final Map<Integer, Object> arrayFields = new HashMap<>();
-        final Map<Integer, Object> arrayClasses = new HashMap<>();
 
         @Getter
         private RelRecordType staticRowType;

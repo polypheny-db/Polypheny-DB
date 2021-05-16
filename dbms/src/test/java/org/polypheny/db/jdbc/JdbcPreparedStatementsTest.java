@@ -543,6 +543,8 @@ public class JdbcPreparedStatementsTest {
                             ImmutableList.of( 4, 5 ) ) );
                     preparedInsert.execute();
 
+                    connection.commit();
+
                     PreparedStatement preparedSelect = connection.prepareStatement( "SELECT tinteger,tintarr FROM psarrtest WHERE tinteger < ?" );
                     preparedSelect.setInt( 1, 3 );
                     TestHelper.checkResultSet(

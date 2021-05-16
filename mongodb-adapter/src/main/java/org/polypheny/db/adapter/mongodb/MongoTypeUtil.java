@@ -122,60 +122,46 @@ public class MongoTypeUtil {
     public static BsonValue getAsBson( RexLiteral literal, GridFSBucket bucket ) {
         return getAsBson( literal.getValue3(), literal.getTypeName(), bucket );
     }
-    
-    /*public static BsonValue getAsBson( Object obj, GridFSBucket bucket ) {
-        if ( obj == null ) {
-            return new BsonNull();
-        } else if ( obj instanceof String ) {
-            return new BsonString( (String) obj );
-        } else if ( obj instanceof Integer ) {
-            return new BsonInt32( (Integer) obj );
-        } else if ( obj instanceof Long ) {
-            return new BsonInt64( (Long) obj );
-        } else if ( obj instanceof BigDecimal ) {
-            return new BsonDecimal128( new Decimal128( (BigDecimal) obj ) );
-        } else if ( obj instanceof Double ) {
-            return new BsonDouble( (Double) obj );
-        } else if ( obj instanceof Timestamp ) {
-            return new BsonInt64( ((Timestamp) obj).getTime() );
-        } else if ( obj instanceof Time ) {
-            return new BsonInt64( ((Time) obj).getTime() );
-        } else if ( obj instanceof Date ) {
-            return new BsonInt64( ((Date) obj).toLocalDate().toEpochDay() );
-        } else if ( obj instanceof Boolean ) {
-            return new BsonBoolean( (Boolean) obj );
-        } else if ( obj instanceof ByteString ) {
-            return new BsonString( ((ByteString) obj).toBase64String() );
-        } else if ( obj instanceof InputStream ) {
-            // the object is a file which need to be handle specially
-            ObjectId id = bucket.uploadFromStream( "test", (PushbackInputStream) obj );
-            return new BsonDocument().append( "_id", new BsonString( id.toString() ) );
-        } else {
-            return new BsonString( obj.toString() );
-        }
-    }*/
 
 
-    public static String getAsString( Object obj ) {
-        if ( obj == null ) {
-            return "{}";
-        } else if ( obj instanceof String ) {
-            return "\"" + obj + "\"";
-        } else if ( obj instanceof BigDecimal ) {
-            return "NumberDecimal(\"" + obj + "\")";
-        } else if ( obj instanceof ByteString ) {
-            return ((ByteString) obj).toBase64String();
-        } else if ( obj instanceof Timestamp ) {
-            return String.valueOf( ((Timestamp) obj).toInstant().toEpochMilli() + 3600000 );
-        } else if ( obj instanceof Time ) {
-            return String.valueOf( ((Time) obj).toLocalTime().toNanoOfDay() / 1000000 );
-        } else if ( obj instanceof Date ) {
-            return String.valueOf( ((Date) obj).toLocalDate().toEpochDay() );
-        } else {
-            return obj.toString();
+    static Comparable<?> getMongoComparable( PolyType finalType, RexLiteral el ) {
+        switch ( finalType ) {
+
+            case BOOLEAN:
+                return el.getValueAs( Boolean.class );
+            case TINYINT:
+                return el.getValueAs( Byte.class );
+            case SMALLINT:
+                return el.getValueAs( Short.class );
+            case INTEGER:
+                return el.getValueAs( Integer.class );
+            case BIGINT:
+                return el.getValueAs( Long.class );
+            case DECIMAL:
+                return el.getValueAs( BigDecimal.class ).toString();
+            case FLOAT:
+            case REAL:
+                return el.getValueAs( Float.class );
+            case DOUBLE:
+                return el.getValueAs( Double.class );
+            case DATE:
+            case TIME:
+                return el.getValueAs( Integer.class );
+            case TIMESTAMP:
+                return el.getValueAs( Long.class );
+            case CHAR:
+            case VARCHAR:
+                return el.getValueAs( String.class );
+            case GEOMETRY:
+            case FILE:
+            case IMAGE:
+            case VIDEO:
+            case SOUND:
+                return el.getValueAs( ByteString.class ).toBase64String();
+            default:
+                return el.getValue();
         }
     }
-
 
     public static BsonArray getBsonArray( RexCall call, GridFSBucket bucket ) {
         BsonArray array = new BsonArray();

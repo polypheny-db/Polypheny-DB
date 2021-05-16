@@ -20,6 +20,8 @@ import lombok.Getter;
 import org.bson.BsonDocument;
 import org.bson.BsonInt64;
 import org.bson.BsonString;
+import org.polypheny.db.rex.RexDynamicParam;
+import org.polypheny.db.type.PolyType;
 
 public class BsonDynamic extends BsonDocument {
 
@@ -38,6 +40,14 @@ public class BsonDynamic extends BsonDocument {
         this.polyTypeName = polyTypeName;
         append( "_dyn", new BsonInt64( id ) );
         append( "_type", new BsonString( polyTypeName ) );
+    }
+
+
+    public BsonDynamic( RexDynamicParam rexNode ) {
+        this( rexNode.getIndex(),
+                rexNode.getType().getPolyType() == PolyType.ARRAY
+                        ? rexNode.getType().getComponentType().getPolyType().getTypeName()
+                        : rexNode.getType().getPolyType().getTypeName() );
     }
 
 }

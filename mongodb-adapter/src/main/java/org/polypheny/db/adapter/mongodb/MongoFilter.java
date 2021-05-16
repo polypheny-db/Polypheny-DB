@@ -342,14 +342,14 @@ public class MongoFilter extends Filter implements MongoRel {
                                     new BsonDocument()
                                             .append(
                                                     getPhysicalName( (RexInputRef) left ),
-                                                    new BsonDynamic( right.getIndex(), right.getType().getPolyType().getTypeName() ) ) );
+                                                    new BsonDynamic( right ) ) );
                 } else {
                     this.dynamics
                             .add(
                                     new BsonDocument()
                                             .append(
                                                     getPhysicalName( (RexInputRef) left ),
-                                                    new BsonDocument().append( op, new BsonDynamic( right.getIndex(), right.getType().getPolyType().getTypeName() ) ) ) );
+                                                    new BsonDocument().append( op, new BsonDynamic( right ) ) ) );
                 }
                 //this.dynamics.add( new MongoPair<>( getPhysicalName( (RexInputRef) left ), right.getIndex(), op ) );
             }
