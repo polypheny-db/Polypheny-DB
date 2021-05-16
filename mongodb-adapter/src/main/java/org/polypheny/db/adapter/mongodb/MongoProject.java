@@ -121,7 +121,9 @@ public class MongoProject extends Project implements MongoRel {
 
             }
 
-            items.add( expr.equals( "'$" + name + "'" )
+            String[] splits = name.split( "\\." );
+            String parsedName = splits[splits.length - 1];
+            items.add( expr.equals( "'$" + parsedName + "'" )
                     ? MongoRules.maybeQuote( name ) + ": " + phyName//1"
                     : MongoRules.maybeQuote( name ) + ": " + expr );
         }

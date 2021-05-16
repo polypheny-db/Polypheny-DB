@@ -103,7 +103,6 @@ public class MongoFilter extends Filter implements MongoRel {
         String match = translator.translateMatch( condition, implementor.isDML() );
 
         if ( translator.dynamics.size() > 0 ) {
-            //implementor.dynamicConditions.putAll( translator.dynamics );
             // we merge the dynamic BsonDocument with the static conditions
             implementor.dynamicConditions = new BsonDocument().append( "$or", translator.dynamics );
             if ( !implementor.isDML() ) {

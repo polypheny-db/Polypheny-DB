@@ -39,6 +39,11 @@ public class MongoRowType extends RelRecordType {
 
 
     public Long getId( String name ) {
+        if ( name.contains( "." ) ) {
+            String[] splits = name.split( "\\." );
+            return nameToId.get( splits[splits.length - 1] );
+        }
+
         return nameToId.get( name );
     }
 

@@ -177,6 +177,7 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
 
         final Expression table = list.append( "table", mongoImplementor.table.getExpression( MongoTable.MongoQueryable.class ) );
         List<String> opList = Pair.right( mongoImplementor.list );
+
         final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );
         Expression enumerable;
         if ( !mongoImplementor.isDML() ) {

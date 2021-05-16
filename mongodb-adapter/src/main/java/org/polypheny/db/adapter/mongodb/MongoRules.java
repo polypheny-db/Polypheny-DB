@@ -551,14 +551,6 @@ public class MongoRules {
                     }
                     BsonDocument update = new BsonDocument().append( "$set", doc );
 
-                    //implementor.filter = condImplementor.getMergedConditions();
-
-                    /*if ( condImplementor.list.size() == 1 ) {
-                        implementor.filter = condImplementor.list.get( 0 ).right;
-                    } else {
-                        implementor.filter = new BsonDocument().toJson();
-                    }*/
-
                     implementor.operations = Collections.singletonList( update.toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() ) );
 
                     break;
@@ -708,46 +700,6 @@ public class MongoRules {
             }
             throw new RuntimeException( "The given RexCall could not be transformed correctly." );
         }
-
-
-        /*private Comparable<?> getMongoComparable( PolyType finalType, RexLiteral el ) {
-            switch ( finalType ) {
-
-                case BOOLEAN:
-                    return el.getValueAs( Boolean.class );
-                case TINYINT:
-                    return el.getValueAs( Byte.class );
-                case SMALLINT:
-                    return el.getValueAs( Short.class );
-                case INTEGER:
-                    return el.getValueAs( Integer.class );
-                case BIGINT:
-                    return el.getValueAs( Long.class );
-                case DECIMAL:
-                    return el.getValueAs( BigDecimal.class ).toString();
-                case FLOAT:
-                case REAL:
-                    return el.getValueAs( Float.class );
-                case DOUBLE:
-                    return el.getValueAs( Double.class );
-                case DATE:
-                case TIME:
-                    return el.getValueAs( Integer.class );
-                case TIMESTAMP:
-                    return el.getValueAs( Long.class );
-                case CHAR:
-                case VARCHAR:
-                    return el.getValueAs( String.class );
-                case GEOMETRY:
-                case FILE:
-                case IMAGE:
-                case VIDEO:
-                case SOUND:
-                    return el.getValueAs( ByteString.class ).toBase64String();
-                default:
-                    return el.getValue();
-            }
-        }*/
 
 
         private void handleDirectInsert( Implementor implementor, MongoValues values ) {

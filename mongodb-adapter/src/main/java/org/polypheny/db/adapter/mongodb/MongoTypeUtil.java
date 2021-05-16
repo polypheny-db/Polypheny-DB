@@ -67,9 +67,15 @@ public class MongoTypeUtil {
                 value = new BsonDecimal128( new Decimal128( new BigDecimal( String.valueOf( obj ) ) ) );
             }
         } else if ( type == PolyType.TINYINT ) {
-            value = new BsonInt32( (Byte) obj );
+            if ( obj instanceof Long ) {
+                value = new BsonInt32( Math.toIntExact( (Long) obj ) );
+            } else {
+                value = new BsonInt32( (Byte) obj );
+            }
         } else if ( type == PolyType.SMALLINT ) {
-            if ( obj instanceof Integer ) {
+            if ( obj instanceof Long ) {
+                value = new BsonInt32( Math.toIntExact( (Long) obj ) );
+            } else if ( obj instanceof Integer ) {
                 value = new BsonInt32( (Integer) obj );
             } else {
                 value = new BsonInt32( (Short) obj );
@@ -120,11 +126,15 @@ public class MongoTypeUtil {
 
 
     public static BsonValue getAsBson( RexLiteral literal, GridFSBucket bucket ) {
-        return getAsBson( literal.getValue3(), literal.getTypeName(), bucket );
+        return getAsBson( getMongoComparable( literal.getType().getPolyType(), literal ), literal.getType().getPolyType(), bucket );
     }
 
 
     static Comparable<?> getMongoComparable( PolyType finalType, RexLiteral el ) {
+        if ( el.getValue() == null ) {
+            return null;
+        }
+
         switch ( finalType ) {
 
             case BOOLEAN:
@@ -162,6 +172,7 @@ public class MongoTypeUtil {
                 return el.getValue();
         }
     }
+
 
     public static BsonArray getBsonArray( RexCall call, GridFSBucket bucket ) {
         BsonArray array = new BsonArray();

@@ -59,6 +59,8 @@ import org.bson.BsonDocument;
 import org.bson.BsonString;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.bson.json.JsonMode;
+import org.bson.json.JsonWriterSettings;
 import org.polypheny.db.adapter.AdapterManager;
 import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.java.AbstractQueryableTable;
@@ -400,7 +402,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                         for ( Map<Long, Object> parameterValue : dataContext.getParameterValues() ) {
                             List<Document> docs = operations.stream()
                                     .map( op -> MongoDynamicUtil.initReplace( BsonDocument.parse( op ), parameterValue, bucket ) )
-                                    .map( parsed -> Document.parse( parsed.toJson() ) ).collect( Collectors.toList() );
+                                    .map( parsed -> Document.parse( parsed.toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() ) ) ).collect( Collectors.toList() );
                             mongoTable.getCollection().insertMany( session, docs );
                             changes += docs.size();
                         }
@@ -424,6 +426,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                         for ( Map<Long, Object> parameterValue : dataContext.getParameterValues() ) {
                             BsonDocument parsedFilter = MongoDynamicUtil.initReplace( BsonDocument.parse( filter ), parameterValue, mongoTable.getMongoSchema().getBucket() );
                             BsonDocument parsedDoc = MongoDynamicUtil.initReplace( doc.clone(), parameterValue, mongoTable.getMongoSchema().getBucket() );
+
                             changes += mongoTable.getCollection().updateMany( session, parsedFilter, Collections.singletonList( parsedDoc ) ).getModifiedCount();
                         }
                     } else {
