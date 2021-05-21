@@ -34,19 +34,16 @@
 package org.polypheny.db.adapter.mongodb;
 
 
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
+import com.mongodb.client.gridfs.GridFSBucket;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
+import org.bson.BsonString;
+import org.bson.BsonValue;
 import org.polypheny.db.adapter.mongodb.bson.BsonDynamic;
+import org.polypheny.db.adapter.mongodb.util.MongoTypeUtil;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptCost;
 import org.polypheny.db.plan.RelOptPlanner;
@@ -62,7 +59,6 @@ import org.polypheny.db.rex.RexLiteral;
 import org.polypheny.db.rex.RexNode;
 import org.polypheny.db.sql.SqlKind;
 import org.polypheny.db.util.JsonBuilder;
-import org.polypheny.db.util.Pair;
 
 
 /**
@@ -96,13 +92,13 @@ public class MongoFilter extends Filter implements MongoRel {
         // to not break the existing functionality for now we have to handle it this way
         Translator translator = null;
         if ( implementor.getStaticRowType() != null && implementor.getStaticRowType() instanceof MongoRowType ) {
-            translator = new Translator( MongoRules.mongoFieldNames( getRowType() ), (MongoRowType) implementor.getStaticRowType() );
+            translator = new Translator( MongoRules.mongoFieldNames( getRowType() ), (MongoRowType) implementor.getStaticRowType(), implementor.getBucket() );
         } else {
-            translator = new Translator( MongoRules.mongoFieldNames( getRowType() ) );
+            translator = new Translator( MongoRules.mongoFieldNames( getRowType() ), implementor.getBucket() );
         }
-        String match = translator.translateMatch( condition, implementor.isDML() );
+        translator.translateMatch( condition, implementor, implementor.isDML() );
 
-        if ( translator.dynamics.size() > 0 ) {
+        /*if ( translator.dynamics.size() > 0 ) {
             // we merge the dynamic BsonDocument with the static conditions
             implementor.dynamicConditions = new BsonDocument().append( "$or", translator.dynamics );
             if ( !implementor.isDML() ) {
@@ -110,8 +106,9 @@ public class MongoFilter extends Filter implements MongoRel {
             }
             implementor.filter = implementor.dynamicConditions.toJson();
             match = implementor.filter;
-        }
-        implementor.add( null, match );
+        }*/
+        //implementor.add( null, match );
+
     }
 
 
@@ -121,50 +118,42 @@ public class MongoFilter extends Filter implements MongoRel {
     static class Translator {
 
         final JsonBuilder builder = new JsonBuilder();
-        final Multimap<String, Pair<String, RexLiteral>> multimap = HashMultimap.create();
-        final Map<String, RexLiteral> eqMap = new LinkedHashMap<>();
         private final List<String> fieldNames;
         private final MongoRowType rowType;
-        private final Map<String, List<RexNode>> arrayMap = new HashMap<>();
         private final BsonArray dynamics = new BsonArray();
+        private final GridFSBucket bucket;
 
 
-        Translator( List<String> fieldNames ) {
-            this( fieldNames, null );
+        Translator( List<String> fieldNames, GridFSBucket bucket ) {
+            this( fieldNames, null, bucket );
         }
 
 
-        Translator( List<String> fieldNames, MongoRowType rowType ) {
+        Translator( List<String> fieldNames, MongoRowType rowType, GridFSBucket bucket ) {
             this.builder.setMongo( true );
             this.fieldNames = fieldNames;
             this.rowType = rowType;
+            this.bucket = bucket;
         }
 
 
-        private String translateMatch( RexNode condition, boolean isDDL ) {
-            if ( !isDDL ) {
-                Map<String, Object> map = builder.map();
-                map.put( "$match", translateOr( condition ) );
-                return builder.toJsonString( map );
-            } else {
-                // TODO DL: kinda hacky maybe need to implement cleaner in the future
-                return builder.toJsonString( translateOr( condition ) );
-            }
+        private void translateMatch( RexNode condition, Implementor implementor, boolean isDDL ) {
+            implementor.filter.add( translateOr( condition ) );
         }
 
 
-        private Object translateOr( RexNode condition ) {
-            List<Object> list = new ArrayList<>();
+        private BsonValue translateOr( RexNode condition ) {
             for ( RexNode node : RelOptUtil.disjunctions( condition ) ) {
-                list.add( translateAnd( node ) );
+                translateAnd( node );
             }
-            switch ( list.size() ) {
+
+            switch ( dynamics.size() ) {
+                case 0:
+                    return new BsonDocument();
                 case 1:
-                    return list.get( 0 );
+                    return dynamics.get( 0 );
                 default:
-                    Map<String, Object> map = builder.map();
-                    map.put( "$or", list );
-                    return map;
+                    return new BsonDocument( "$or", dynamics );
             }
         }
 
@@ -172,29 +161,10 @@ public class MongoFilter extends Filter implements MongoRel {
         /**
          * Translates a condition that may be an AND of other conditions. Gathers together conditions that apply to the same field.
          */
-        private Map<String, Object> translateAnd( RexNode node0 ) {
-            eqMap.clear();
-            multimap.clear();
+        private void translateAnd( RexNode node0 ) {
             for ( RexNode node : RelOptUtil.conjunctions( node0 ) ) {
                 translateMatch2( node );
             }
-            Map<String, Object> map = builder.map();
-            for ( Map.Entry<String, RexLiteral> entry : eqMap.entrySet() ) {
-                multimap.removeAll( entry.getKey() );
-                map.put( entry.getKey(), literalValue( entry.getValue() ) );
-            }
-            for ( Map.Entry<String, Collection<Pair<String, RexLiteral>>> entry : multimap.asMap().entrySet() ) {
-                Map<String, Object> map2 = builder.map();
-                for ( Pair<String, RexLiteral> s : entry.getValue() ) {
-                    addPredicate( map2, s.left, literalValue( s.right ) );
-                }
-                map.put( entry.getKey(), map2 );
-            }
-            for ( Entry<String, List<RexNode>> entry : arrayMap.entrySet() ) {
-                map.put( entry.getKey(), entry.getValue().stream().map( el -> literalValue( (RexLiteral) el ) ).collect( Collectors.toList() ) );
-            }
-
-            return map;
         }
 
 
@@ -227,11 +197,6 @@ public class MongoFilter extends Filter implements MongoRel {
         }
 
 
-        private static Object literalValue( RexLiteral literal ) {
-            return literal.getValue3();
-        }
-
-
         private Void translateMatch2( RexNode node ) {
             switch ( node.getKind() ) {
                 case EQUALS:
@@ -246,9 +211,52 @@ public class MongoFilter extends Filter implements MongoRel {
                     return translateBinary( "$gt", "$lt", (RexCall) node );
                 case GREATER_THAN_OR_EQUAL:
                     return translateBinary( "$gte", "$lte", (RexCall) node );
+                case LIKE:
+                    return translateLike( (RexCall) node );
                 default:
                     throw new AssertionError( "cannot translate " + node );
             }
+        }
+
+
+        private Void translateLike( RexCall call ) {
+            final RexNode left = call.operands.get( 0 );
+            final RexNode right = call.operands.get( 1 );
+
+            switch ( right.getKind() ) {
+                case DYNAMIC_PARAM:
+                    this.dynamics.add(
+                            new BsonDocument()
+                                    .append(
+                                            getPhysicalName( (RexInputRef) left ),
+                                            new BsonDynamic( (RexDynamicParam) right, true ) ) );
+                    return null;
+                case LITERAL:
+                    String reg = ((RexLiteral) right).getValueAs( String.class );
+
+                    if ( !reg.startsWith( "%" ) ) {
+                        reg = "^" + reg;
+                    }
+
+                    if ( !reg.endsWith( "%" ) ) {
+                        reg = reg + "$";
+                    }
+
+                    reg = reg
+                            .replace( "_", "." )
+                            .replace( "%", ".*" );
+
+                    this.dynamics.add( new BsonDocument(
+                            getPhysicalName( (RexInputRef) left ),
+                            new BsonDocument()
+                                    .append( "$regex", new BsonString( reg ) )
+                                    // Polypheny is case insensitive and therefore we have to set the "i" option
+                                    .append( "$options", new BsonString( "i" ) ) ) );
+                    return null;
+                default:
+                    throw new IllegalStateException( "Unexpected value: " + right.getKind() );
+            }
+
         }
 
 
@@ -282,7 +290,7 @@ public class MongoFilter extends Filter implements MongoRel {
             if ( right instanceof RexCall && left instanceof RexInputRef ) {
                 // $9 ( index ) -> [el1, el2]
                 String name = getPhysicalName( (RexInputRef) left );
-                arrayMap.put( name, ((RexCall) right).operands );
+                dynamics.add( new BsonDocument( name, new BsonArray( ((RexCall) right).operands.stream().map( el -> MongoTypeUtil.getAsBson( (RexLiteral) el, null ) ).collect( Collectors.toList() ) ) ) );
 
                 return true;
             } else if ( right instanceof RexCall && left instanceof RexLiteral ) {
@@ -290,8 +298,7 @@ public class MongoFilter extends Filter implements MongoRel {
                 String name = getPhysicalName( (RexInputRef) ((RexCall) right).operands.get( 0 ) );
                 // we have to adjust as mongodb arrays start at 0 and sql at 1
                 int pos = ((RexLiteral) ((RexCall) right).operands.get( 1 )).getValueAs( Integer.class ) - 1;
-
-                eqMap.put( name + "." + pos, (RexLiteral) left );
+                translateOp2( null, name + "." + pos, (RexLiteral) left );
 
                 return true;
             }
@@ -350,7 +357,6 @@ public class MongoFilter extends Filter implements MongoRel {
                                                     getPhysicalName( (RexInputRef) left ),
                                                     new BsonDocument().append( op, new BsonDynamic( right ) ) ) );
                 }
-                //this.dynamics.add( new MongoPair<>( getPhysicalName( (RexInputRef) left ), right.getIndex(), op ) );
             }
         }
 
@@ -368,11 +374,9 @@ public class MongoFilter extends Filter implements MongoRel {
         private void translateOp2( String op, String name, RexLiteral right ) {
             if ( op == null ) {
                 // E.g.: {deptno: 100}
-                eqMap.put( name, right );
                 dynamics.add( new BsonDocument().append( name, MongoTypeUtil.getAsBson( right, null ) ) );
             } else {
                 // E.g. {deptno: {$lt: 100}} which may later be combined with other conditions: E.g. {deptno: [$lt: 100, $gt: 50]}
-                multimap.put( name, Pair.of( op, right ) );
                 dynamics.add( new BsonDocument().append( name, new BsonDocument().append( op, MongoTypeUtil.getAsBson( right, null ) ) ) );
             }
         }

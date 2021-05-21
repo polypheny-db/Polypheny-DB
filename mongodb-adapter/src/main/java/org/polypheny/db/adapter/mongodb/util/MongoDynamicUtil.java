@@ -17,56 +17,143 @@
 package org.polypheny.db.adapter.mongodb.util;
 
 import com.mongodb.client.gridfs.GridFSBucket;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.function.Function;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
 import org.bson.BsonValue;
-import org.polypheny.db.adapter.mongodb.MongoTypeUtil;
+import org.bson.Document;
+import org.bson.json.JsonMode;
+import org.bson.json.JsonWriterSettings;
 import org.polypheny.db.type.PolyType;
 
 public class MongoDynamicUtil {
 
 
-    public static BsonValue replaceDynamic( BsonValue preDocument, Map<Long, Object> parameterValues, GridFSBucket bucket ) {
+    private final HashMap<Long, List<DocWrapper>> docHandles = new HashMap<>(); // parent, key,
+    private final HashMap<Long, List<ArrayWrapper>> arrayHandles = new HashMap<>(); // parent, index,
+    private final HashMap<Long, Function<Object, BsonValue>> transformerMap = new HashMap<>();
+    private final GridFSBucket bucket;
+    private final BsonDocument document;
+
+
+    public MongoDynamicUtil( BsonDocument preDocument, GridFSBucket bucket ) {
+        this.document = preDocument;
+        this.bucket = bucket;
+        preDocument.forEach( ( k, bsonValue ) -> replaceDynamic( bsonValue, preDocument, k, true, bucket ) );
+    }
+
+
+    public void replaceDynamic( BsonValue preDocument, BsonValue parent, Object key, boolean isDoc, GridFSBucket bucket ) {
         if ( preDocument instanceof BsonDocument ) {
             if ( ((BsonDocument) preDocument).containsKey( "_dyn" ) ) {
                 // prepared
                 BsonValue bsonIndex = ((BsonDocument) preDocument).get( "_dyn" );
-                long index;
+                long pos;
                 if ( bsonIndex.isInt64() ) {
-                    index = bsonIndex.asInt64().getValue();
+                    pos = bsonIndex.asInt64().getValue();
                 } else {
-                    index = bsonIndex.asInt32().getValue();
+                    pos = bsonIndex.asInt32().getValue();
                 }
-                String polyTypeName = ((BsonDocument) preDocument).get( "_type" ).asString().getValue();
+                PolyType polyTyp = PolyType.valueOf( ((BsonDocument) preDocument).get( "_type" ).asString().getValue() );
 
-                return MongoTypeUtil.getAsBson( parameterValues.get( index ), PolyType.valueOf( polyTypeName ), bucket );
+                if ( isDoc ) {
+                    addHandle( pos, (BsonDocument) parent, (String) key, polyTyp );
+                } else {
+                    addHandle( pos, (BsonArray) parent, (int) key, polyTyp );
+                }
 
             } else {
                 // normal
-                BsonDocument doc = new BsonDocument();
-                ((BsonDocument) preDocument).forEach( ( s, bsonValue ) -> doc.append( s, replaceDynamic( bsonValue, parameterValues, bucket ) ) );
-                return doc;
+                ((BsonDocument) preDocument).forEach( ( k, bsonValue ) -> replaceDynamic( bsonValue, preDocument, k, true, bucket ) );
             }
         } else if ( preDocument instanceof BsonArray ) {
-            BsonArray array = new BsonArray();
-            ((BsonArray) preDocument).forEach( bsonValue -> array.add( replaceDynamic( bsonValue, parameterValues, bucket ) ) );
-            return array;
+            int i = 0;
+            for ( BsonValue bsonValue : ((BsonArray) preDocument) ) {
+                replaceDynamic( bsonValue, preDocument, i, false, bucket );
+                i++;
+            }
         }
-
-        return preDocument;
     }
 
 
-    public static BsonDocument initReplace( BsonDocument preDocument, Map<Long, Object> parameterValues, GridFSBucket bucket ) {
-        if ( parameterValues.size() == 0 ) {
-            return preDocument;
+    public void addHandle( long index, BsonDocument doc, String key, PolyType type ) {
+
+        if ( !arrayHandles.containsKey( index ) ) {
+            this.transformerMap.put( index, MongoTypeUtil.getBsonTransformer( type, bucket ) );
+            this.docHandles.put( index, new ArrayList<>() );
+            this.arrayHandles.put( index, new ArrayList<>() );
         }
-        BsonDocument doc = new BsonDocument();
-        preDocument.forEach( (( s, bsonValue ) -> doc.put( s, replaceDynamic( bsonValue, parameterValues, bucket ) )) );
-        return doc;
+        this.docHandles.get( index ).add( new DocWrapper( key, doc ) );
+    }
+
+
+    public void addHandle( long index, BsonArray array, int pos, PolyType type ) {
+        if ( !arrayHandles.containsKey( index ) ) {
+            this.transformerMap.put( index, MongoTypeUtil.getBsonTransformer( type, bucket ) );
+            this.docHandles.put( index, new ArrayList<>() );
+            this.arrayHandles.put( index, new ArrayList<>() );
+        }
+        this.arrayHandles.get( index ).add( new ArrayWrapper( pos, array ) );
+    }
+
+
+    public BsonDocument insert( Map<Long, Object> parameterValues ) {
+        for ( Entry<Long, Object> entry : parameterValues.entrySet() ) {
+            if ( arrayHandles.containsKey( entry.getKey() ) ) {
+                Function<Object, BsonValue> transformer = transformerMap.get( entry.getKey() );
+                arrayHandles.get( entry.getKey() ).forEach( el -> el.insert( transformer.apply( entry.getValue() ) ) );
+                docHandles.get( entry.getKey() ).forEach( el -> el.insert( transformer.apply( entry.getValue() ) ) );
+            }
+        }
+        return document;
+    }
+
+
+    public Document insertAsDoc( Map<Long, Object> parameterValues ) {
+        return Document.parse( insert( parameterValues ).toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() ) );
+    }
+
+
+    static class DocWrapper {
+
+        final String key;
+        final BsonDocument doc;
+
+
+        DocWrapper( String key, BsonDocument doc ) {
+            this.key = key;
+            this.doc = doc;
+        }
+
+
+        public void insert( BsonValue value ) {
+            doc.put( key, value );
+        }
 
     }
 
+
+    static class ArrayWrapper {
+
+        final int index;
+        final BsonArray array;
+
+
+        ArrayWrapper( int index, BsonArray array ) {
+            this.index = index;
+            this.array = array;
+        }
+
+
+        public void insert( BsonValue value ) {
+            array.set( index, value );
+        }
+
+    }
 
 }

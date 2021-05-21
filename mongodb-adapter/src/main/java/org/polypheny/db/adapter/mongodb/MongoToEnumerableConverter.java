@@ -179,11 +179,11 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
         List<String> opList = Pair.right( mongoImplementor.list );
 
         final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );
+        final Expression filter = list.append( "filter", Expressions.constant( mongoImplementor.getFilters(), String.class ) );
         Expression enumerable;
         if ( !mongoImplementor.isDML() ) {
-            enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, arrayClassFields, ops ) );
+            enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, arrayClassFields, ops, filter ) );
         } else {
-            Expression filter = list.append( "filter", Expressions.constant( mongoImplementor.filter, String.class ) );
             Expression operations = list.append( "operations", constantArrayList( mongoImplementor.operations, String.class ) );
             Expression operation = list.append( "operation", Expressions.constant( mongoImplementor.getOperation(), Operation.class ) );
 

@@ -36,6 +36,7 @@ package org.polypheny.db.adapter.mongodb;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.bson.BsonDocument;
 import org.polypheny.db.adapter.java.JavaTypeFactory;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptCost;
@@ -45,7 +46,9 @@ import org.polypheny.db.rel.RelNode;
 import org.polypheny.db.rel.core.Project;
 import org.polypheny.db.rel.metadata.RelMetadataQuery;
 import org.polypheny.db.rel.type.RelDataType;
+import org.polypheny.db.rex.RexCall;
 import org.polypheny.db.rex.RexNode;
+import org.polypheny.db.sql.SqlKind;
 import org.polypheny.db.util.Pair;
 import org.polypheny.db.util.Util;
 
@@ -86,18 +89,26 @@ public class MongoProject extends Project implements MongoRel {
             mongoRowType = ((MongoRowType) implementor.getStaticRowType());
         }
 
+        List<BsonDocument> documents = new ArrayList<>();
+
         for ( Pair<RexNode, String> pair : getNamedProjects() ) {
             final String name = pair.right;
             String phyName = "1";
-            // we can you use a project of [name] : $[physical name] to rename our retrieved columns on aggregation
-            // we have to pay attention to "DUMMY" as it is apparently used for handling aggregates here
-            if ( mongoRowType != null && !name.contains( "$" ) && !name.equals( "DUMMY" ) ) {
-                phyName = "\"$" + mongoRowType.getPhysicalName( name ) + "\"";
+
+            if ( pair.left.getKind() == SqlKind.DISTANCE ) {
+                documents.add( new BsonFunction( (RexCall) pair.left, mongoRowType ) );
+                continue;
             }
 
             String expr = pair.left.accept( translator );
             if ( expr == null ) {
                 continue;
+            }
+
+            // we can you use a project of [name] : $[physical name] to rename our retrieved columns on aggregation
+            // we have to pay attention to "DUMMY" as it is apparently used for handling aggregates here
+            if ( mongoRowType != null && !name.contains( "$" ) && !name.equals( "DUMMY" ) ) {
+                phyName = "\"$" + mongoRowType.getPhysicalName( name ) + "\"";
             }
 
             StringBuilder blankExpr = new StringBuilder( expr.replace( "'", "" ) );
@@ -123,16 +134,31 @@ public class MongoProject extends Project implements MongoRel {
 
             String[] splits = name.split( "\\." );
             String parsedName = splits[splits.length - 1];
+            // mongodb nests . separated names, to prevent this we can use the unicode character \u2024 for "."
+            if ( !expr.equals( "'$" + parsedName + "'" ) && expr.equals( "'$" + name + "'" ) ) {
+                // this would be a projection onto the same field, which does not work with the projection logic
+                continue;
+            }
             items.add( expr.equals( "'$" + parsedName + "'" )
-                    ? MongoRules.maybeQuote( name ) + ": " + phyName//1"
-                    : MongoRules.maybeQuote( name ) + ": " + expr );
+                    ? MongoRules.maybeQuote( replaceDot( name ) ) + ": " + replaceDot( phyName )//1"
+                    : MongoRules.maybeQuote( replaceDot( name ) ) + ": " + expr );
         }
         final String findString = Util.toString( items, "{", ", ", "}" );
         final String aggregateString = "{$project: " + findString + "}";
         final Pair<String, String> op = Pair.of( findString, aggregateString );
-        if ( !implementor.isDML() ) {
+        if ( !implementor.isDML() && items.size() != 0 ) {
             implementor.add( op.left, op.right );
         }
+    }
+
+
+    public static String replaceDot( String name ) {
+        return name.replace( ".", "\\u2024" );
+    }
+
+
+    public static String reverseDot( String name ) {
+        return name.replace( "\\u2024", "." );
     }
 
 }

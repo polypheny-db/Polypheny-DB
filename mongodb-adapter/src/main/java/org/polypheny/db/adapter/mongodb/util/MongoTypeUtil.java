@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.polypheny.db.adapter.mongodb;
+package org.polypheny.db.adapter.mongodb.util;
 
 import com.mongodb.client.gridfs.GridFSBucket;
 import java.io.InputStream;
@@ -24,8 +24,7 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.List;
-import java.util.Objects;
-import lombok.SneakyThrows;
+import java.util.function.Function;
 import org.apache.calcite.avatica.util.ByteString;
 import org.bson.BsonArray;
 import org.bson.BsonBoolean;
@@ -47,7 +46,106 @@ import org.polypheny.db.type.PolyTypeFamily;
 
 public class MongoTypeUtil {
 
-    @SneakyThrows
+    public static Function<Object, BsonValue> getBsonTransformer( PolyType type, GridFSBucket bucket ) {
+        Function<Object, BsonValue> function = getBsonTransformerSpecial( type, bucket );
+        return ( o ) -> {
+            if ( o == null ) {
+                return new BsonNull();
+            } else if ( o instanceof List ) {
+                BsonArray array = new BsonArray();
+                ((List<?>) o).forEach( el -> array.add( getAsBson( el, type, bucket ) ) );
+                return array;
+            } else {
+                return function.apply( o );
+            }
+        };
+    }
+
+
+    private static Function<Object, BsonValue> getBsonTransformerSpecial( PolyType type, GridFSBucket bucket ) {
+        Function<Object, BsonValue> function;
+        if ( type.getFamily() == PolyTypeFamily.CHARACTER ) {
+            function = ( o ) -> new BsonString( o.toString() );
+        } else if ( type == PolyType.BIGINT ) {
+            function = ( o ) -> new BsonInt64( (Long) o );
+        } else if ( type == PolyType.DECIMAL ) {
+            function = ( o ) -> {
+                if ( o instanceof String ) {
+                    return new BsonDecimal128( new Decimal128( new BigDecimal( (String) o ) ) );
+                } else {
+                    return new BsonDecimal128( new Decimal128( new BigDecimal( String.valueOf( o ) ) ) );
+                }
+            };
+
+        } else if ( type == PolyType.TINYINT ) {
+            function = ( o ) -> {
+                if ( o instanceof Long ) {
+                    return new BsonInt32( Math.toIntExact( (Long) o ) );
+                } else {
+                    return new BsonInt32( (Byte) o );
+                }
+            };
+        } else if ( type == PolyType.SMALLINT ) {
+            function = ( o ) -> {
+                if ( o instanceof Long ) {
+                    return new BsonInt32( Math.toIntExact( (Long) o ) );
+                } else if ( o instanceof Integer ) {
+                    return new BsonInt32( (Integer) o );
+                } else {
+                    return new BsonInt32( (Short) o );
+                }
+            };
+
+        } else if ( PolyType.INT_TYPES.contains( type ) ) {
+            function = ( o ) -> new BsonInt32( (Integer) o );
+        } else if ( type == PolyType.FLOAT || type == PolyType.REAL ) {
+            function = ( o ) -> new BsonDouble( Double.parseDouble( o.toString() ) );
+        } else if ( PolyType.FRACTIONAL_TYPES.contains( type ) ) {
+            function = ( o ) -> new BsonDouble( (Double) o );
+        } else if ( type.getFamily() == PolyTypeFamily.DATE ) {
+            function = ( o ) -> {
+                if ( o instanceof Integer ) {
+                    return new BsonInt64( (Integer) o );
+                } else if ( o instanceof Date ) {
+                    return new BsonInt64( ((Date) o).toLocalDate().toEpochDay() );
+                } else {
+                    return new BsonInt64( new Date( ((Time) o).getTime() ).toLocalDate().toEpochDay() );
+                }
+            };
+        } else if ( type.getFamily() == PolyTypeFamily.TIME ) {
+            function = ( o ) -> {
+                if ( o instanceof Integer ) {
+                    return new BsonInt64( ((Integer) o) );
+                } else {
+                    return new BsonInt64( ((Time) o).toLocalTime().toNanoOfDay() / 1000000 );
+                }
+            };
+        } else if ( type.getFamily() == PolyTypeFamily.TIMESTAMP ) {
+            function = ( o ) -> {
+                if ( o instanceof Timestamp ) {
+                    return new BsonInt64( ((Timestamp) o).toInstant().toEpochMilli() + 3600000 );
+                } else {
+                    return new BsonInt64( (Long) o );
+                }
+            };
+        } else if ( type.getFamily() == PolyTypeFamily.BOOLEAN ) {
+            function = ( o ) -> new BsonBoolean( (Boolean) o );
+        } else if ( type.getFamily() == PolyTypeFamily.BINARY ) {
+            function = ( o ) -> new BsonString( ((ByteString) o).toBase64String() );
+        } else if ( PolyTypeFamily.MULTIMEDIA == type.getFamily() ) {
+            function = ( o ) -> {
+                ObjectId id = bucket.uploadFromStream( "_", (InputStream) o );
+                return new BsonDocument()
+                        .append( "_type", new BsonString( "s" ) )
+                        .append( "_id", new BsonString( id.toString() ) );
+            };
+        } else {
+            function = ( o ) -> new BsonString( o.toString() );
+        }
+        return function;
+    }
+
+
     public static BsonValue getAsBson( Object obj, PolyType type, GridFSBucket bucket ) {
         BsonValue value;
         if ( obj instanceof List ) { // TODO DL: reevaluate
@@ -57,7 +155,7 @@ public class MongoTypeUtil {
         } else if ( type == PolyType.NULL || obj == null ) {
             value = new BsonNull();
         } else if ( type.getFamily() == PolyTypeFamily.CHARACTER ) {
-            value = new BsonString( Objects.requireNonNull( obj.toString() ) );
+            value = new BsonString( obj.toString() );
         } else if ( type == PolyType.BIGINT ) {
             value = new BsonInt64( (Long) obj );
         } else if ( type == PolyType.DECIMAL ) {
@@ -130,7 +228,7 @@ public class MongoTypeUtil {
     }
 
 
-    static Comparable<?> getMongoComparable( PolyType finalType, RexLiteral el ) {
+    public static Comparable<?> getMongoComparable( PolyType finalType, RexLiteral el ) {
         if ( el.getValue() == null ) {
             return null;
         }

@@ -46,8 +46,7 @@ import org.polypheny.db.rel.core.TableModify.Operation;
  */
 public enum MongoMethod {
     MONGO_QUERYABLE_FIND( MongoTable.MongoQueryable.class, "find", String.class, String.class, List.class, List.class ),
-    MONGO_QUERYABLE_AGGREGATE( MongoTable.MongoQueryable.class, "aggregate", List.class, List.class, List.class ),
-    //PREPARED_WRAPPER( MongoTable.MongoQueryable.class, "preparedWrapper", DataContext.class ),
+    MONGO_QUERYABLE_AGGREGATE( MongoTable.MongoQueryable.class, "aggregate", List.class, List.class, List.class, String.class ),
     HANDLE_DIRECT_DML( MongoTable.MongoQueryable.class, "handleDirectDML", Operation.class, String.class, List.class );
 
     public final Method method;

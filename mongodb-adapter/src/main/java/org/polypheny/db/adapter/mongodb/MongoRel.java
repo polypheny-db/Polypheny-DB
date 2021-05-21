@@ -34,6 +34,7 @@
 package org.polypheny.db.adapter.mongodb;
 
 
+import com.mongodb.client.gridfs.GridFSBucket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +42,10 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.Getter;
 import lombok.Setter;
+import org.bson.BsonArray;
 import org.bson.BsonDocument;
+import org.bson.json.JsonMode;
+import org.bson.json.JsonWriterSettings;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.plan.Convention;
@@ -71,9 +75,11 @@ public interface MongoRel extends RelNode {
     class Implementor {
 
         final List<Pair<String, String>> list = new ArrayList<>();
-        public String filter = new BsonDocument().toJson();
         public List<String> operations = new ArrayList<>();
-        public BsonDocument dynamicConditions = new BsonDocument();
+        public BsonArray filter = new BsonArray();
+        @Getter
+        @Setter
+        public GridFSBucket bucket;
 
         RelOptTable table;
 
@@ -149,18 +155,17 @@ public interface MongoRel extends RelNode {
         }
 
 
-        public String getMergedConditions() {
-            BsonDocument doc = new BsonDocument();
-            for ( Pair<String, String> pair : list ) {
-                doc.putAll( BsonDocument.parse( pair.right ) );
+        public String getFilters() {
+            BsonDocument filter;
+            if ( this.filter.size() == 1 ) {
+                filter = this.filter.get( 0 ).asDocument();
+            } else if ( this.filter.size() == 0 ) {
+                filter = new BsonDocument();
+            } else {
+                filter = new BsonDocument( "$or", this.filter );
             }
 
-            doc.putAll( BsonDocument.parse( filter ) );
-            doc.putAll( dynamicConditions );
-
-            return doc.toJson();
-
-
+            return filter.toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() );
         }
 
     }

@@ -17,6 +17,7 @@
 package org.polypheny.db.adapter.mongodb.bson;
 
 import lombok.Getter;
+import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
 import org.bson.BsonInt64;
 import org.bson.BsonString;
@@ -28,6 +29,7 @@ public class BsonDynamic extends BsonDocument {
     @Getter
     private final long id;
     private final String polyTypeName;
+    private boolean isRegex;
 
 
     /**
@@ -35,19 +37,31 @@ public class BsonDynamic extends BsonDocument {
      * @param polyTypeName
      */
     public BsonDynamic( long id, String polyTypeName ) {
-        super();
-        this.id = id;
-        this.polyTypeName = polyTypeName;
-        append( "_dyn", new BsonInt64( id ) );
-        append( "_type", new BsonString( polyTypeName ) );
+        this( id, polyTypeName, false );
     }
 
 
     public BsonDynamic( RexDynamicParam rexNode ) {
+        this( rexNode, false );
+    }
+
+
+    public BsonDynamic( RexDynamicParam rexNode, boolean isRegex ) {
         this( rexNode.getIndex(),
                 rexNode.getType().getPolyType() == PolyType.ARRAY
                         ? rexNode.getType().getComponentType().getPolyType().getTypeName()
-                        : rexNode.getType().getPolyType().getTypeName() );
+                        : rexNode.getType().getPolyType().getTypeName(), isRegex );
+    }
+
+
+    public BsonDynamic( long id, String polyTypeName, boolean isRegex ) {
+        super();
+        this.id = id;
+        this.polyTypeName = polyTypeName;
+        this.isRegex = isRegex;
+        append( "_dyn", new BsonInt64( id ) );
+        append( "_type", new BsonString( polyTypeName ) );
+        append( "_reg", new BsonBoolean( false ) );
     }
 
 }

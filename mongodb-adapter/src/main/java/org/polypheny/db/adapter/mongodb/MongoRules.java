@@ -54,6 +54,7 @@ import org.polypheny.db.adapter.enumerable.RexImpTable;
 import org.polypheny.db.adapter.enumerable.RexToLixTranslator;
 import org.polypheny.db.adapter.java.JavaTypeFactory;
 import org.polypheny.db.adapter.mongodb.bson.BsonDynamic;
+import org.polypheny.db.adapter.mongodb.util.MongoTypeUtil;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptCluster;
@@ -570,7 +571,7 @@ public class MongoRules {
                     } else {
                         // TODO DL: evaluate if this is even possible
                     }
-                    implementor.filter = docString;
+                    implementor.filter = filterCollector.filter;
                 }
 
             }
