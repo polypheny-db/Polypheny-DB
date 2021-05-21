@@ -39,20 +39,22 @@ public class MongoDynamicUtil {
     private final HashMap<Long, Function<Object, BsonValue>> transformerMap = new HashMap<>();
     private final GridFSBucket bucket;
     private final BsonDocument document;
+    private final HashMap<Long, Boolean> isRegexMap = new HashMap<>();
 
 
     public MongoDynamicUtil( BsonDocument preDocument, GridFSBucket bucket ) {
         this.document = preDocument;
         this.bucket = bucket;
-        preDocument.forEach( ( k, bsonValue ) -> replaceDynamic( bsonValue, preDocument, k, true, bucket ) );
+        preDocument.forEach( ( k, bsonValue ) -> replaceDynamic( bsonValue, preDocument, k, true ) );
     }
 
 
-    public void replaceDynamic( BsonValue preDocument, BsonValue parent, Object key, boolean isDoc, GridFSBucket bucket ) {
+    public void replaceDynamic( BsonValue preDocument, BsonValue parent, Object key, boolean isDoc ) {
         if ( preDocument instanceof BsonDocument ) {
             if ( ((BsonDocument) preDocument).containsKey( "_dyn" ) ) {
                 // prepared
                 BsonValue bsonIndex = ((BsonDocument) preDocument).get( "_dyn" );
+                Boolean isRegex = ((BsonDocument) preDocument).get( "_reg" ).asBoolean().getValue();
                 long pos;
                 if ( bsonIndex.isInt64() ) {
                     pos = bsonIndex.asInt64().getValue();
@@ -62,29 +64,30 @@ public class MongoDynamicUtil {
                 PolyType polyTyp = PolyType.valueOf( ((BsonDocument) preDocument).get( "_type" ).asString().getValue() );
 
                 if ( isDoc ) {
-                    addHandle( pos, (BsonDocument) parent, (String) key, polyTyp );
+                    addHandle( pos, (BsonDocument) parent, (String) key, polyTyp, isRegex );
                 } else {
-                    addHandle( pos, (BsonArray) parent, (int) key, polyTyp );
+                    addHandle( pos, (BsonArray) parent, (int) key, polyTyp, isRegex );
                 }
 
             } else {
                 // normal
-                ((BsonDocument) preDocument).forEach( ( k, bsonValue ) -> replaceDynamic( bsonValue, preDocument, k, true, bucket ) );
+                ((BsonDocument) preDocument).forEach( ( k, bsonValue ) -> replaceDynamic( bsonValue, preDocument, k, true ) );
             }
         } else if ( preDocument instanceof BsonArray ) {
             int i = 0;
             for ( BsonValue bsonValue : ((BsonArray) preDocument) ) {
-                replaceDynamic( bsonValue, preDocument, i, false, bucket );
+                replaceDynamic( bsonValue, preDocument, i, false );
                 i++;
             }
         }
     }
 
 
-    public void addHandle( long index, BsonDocument doc, String key, PolyType type ) {
+    public void addHandle( long index, BsonDocument doc, String key, PolyType type, Boolean isRegex ) {
 
         if ( !arrayHandles.containsKey( index ) ) {
             this.transformerMap.put( index, MongoTypeUtil.getBsonTransformer( type, bucket ) );
+            this.isRegexMap.put( index, isRegex );
             this.docHandles.put( index, new ArrayList<>() );
             this.arrayHandles.put( index, new ArrayList<>() );
         }
@@ -92,9 +95,10 @@ public class MongoDynamicUtil {
     }
 
 
-    public void addHandle( long index, BsonArray array, int pos, PolyType type ) {
+    public void addHandle( long index, BsonArray array, int pos, PolyType type, Boolean isRegex ) {
         if ( !arrayHandles.containsKey( index ) ) {
             this.transformerMap.put( index, MongoTypeUtil.getBsonTransformer( type, bucket ) );
+            this.isRegexMap.put( index, isRegex );
             this.docHandles.put( index, new ArrayList<>() );
             this.arrayHandles.put( index, new ArrayList<>() );
         }
@@ -105,9 +109,16 @@ public class MongoDynamicUtil {
     public BsonDocument insert( Map<Long, Object> parameterValues ) {
         for ( Entry<Long, Object> entry : parameterValues.entrySet() ) {
             if ( arrayHandles.containsKey( entry.getKey() ) ) {
-                Function<Object, BsonValue> transformer = transformerMap.get( entry.getKey() );
-                arrayHandles.get( entry.getKey() ).forEach( el -> el.insert( transformer.apply( entry.getValue() ) ) );
-                docHandles.get( entry.getKey() ).forEach( el -> el.insert( transformer.apply( entry.getValue() ) ) );
+                Boolean isRegex = isRegexMap.get( entry.getKey() );
+
+                if ( isRegex ) {
+                    arrayHandles.get( entry.getKey() ).forEach( el -> el.insert( MongoTypeUtil.replaceRegex( (String) entry.getValue() ) ) );
+                    docHandles.get( entry.getKey() ).forEach( el -> el.insert( MongoTypeUtil.replaceRegex( (String) entry.getValue() ) ) );
+                } else {
+                    Function<Object, BsonValue> transformer = transformerMap.get( entry.getKey() );
+                    arrayHandles.get( entry.getKey() ).forEach( el -> el.insert( transformer.apply( entry.getValue() ) ) );
+                    docHandles.get( entry.getKey() ).forEach( el -> el.insert( transformer.apply( entry.getValue() ) ) );
+                }
             }
         }
         return document;

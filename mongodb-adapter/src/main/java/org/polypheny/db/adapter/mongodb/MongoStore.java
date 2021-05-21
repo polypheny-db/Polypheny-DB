@@ -205,8 +205,9 @@ public class MongoStore extends DataStore {
     @Override
     public void createTable( Context context, CatalogTable catalogTable ) {
         Catalog catalog = Catalog.getInstance();
-
-        context.getStatement().getTransaction().registerInvolvedAdapter( this );
+        commitAll();
+        //ClientSession session = transactionProvider.startTransaction( context.getStatement().getTransaction().getXid() );
+        //context.getStatement().getTransaction().registerInvolvedAdapter( this );
         this.currentSchema.database.createCollection( getPhysicalTableName( catalogTable.id ) );
 
         for ( CatalogColumnPlacement placement : catalog.getColumnPlacementsOnAdapter( getAdapterId(), catalogTable.id ) ) {

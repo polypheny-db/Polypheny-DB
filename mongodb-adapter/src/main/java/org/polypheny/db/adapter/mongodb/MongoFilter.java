@@ -40,7 +40,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
-import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.polypheny.db.adapter.mongodb.bson.BsonDynamic;
 import org.polypheny.db.adapter.mongodb.util.MongoTypeUtil;
@@ -90,24 +89,13 @@ public class MongoFilter extends Filter implements MongoRel {
     public void implement( Implementor implementor ) {
         implementor.visitChild( 0, getInput() );
         // to not break the existing functionality for now we have to handle it this way
-        Translator translator = null;
+        Translator translator;
         if ( implementor.getStaticRowType() != null && implementor.getStaticRowType() instanceof MongoRowType ) {
             translator = new Translator( MongoRules.mongoFieldNames( getRowType() ), (MongoRowType) implementor.getStaticRowType(), implementor.getBucket() );
         } else {
             translator = new Translator( MongoRules.mongoFieldNames( getRowType() ), implementor.getBucket() );
         }
         translator.translateMatch( condition, implementor, implementor.isDML() );
-
-        /*if ( translator.dynamics.size() > 0 ) {
-            // we merge the dynamic BsonDocument with the static conditions
-            implementor.dynamicConditions = new BsonDocument().append( "$or", translator.dynamics );
-            if ( !implementor.isDML() ) {
-                implementor.dynamicConditions = new BsonDocument().append( "$match", implementor.dynamicConditions );
-            }
-            implementor.filter = implementor.dynamicConditions.toJson();
-            match = implementor.filter;
-        }*/
-        //implementor.add( null, match );
 
     }
 
@@ -232,26 +220,9 @@ public class MongoFilter extends Filter implements MongoRel {
                                             new BsonDynamic( (RexDynamicParam) right, true ) ) );
                     return null;
                 case LITERAL:
-                    String reg = ((RexLiteral) right).getValueAs( String.class );
-
-                    if ( !reg.startsWith( "%" ) ) {
-                        reg = "^" + reg;
-                    }
-
-                    if ( !reg.endsWith( "%" ) ) {
-                        reg = reg + "$";
-                    }
-
-                    reg = reg
-                            .replace( "_", "." )
-                            .replace( "%", ".*" );
 
                     this.dynamics.add( new BsonDocument(
-                            getPhysicalName( (RexInputRef) left ),
-                            new BsonDocument()
-                                    .append( "$regex", new BsonString( reg ) )
-                                    // Polypheny is case insensitive and therefore we have to set the "i" option
-                                    .append( "$options", new BsonString( "i" ) ) ) );
+                            getPhysicalName( (RexInputRef) left ), MongoTypeUtil.replaceRegex( ((RexLiteral) right).getValueAs( String.class ) ) ) );
                     return null;
                 default:
                     throw new IllegalStateException( "Unexpected value: " + right.getKind() );

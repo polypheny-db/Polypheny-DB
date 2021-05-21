@@ -342,4 +342,25 @@ public class MongoTypeUtil {
         }
     }
 
+
+    public static BsonValue replaceRegex( String input ) {
+
+        if ( !input.startsWith( "%" ) ) {
+            input = "^" + input;
+        }
+
+        if ( !input.endsWith( "%" ) ) {
+            input = input + "$";
+        }
+
+        input = input
+                .replace( "_", "." )
+                .replace( "%", ".*" );
+
+        return new BsonDocument()
+                .append( "$regex", new BsonString( input ) )
+                // Polypheny is case insensitive and therefore we have to set the "i" option
+                .append( "$options", new BsonString( "i" ) );
+    }
+
 }
