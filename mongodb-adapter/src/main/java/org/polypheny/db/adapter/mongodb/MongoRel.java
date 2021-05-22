@@ -80,6 +80,7 @@ public interface MongoRel extends RelNode {
         @Getter
         @Setter
         public GridFSBucket bucket;
+        public BsonDocument preProjections = new BsonDocument();
 
         RelOptTable table;
 

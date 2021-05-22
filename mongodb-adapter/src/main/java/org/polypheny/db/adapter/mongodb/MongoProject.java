@@ -34,10 +34,14 @@
 package org.polypheny.db.adapter.mongodb;
 
 
+import com.mongodb.client.gridfs.GridFSBucket;
 import java.util.ArrayList;
 import java.util.List;
 import org.bson.BsonDocument;
+import org.bson.json.JsonMode;
+import org.bson.json.JsonWriterSettings;
 import org.polypheny.db.adapter.java.JavaTypeFactory;
+import org.polypheny.db.adapter.mongodb.bson.BsonFunctionHelper;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptCost;
 import org.polypheny.db.plan.RelOptPlanner;
@@ -83,20 +87,21 @@ public class MongoProject extends Project implements MongoRel {
 
         final MongoRules.RexToMongoTranslator translator = new MongoRules.RexToMongoTranslator( (JavaTypeFactory) getCluster().getTypeFactory(), MongoRules.mongoFieldNames( getInput().getRowType() ) );
         final List<String> items = new ArrayList<>();
+        GridFSBucket bucket = implementor.getBucket();
         // we us our specialized rowType to derive the mapped underlying column identifiers
         MongoRowType mongoRowType = null;
         if ( implementor.getStaticRowType() instanceof MongoRowType ) {
             mongoRowType = ((MongoRowType) implementor.getStaticRowType());
         }
 
-        List<BsonDocument> documents = new ArrayList<>();
+        BsonDocument documents = new BsonDocument();
 
         for ( Pair<RexNode, String> pair : getNamedProjects() ) {
             final String name = pair.right;
             String phyName = "1";
 
             if ( pair.left.getKind() == SqlKind.DISTANCE ) {
-                documents.add( new BsonFunction( (RexCall) pair.left, mongoRowType ) );
+                documents.put( pair.right, BsonFunctionHelper.getFunction( (RexCall) pair.left, mongoRowType, bucket ) );
                 continue;
             }
 
@@ -140,25 +145,16 @@ public class MongoProject extends Project implements MongoRel {
                 continue;
             }
             items.add( expr.equals( "'$" + parsedName + "'" )
-                    ? MongoRules.maybeQuote( replaceDot( name ) ) + ": " + replaceDot( phyName )//1"
-                    : MongoRules.maybeQuote( replaceDot( name ) ) + ": " + expr );
+                    ? MongoRules.maybeQuote( name ) + ": " + phyName//1"
+                    : MongoRules.maybeQuote( name ) + ": " + expr );
         }
-        final String findString = Util.toString( items, "{", ", ", "}" );
+        String functions = documents.toJson( JsonWriterSettings.builder().outputMode( JsonMode.RELAXED ).build() );
+        String findString = Util.toString( items, "{", ", ", "" ) + functions.substring( 1, functions.length() - 1 ) + "}";
         final String aggregateString = "{$project: " + findString + "}";
         final Pair<String, String> op = Pair.of( findString, aggregateString );
         if ( !implementor.isDML() && items.size() != 0 ) {
             implementor.add( op.left, op.right );
         }
-    }
-
-
-    public static String replaceDot( String name ) {
-        return name.replace( ".", "\\u2024" );
-    }
-
-
-    public static String reverseDot( String name ) {
-        return name.replace( "\\u2024", "." );
     }
 
 }

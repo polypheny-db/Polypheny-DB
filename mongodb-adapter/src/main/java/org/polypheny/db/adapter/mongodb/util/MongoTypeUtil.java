@@ -278,7 +278,8 @@ public class MongoTypeUtil {
             if ( op instanceof RexCall ) {
                 array.add( getBsonArray( (RexCall) op, bucket ) );
             } else {
-                array.add( getAsBson( ((RexLiteral) op).getValue3(), ((RexLiteral) op).getTypeName(), bucket ) );
+                PolyType type = call.getType().getComponentType().getPolyType();
+                array.add( getAsBson( getMongoComparable( type, (RexLiteral) op ), type, bucket ) );
             }
         }
         return array;

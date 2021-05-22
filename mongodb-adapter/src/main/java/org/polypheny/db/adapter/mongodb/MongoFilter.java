@@ -42,6 +42,7 @@ import org.bson.BsonArray;
 import org.bson.BsonDocument;
 import org.bson.BsonValue;
 import org.polypheny.db.adapter.mongodb.bson.BsonDynamic;
+import org.polypheny.db.adapter.mongodb.bson.BsonFunctionHelper;
 import org.polypheny.db.adapter.mongodb.util.MongoTypeUtil;
 import org.polypheny.db.plan.RelOptCluster;
 import org.polypheny.db.plan.RelOptCost;
@@ -110,6 +111,7 @@ public class MongoFilter extends Filter implements MongoRel {
         private final MongoRowType rowType;
         private final BsonArray dynamics = new BsonArray();
         private final GridFSBucket bucket;
+        private final BsonDocument preProjections = new BsonDocument();
 
 
         Translator( List<String> fieldNames, GridFSBucket bucket ) {
@@ -126,15 +128,16 @@ public class MongoFilter extends Filter implements MongoRel {
 
 
         private void translateMatch( RexNode condition, Implementor implementor, boolean isDDL ) {
-            implementor.filter.add( translateOr( condition ) );
+            implementor.filter.add( translateOr( condition, implementor ) );
         }
 
 
-        private BsonValue translateOr( RexNode condition ) {
+        private BsonValue translateOr( RexNode condition, Implementor implementor ) {
             for ( RexNode node : RelOptUtil.disjunctions( condition ) ) {
                 translateAnd( node );
             }
 
+            implementor.preProjections.putAll( preProjections );
             switch ( dynamics.size() ) {
                 case 0:
                     return new BsonDocument();
@@ -261,15 +264,21 @@ public class MongoFilter extends Filter implements MongoRel {
             if ( right instanceof RexCall && left instanceof RexInputRef ) {
                 // $9 ( index ) -> [el1, el2]
                 String name = getPhysicalName( (RexInputRef) left );
-                dynamics.add( new BsonDocument( name, new BsonArray( ((RexCall) right).operands.stream().map( el -> MongoTypeUtil.getAsBson( (RexLiteral) el, null ) ).collect( Collectors.toList() ) ) ) );
+                dynamics.add( new BsonDocument( name, new BsonArray( ((RexCall) right).operands.stream().map( el -> MongoTypeUtil.getAsBson( (RexLiteral) el, bucket ) ).collect( Collectors.toList() ) ) ) );
 
                 return true;
             } else if ( right instanceof RexCall && left instanceof RexLiteral ) {
-                // $9[1] -> el1
-                String name = getPhysicalName( (RexInputRef) ((RexCall) right).operands.get( 0 ) );
-                // we have to adjust as mongodb arrays start at 0 and sql at 1
-                int pos = ((RexLiteral) ((RexCall) right).operands.get( 1 )).getValueAs( Integer.class ) - 1;
-                translateOp2( null, name + "." + pos, (RexLiteral) left );
+                if ( right.isA( SqlKind.DISTANCE ) ) {
+                    String randomName = "__temp" + preProjections.size();
+                    this.preProjections.put( randomName, BsonFunctionHelper.getFunction( (RexCall) right, rowType, bucket ) );
+                    this.dynamics.add( new BsonDocument( randomName, MongoTypeUtil.getAsBson( (RexLiteral) left, null ) ) );
+                } else {
+                    // $9[1] -> el1
+                    String name = getPhysicalName( (RexInputRef) ((RexCall) right).operands.get( 0 ) );
+                    // we have to adjust as mongodb arrays start at 0 and sql at 1
+                    int pos = ((RexLiteral) ((RexCall) right).operands.get( 1 )).getValueAs( Integer.class ) - 1;
+                    translateOp2( null, name + "." + pos, (RexLiteral) left );
+                }
 
                 return true;
             }

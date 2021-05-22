@@ -41,6 +41,9 @@ import org.apache.calcite.linq4j.tree.BlockBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.Expressions;
 import org.apache.calcite.linq4j.tree.MethodCallExpression;
+import org.bson.BsonDocument;
+import org.bson.json.JsonMode;
+import org.bson.json.JsonWriterSettings;
 import org.polypheny.db.adapter.enumerable.EnumUtils;
 import org.polypheny.db.adapter.enumerable.EnumerableRel;
 import org.polypheny.db.adapter.enumerable.EnumerableRelImplementor;
@@ -176,6 +179,9 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
                                 Pair.class ) );
 
         final Expression table = list.append( "table", mongoImplementor.table.getExpression( MongoTable.MongoQueryable.class ) );
+        if ( mongoImplementor.preProjections.size() != 0 ) {
+            mongoImplementor.add( null, new BsonDocument( "$project", mongoImplementor.preProjections ).toJson( JsonWriterSettings.builder().outputMode( JsonMode.RELAXED ).build() ) );
+        }
         List<String> opList = Pair.right( mongoImplementor.list );
 
         final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );

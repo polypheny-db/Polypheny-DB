@@ -132,6 +132,7 @@ public class MongoDynamicUtil {
 
 
     private Document asDocument( BsonDocument bson ) {
+        //CodecRegistries.fromProviders( new DocumentCodecProvider(), new BsonCodecProvider() );
         Document doc = new Document();
         for ( Entry<String, BsonValue> entry : bson.entrySet() ) {
             doc.put( entry.getKey(), entry.getValue() );
