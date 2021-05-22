@@ -61,7 +61,7 @@ public class BsonDynamic extends BsonDocument {
         this.isRegex = isRegex;
         append( "_dyn", new BsonInt64( id ) );
         append( "_type", new BsonString( polyTypeName ) );
-        append( "_reg", new BsonBoolean( false ) );
+        append( "_reg", new BsonBoolean( isRegex ) );
     }
 
 }

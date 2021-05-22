@@ -39,6 +39,8 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.gridfs.GridFSBucket;
+import com.mongodb.client.model.DeleteManyModel;
+import com.mongodb.client.model.WriteModel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -376,14 +378,14 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
 
                 case INSERT:
                     if ( dataContext.getParameterValues().size() != 0 ) {
+                        assert operations.size() == 1;
                         // prepared
-                        List<MongoDynamicUtil> ops = operations.stream().map( op -> new MongoDynamicUtil( BsonDocument.parse( op ), bucket ) ).collect( Collectors.toList() );
+                        MongoDynamicUtil util = new MongoDynamicUtil( BsonDocument.parse( operations.get( 0 ) ), bucket );
 
-                        for ( Map<Long, Object> parameterValue : dataContext.getParameterValues() ) {
-                            List<Document> docs = ops.stream().map( op -> op.insertAsDoc( parameterValue ) ).collect( Collectors.toList() );
-                            mongoTable.getCollection().insertMany( session, docs );
-                            changes += docs.size();
-                        }
+                        List<Document> inserts = util.getAll( dataContext.getParameterValues() );
+
+                        mongoTable.getCollection().insertMany( session, inserts );
+                        changes = inserts.size();
                     } else {
                         // direct
                         List<Document> docs = operations.stream().map( Document::parse ).collect( Collectors.toList() );
@@ -394,17 +396,17 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                     break;
                 case UPDATE:
                     assert operations.size() == 1;
-                    BsonDocument doc = BsonDocument.parse( operations.get( 0 ) );
                     if ( dataContext.getParameterValues().size() != 0 ) {
                         // prepared
                         MongoDynamicUtil filterUtil = new MongoDynamicUtil( BsonDocument.parse( filter ), bucket );
-                        MongoDynamicUtil docUtil = new MongoDynamicUtil( doc, bucket );
+                        MongoDynamicUtil docUtil = new MongoDynamicUtil( BsonDocument.parse( operations.get( 0 ) ), bucket );
                         for ( Map<Long, Object> parameterValue : dataContext.getParameterValues() ) {
                             changes += mongoTable.getCollection().updateMany( session, filterUtil.insert( parameterValue ), Collections.singletonList( docUtil.insert( parameterValue ) ) ).getModifiedCount();
                         }
+
                     } else {
                         // direct
-                        changes = mongoTable.getCollection().updateMany( session, BsonDocument.parse( filter ), Collections.singletonList( doc ) ).getModifiedCount();
+                        changes = mongoTable.getCollection().updateMany( session, BsonDocument.parse( filter ), Collections.singletonList( BsonDocument.parse( operations.get( 0 ) ) ) ).getModifiedCount();
                     }
 
                     break;
@@ -413,9 +415,9 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                     if ( dataContext.getParameterValues().size() != 0 ) {
                         // prepared
                         MongoDynamicUtil filterUtil = new MongoDynamicUtil( BsonDocument.parse( filter ), bucket );
-                        for ( Map<Long, Object> parameterValue : dataContext.getParameterValues() ) {
-                            changes += mongoTable.getCollection().deleteMany( session, filterUtil.insert( parameterValue ) ).getDeletedCount();
-                        }
+                        List<? extends WriteModel<Document>> filters = filterUtil.getAll( dataContext.getParameterValues(), DeleteManyModel::new );
+
+                        changes = mongoTable.getCollection().bulkWrite( session, filters ).getDeletedCount();
                     } else {
                         // direct
                         changes = mongoTable.getCollection().deleteMany( session, BsonDocument.parse( filter ) ).getDeletedCount();

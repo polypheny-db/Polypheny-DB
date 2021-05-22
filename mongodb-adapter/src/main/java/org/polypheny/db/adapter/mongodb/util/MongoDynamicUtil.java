@@ -17,18 +17,19 @@
 package org.polypheny.db.adapter.mongodb.util;
 
 import com.mongodb.client.gridfs.GridFSBucket;
+import com.mongodb.client.model.UpdateManyModel;
+import com.mongodb.client.model.WriteModel;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
 import org.bson.BsonValue;
 import org.bson.Document;
-import org.bson.json.JsonMode;
-import org.bson.json.JsonWriterSettings;
 import org.polypheny.db.type.PolyType;
 
 public class MongoDynamicUtil {
@@ -121,12 +122,26 @@ public class MongoDynamicUtil {
                 }
             }
         }
-        return document;
+        return document.clone();
     }
 
 
-    public Document insertAsDoc( Map<Long, Object> parameterValues ) {
-        return Document.parse( insert( parameterValues ).toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() ) );
+    public List<? extends WriteModel<Document>> getAll( List<Map<Long, Object>> parameterValues, Function<Document, ? extends WriteModel<Document>> constructor ) {
+        return parameterValues.stream().map( value -> constructor.apply( asDocument( insert( value ) ) ) ).collect( Collectors.toList() );
+    }
+
+
+    private Document asDocument( BsonDocument bson ) {
+        Document doc = new Document();
+        for ( Entry<String, BsonValue> entry : bson.entrySet() ) {
+            doc.put( entry.getKey(), entry.getValue() );
+        }
+        return doc;
+    }
+
+
+    public List<Document> getAll( List<Map<Long, Object>> parameterValues ) {
+        return parameterValues.stream().map( value -> asDocument( insert( value ) ) ).collect( Collectors.toList() );
     }
 
 
@@ -165,6 +180,18 @@ public class MongoDynamicUtil {
             array.set( index, value );
         }
 
+    }
+
+
+    public static List<UpdateManyModel<Document>> zipUpdate( List<Document> left, List<Document> right ) {
+        assert left.size() == right.size();
+        ArrayList<UpdateManyModel<Document>> res = new ArrayList<>();
+        int pos = 0;
+        for ( Document document : left ) {
+            res.add( new UpdateManyModel<>( document, right.get( pos ) ) );
+            pos++;
+        }
+        return res;
     }
 
 }
