@@ -68,6 +68,7 @@ import org.polypheny.db.adapter.java.AbstractQueryableTable;
 import org.polypheny.db.adapter.mongodb.MongoEnumerator.IterWrapper;
 import org.polypheny.db.adapter.mongodb.MongoRel.Implementor;
 import org.polypheny.db.adapter.mongodb.util.MongoDynamicUtil;
+import org.polypheny.db.adapter.mongodb.util.MongoTypeUtil;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptCluster;
@@ -360,7 +361,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 values = dataContext.getParameterValues().get( 0 );
             }
 
-            return getTable().aggregate( session, getMongoDb(), getTable(), fields, arrayClass, Pair.right( implementor.list ), values, implementor.getNormalFilter(), implementor.preProjections );
+            return getTable().aggregate( session, getMongoDb(), getTable(), fields, arrayClass, Pair.right( implementor.list ), values, implementor.getFilter(), implementor.preProjections );
         }
 
 
@@ -385,22 +386,23 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
          * @return
          */
         @SuppressWarnings("UnusedDeclaration")
-        public Enumerable<Object> handleDirectDML( Operation operation, String filter, List<String> operations ) {
-            MongoTable mongoTable = (MongoTable) table;
+        public Enumerable<Object> handleDirectDML( Long queryId ) {
+            MongoTable mongoTable = getTable();
             PolyXid xid = dataContext.getStatement().getTransaction().getXid();
             dataContext.getStatement().getTransaction().registerInvolvedAdapter( AdapterManager.getInstance().getStore( mongoTable.getStoreId() ) );
             ClientSession session = mongoTable.getTransactionProvider().startTransaction( xid );
             GridFSBucket bucket = mongoTable.getMongoSchema().getBucket();
+            Implementor implementor = mongoTable.queries.get( queryId );
 
             long changes = 0;
 
-            switch ( operation ) {
+            switch ( implementor.getOperation() ) {
 
                 case INSERT:
                     if ( dataContext.getParameterValues().size() != 0 ) {
-                        assert operations.size() == 1;
+                        assert implementor.operations.size() == 1;
                         // prepared
-                        MongoDynamicUtil util = new MongoDynamicUtil( BsonDocument.parse( operations.get( 0 ) ), bucket );
+                        MongoDynamicUtil util = new MongoDynamicUtil( implementor.operations.get( 0 ), bucket );
 
                         List<Document> inserts = util.getAll( dataContext.getParameterValues() );
 
@@ -408,39 +410,38 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                         changes = inserts.size();
                     } else {
                         // direct
-                        List<Document> docs = operations.stream().map( Document::parse ).collect( Collectors.toList() );
+                        List<Document> docs = implementor.operations.stream().map( MongoTypeUtil::asDocument ).collect( Collectors.toList() );
                         mongoTable.getCollection().insertMany( session, docs );
                         changes = docs.size();
                     }
 
                     break;
                 case UPDATE:
-                    assert operations.size() == 1;
+                    assert implementor.operations.size() == 1;
                     if ( dataContext.getParameterValues().size() != 0 ) {
                         // prepared
-                        MongoDynamicUtil filterUtil = new MongoDynamicUtil( BsonDocument.parse( filter ), bucket );
-                        MongoDynamicUtil docUtil = new MongoDynamicUtil( BsonDocument.parse( operations.get( 0 ) ), bucket );
+                        MongoDynamicUtil filterUtil = new MongoDynamicUtil( implementor.getFilter(), bucket );
+                        MongoDynamicUtil docUtil = new MongoDynamicUtil( implementor.operations.get( 0 ), bucket );
                         for ( Map<Long, Object> parameterValue : dataContext.getParameterValues() ) {
                             changes += mongoTable.getCollection().updateMany( session, filterUtil.insert( parameterValue ), Collections.singletonList( docUtil.insert( parameterValue ) ) ).getModifiedCount();
                         }
 
                     } else {
                         // direct
-                        changes = mongoTable.getCollection().updateMany( session, BsonDocument.parse( filter ), Collections.singletonList( BsonDocument.parse( operations.get( 0 ) ) ) ).getModifiedCount();
+                        changes = mongoTable.getCollection().updateMany( session, implementor.getFilter(), Collections.singletonList( implementor.operations.get( 0 ) ) ).getModifiedCount();
                     }
 
                     break;
                 case DELETE:
-                    assert filter != null;
                     if ( dataContext.getParameterValues().size() != 0 ) {
                         // prepared
-                        MongoDynamicUtil filterUtil = new MongoDynamicUtil( BsonDocument.parse( filter ), bucket );
+                        MongoDynamicUtil filterUtil = new MongoDynamicUtil( implementor.getFilter(), bucket );
                         List<? extends WriteModel<Document>> filters = filterUtil.getAll( dataContext.getParameterValues(), DeleteManyModel::new );
 
                         changes = mongoTable.getCollection().bulkWrite( session, filters ).getDeletedCount();
                     } else {
                         // direct
-                        changes = mongoTable.getCollection().deleteMany( session, BsonDocument.parse( filter ) ).getDeletedCount();
+                        changes = mongoTable.getCollection().deleteMany( session, implementor.getFilter() ).getDeletedCount();
                     }
                     break;
                 case MERGE:

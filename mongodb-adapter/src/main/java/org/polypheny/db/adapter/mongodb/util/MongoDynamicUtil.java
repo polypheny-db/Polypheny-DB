@@ -137,22 +137,13 @@ public class MongoDynamicUtil {
 
 
     public List<? extends WriteModel<Document>> getAll( List<Map<Long, Object>> parameterValues, Function<Document, ? extends WriteModel<Document>> constructor ) {
-        return parameterValues.stream().map( value -> constructor.apply( asDocument( insert( value ) ) ) ).collect( Collectors.toList() );
+        return parameterValues.stream().map( value -> constructor.apply( MongoTypeUtil.asDocument( insert( value ) ) ) ).collect( Collectors.toList() );
     }
 
-
-    private Document asDocument( BsonDocument bson ) {
-        //CodecRegistries.fromProviders( new DocumentCodecProvider(), new BsonCodecProvider() );
-        Document doc = new Document();
-        for ( Entry<String, BsonValue> entry : bson.entrySet() ) {
-            doc.put( entry.getKey(), entry.getValue() );
-        }
-        return doc;
-    }
 
 
     public List<Document> getAll( List<Map<Long, Object>> parameterValues ) {
-        return parameterValues.stream().map( value -> asDocument( insert( value ) ) ).collect( Collectors.toList() );
+        return parameterValues.stream().map( value -> MongoTypeUtil.asDocument( insert( value ) ) ).collect( Collectors.toList() );
     }
 
 

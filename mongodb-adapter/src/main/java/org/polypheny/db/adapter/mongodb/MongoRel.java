@@ -44,8 +44,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
-import org.bson.json.JsonMode;
-import org.bson.json.JsonWriterSettings;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.plan.Convention;
@@ -75,7 +73,7 @@ public interface MongoRel extends RelNode {
     class Implementor {
 
         final List<Pair<String, String>> list = new ArrayList<>();
-        public List<String> operations = new ArrayList<>();
+        public List<BsonDocument> operations = new ArrayList<>();
         public BsonArray filter = new BsonArray();
         @Getter
         @Setter
@@ -159,21 +157,7 @@ public interface MongoRel extends RelNode {
         }
 
 
-        public String getFilters() {
-            BsonDocument filter;
-            if ( this.filter.size() == 1 ) {
-                filter = this.filter.get( 0 ).asDocument();
-            } else if ( this.filter.size() == 0 ) {
-                filter = new BsonDocument();
-            } else {
-                filter = new BsonDocument( "$or", this.filter );
-            }
-
-            return filter.toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() );
-        }
-
-
-        public BsonDocument getNormalFilter() {
+        public BsonDocument getFilter() {
             BsonDocument filter;
             if ( this.filter.size() == 1 ) {
                 filter = this.filter.get( 0 ).asDocument();
@@ -184,11 +168,6 @@ public interface MongoRel extends RelNode {
             }
 
             return filter;
-        }
-
-
-        public List<String> getPreProjections() {
-            return preProjections.stream().map( p -> p.toJson( JsonWriterSettings.builder().outputMode( JsonMode.RELAXED ).build() ) ).collect( Collectors.toList() );
         }
 
     }

@@ -48,8 +48,6 @@ import org.bson.BsonArray;
 import org.bson.BsonDocument;
 import org.bson.BsonString;
 import org.bson.BsonValue;
-import org.bson.json.JsonMode;
-import org.bson.json.JsonWriterSettings;
 import org.polypheny.db.adapter.enumerable.RexImpTable;
 import org.polypheny.db.adapter.enumerable.RexToLixTranslator;
 import org.polypheny.db.adapter.java.JavaTypeFactory;
@@ -561,7 +559,7 @@ public class MongoRules {
                     }
                     BsonDocument update = new BsonDocument().append( "$set", doc );
 
-                    implementor.operations = Collections.singletonList( update.toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() ) );
+                    implementor.operations = Collections.singletonList( update );
 
                     break;
                 case MERGE:
@@ -670,7 +668,7 @@ public class MongoRules {
                 pos++;
             }
             // we need to use the extended json format here to not loose precision like long -> int etc.
-            implementor.operations = Collections.singletonList( doc.toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() ) );
+            implementor.operations = Collections.singletonList( doc );
 
         }
 
@@ -713,7 +711,7 @@ public class MongoRules {
 
 
         private void handleDirectInsert( Implementor implementor, MongoValues values ) {
-            List<String> docs = new ArrayList<>();
+            List<BsonDocument> docs = new ArrayList<>();
             CatalogTable catalogTable = implementor.mongoTable.getCatalogTable();
             GridFSBucket bucket = implementor.mongoTable.getMongoSchema().getBucket();
 
@@ -724,7 +722,7 @@ public class MongoRules {
                     doc.append( MongoStore.getPhysicalColumnName( catalogTable.columnIds.get( pos ) ), MongoTypeUtil.getAsBson( literal, bucket ) );
                     pos++;
                 }
-                docs.add( doc.toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() ) );
+                docs.add( doc );
             }
             implementor.operations = docs;
         }

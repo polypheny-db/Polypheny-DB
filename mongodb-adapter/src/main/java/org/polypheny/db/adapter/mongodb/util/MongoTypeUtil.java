@@ -24,6 +24,7 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.function.Function;
 import org.apache.calcite.avatica.util.ByteString;
 import org.bson.BsonArray;
@@ -36,6 +37,7 @@ import org.bson.BsonInt64;
 import org.bson.BsonNull;
 import org.bson.BsonString;
 import org.bson.BsonValue;
+import org.bson.Document;
 import org.bson.types.Decimal128;
 import org.bson.types.ObjectId;
 import org.polypheny.db.rex.RexCall;
@@ -368,6 +370,15 @@ public class MongoTypeUtil {
                 .append( "$regex", new BsonString( input ) )
                 // Polypheny is case insensitive and therefore we have to set the "i" option
                 .append( "$options", new BsonString( "i" ) );
+    }
+
+
+    public static Document asDocument( BsonDocument bson ) {
+        Document doc = new Document();
+        for ( Entry<String, BsonValue> entry : bson.entrySet() ) {
+            doc.put( entry.getKey(), entry.getValue() );
+        }
+        return doc;
     }
 
 }

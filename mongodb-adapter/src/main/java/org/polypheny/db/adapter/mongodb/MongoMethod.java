@@ -38,7 +38,6 @@ import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Method;
 import java.util.List;
 import org.apache.calcite.linq4j.tree.Types;
-import org.polypheny.db.rel.core.TableModify.Operation;
 
 
 /**
@@ -47,7 +46,7 @@ import org.polypheny.db.rel.core.TableModify.Operation;
 public enum MongoMethod {
     MONGO_QUERYABLE_FIND( MongoTable.MongoQueryable.class, "find", String.class, String.class, List.class, List.class ),
     MONGO_QUERYABLE_AGGREGATE( MongoTable.MongoQueryable.class, "aggregate", List.class, List.class, Long.class ),
-    HANDLE_DIRECT_DML( MongoTable.MongoQueryable.class, "handleDirectDML", Operation.class, String.class, List.class );
+    HANDLE_DIRECT_DML( MongoTable.MongoQueryable.class, "handleDirectDML", Long.class );
 
     public final Method method;
 
