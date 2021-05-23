@@ -173,6 +173,20 @@ public interface MongoRel extends RelNode {
         }
 
 
+        public BsonDocument getNormalFilter() {
+            BsonDocument filter;
+            if ( this.filter.size() == 1 ) {
+                filter = this.filter.get( 0 ).asDocument();
+            } else if ( this.filter.size() == 0 ) {
+                filter = new BsonDocument();
+            } else {
+                filter = new BsonDocument( "$or", this.filter );
+            }
+
+            return filter;
+        }
+
+
         public List<String> getPreProjections() {
             return preProjections.stream().map( p -> p.toJson( JsonWriterSettings.builder().outputMode( JsonMode.RELAXED ).build() ) ).collect( Collectors.toList() );
         }

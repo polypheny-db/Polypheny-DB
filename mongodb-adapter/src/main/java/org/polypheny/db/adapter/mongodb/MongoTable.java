@@ -49,6 +49,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import org.apache.calcite.linq4j.AbstractEnumerable;
@@ -65,6 +66,7 @@ import org.polypheny.db.adapter.AdapterManager;
 import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.java.AbstractQueryableTable;
 import org.polypheny.db.adapter.mongodb.MongoEnumerator.IterWrapper;
+import org.polypheny.db.adapter.mongodb.MongoRel.Implementor;
 import org.polypheny.db.adapter.mongodb.util.MongoDynamicUtil;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.plan.Convention;
@@ -107,6 +109,9 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
     private final TransactionProvider transactionProvider;
     @Getter
     private final int storeId;
+    @Getter
+    private HashMap<Long, Implementor> queries = new HashMap<>();
+    private AtomicLong idBuilder = new AtomicLong();
 
 
     /**
@@ -193,14 +198,14 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
      * @param filter
      * @return Enumerator of results
      */
-    private Enumerable<Object> aggregate( ClientSession session, final MongoDatabase mongoDb, MongoTable table, final List<Entry<String, Class>> fields, List<Entry<String, Class>> arrayFields, final List<String> operations, Map<Long, Object> parameterValues, String filter, List<String> preOps ) {
+    private Enumerable<Object> aggregate( ClientSession session, final MongoDatabase mongoDb, MongoTable table, final List<Entry<String, Class>> fields, List<Entry<String, Class>> arrayFields, final List<String> operations, Map<Long, Object> parameterValues, BsonDocument filter, List<BsonDocument> preOps ) {
         final List<BsonDocument> list = new ArrayList<>();
 
         if ( parameterValues.size() == 0 ) {
             // direct query
-            preOps.forEach( op -> list.add( new BsonDocument( "$project", BsonDocument.parse( op ) ) ) );
+            preOps.forEach( op -> list.add( new BsonDocument( "$project", op ) ) );
 
-            list.add( new BsonDocument( "$match", BsonDocument.parse( filter ) ) );
+            list.add( new BsonDocument( "$match", filter ) );
 
             for ( String operation : operations ) {
                 list.add( BsonDocument.parse( operation ) );
@@ -208,10 +213,10 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
         } else {
             // prepared
             preOps.stream()
-                    .map( op -> new MongoDynamicUtil( new BsonDocument( "$project", BsonDocument.parse( op ) ), mongoSchema.getBucket() ) )
+                    .map( op -> new MongoDynamicUtil( new BsonDocument( "$project", op ), mongoSchema.getBucket() ) )
                     .forEach( util -> list.add( util.insert( parameterValues ) ) );
 
-            MongoDynamicUtil util = new MongoDynamicUtil( BsonDocument.parse( filter ), getMongoSchema().getBucket() );
+            MongoDynamicUtil util = new MongoDynamicUtil( filter, getMongoSchema().getBucket() );
             list.add( new BsonDocument( "$match", util.insert( parameterValues ) ) );
 
             for ( String operation : operations ) {
@@ -302,6 +307,14 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
     }
 
 
+    public long attachQueryContent( Implementor implementor ) {
+        long id = idBuilder.getAndIncrement();
+        this.queries.put( id, implementor );
+        return id;
+
+    }
+
+
     /**
      * Implementation of {@link org.apache.calcite.linq4j.Queryable} based on a {@link org.polypheny.db.adapter.mongodb.MongoTable}.
      *
@@ -338,15 +351,16 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
          * @see MongoMethod#MONGO_QUERYABLE_AGGREGATE
          */
         @SuppressWarnings("UnusedDeclaration")
-        public Enumerable<Object> aggregate( List<Map.Entry<String, Class>> fields, List<Map.Entry<String, Class>> arrayClass, List<String> operations, String filter, List<String> preOps ) {
+        public Enumerable<Object> aggregate( List<Map.Entry<String, Class>> fields, List<Map.Entry<String, Class>> arrayClass, Long queryId ) {
             ClientSession session = getTable().getTransactionProvider().getSession( dataContext.getStatement().getTransaction().getXid() );
+            Implementor implementor = getTable().queries.get( queryId );
 
             Map<Long, Object> values = new HashMap<>();
             if ( dataContext.getParameterValues().size() == 1 ) {
                 values = dataContext.getParameterValues().get( 0 );
             }
 
-            return getTable().aggregate( session, getMongoDb(), getTable(), fields, arrayClass, operations, values, filter, preOps );
+            return getTable().aggregate( session, getMongoDb(), getTable(), fields, arrayClass, Pair.right( implementor.list ), values, implementor.getNormalFilter(), implementor.preProjections );
         }
 
 

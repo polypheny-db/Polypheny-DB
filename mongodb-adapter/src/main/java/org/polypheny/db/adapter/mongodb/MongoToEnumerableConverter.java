@@ -179,14 +179,18 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
 
         List<String> opList = Pair.right( mongoImplementor.list );
 
-        final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );
-        final Expression filter = list.append( "filter", Expressions.constant( mongoImplementor.getFilters(), String.class ) );
+        //final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );
 
         Expression enumerable;
         if ( !mongoImplementor.isDML() ) {
-            final Expression preOps = list.append( "preOps", constantArrayList( mongoImplementor.getPreProjections(), String.class ) );
-            enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, arrayClassFields, ops, filter, preOps ) );
+
+            long id = mongoImplementor.mongoTable.attachQueryContent( mongoImplementor );
+
+            //final Expression preOps = list.append( "preOps", constantArrayList( mongoImplementor.getPreProjections(), String.class ) );
+            Expression idExp = list.append( "id", Expressions.constant( id, Long.class ) );
+            enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, arrayClassFields, idExp ) );
         } else {
+            final Expression filter = list.append( "filter", Expressions.constant( mongoImplementor.getFilters(), String.class ) );
             Expression operations = list.append( "operations", constantArrayList( mongoImplementor.operations, String.class ) );
             Expression operation = list.append( "operation", Expressions.constant( mongoImplementor.getOperation(), Operation.class ) );
 
