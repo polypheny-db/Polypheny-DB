@@ -62,4 +62,9 @@ public class MongoRowType extends RelRecordType {
         return new MongoRowType( rowType.getStructKind(), rowType.getFieldList(), mongoTable );
     }
 
+
+    public boolean containsPhysicalName( String name ) {
+        return nameToId.containsKey( name );
+    }
+
 }

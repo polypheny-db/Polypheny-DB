@@ -83,6 +83,9 @@ public interface MongoRel extends RelNode {
         public List<BsonDocument> preProjections = new ArrayList<>();
 
         RelOptTable table;
+        @Setter
+        @Getter
+        public boolean hasProject = false;
 
         MongoTable mongoTable;
         @Setter

@@ -96,8 +96,13 @@ public class MongoProject extends Project implements MongoRel {
 
         BsonDocument documents = new BsonDocument();
 
+        if ( getNamedProjects().size() > 1 && getNamedProjects().get( 0 ).right.contains( "." ) && implementor.hasProject ) {
+            // we already cast so we can skip this whole iteration
+            return;
+        }
+
         for ( Pair<RexNode, String> pair : getNamedProjects() ) {
-            final String name = pair.right;
+            final String name = MongoRules.maybeFix( pair.right );
             String phyName = "1";
 
             if ( pair.left.getKind() == SqlKind.DISTANCE ) {
@@ -113,7 +118,9 @@ public class MongoProject extends Project implements MongoRel {
             // we can you use a project of [name] : $[physical name] to rename our retrieved columns on aggregation
             // we have to pay attention to "DUMMY" as it is apparently used for handling aggregates here
             if ( mongoRowType != null && !name.contains( "$" ) && !name.equals( "DUMMY" ) ) {
-                phyName = "\"$" + mongoRowType.getPhysicalName( name ) + "\"";
+                if ( mongoRowType.containsPhysicalName( MongoRules.maybeFix( name ) ) ) {
+                    phyName = "\"$" + mongoRowType.getPhysicalName( MongoRules.maybeFix( name ) ) + "\"";
+                }
             }
 
             StringBuilder blankExpr = new StringBuilder( expr.replace( "'", "" ) );
@@ -137,14 +144,7 @@ public class MongoProject extends Project implements MongoRel {
 
             }
 
-            String[] splits = name.split( "\\." );
-            String parsedName = splits[splits.length - 1];
-            // mongodb nests . separated names, to prevent this we can use the unicode character \u2024 for "."
-            if ( !expr.equals( "'$" + parsedName + "'" ) && expr.equals( "'$" + name + "'" ) ) {
-                // this would be a projection onto the same field, which does not work with the projection logic
-                continue;
-            }
-            items.add( expr.equals( "'$" + parsedName + "'" )
+            items.add( expr.equals( "'$" + name + "'" )
                     ? MongoRules.maybeQuote( name ) + ": " + phyName//1"
                     : MongoRules.maybeQuote( name ) + ": " + expr );
         }
@@ -152,6 +152,7 @@ public class MongoProject extends Project implements MongoRel {
         String findString = Util.toString( items, "{", ", ", "" ) + functions.substring( 1, functions.length() - 1 ) + "}";
         final String aggregateString = "{$project: " + findString + "}";
         final Pair<String, String> op = Pair.of( findString, aggregateString );
+        implementor.hasProject = true;
         if ( !implementor.isDML() && items.size() != 0 ) {
             implementor.add( op.left, op.right );
         }

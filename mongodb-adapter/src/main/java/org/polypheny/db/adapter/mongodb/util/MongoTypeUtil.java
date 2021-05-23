@@ -95,9 +95,15 @@ public class MongoTypeUtil {
                     return new BsonInt32( (Short) o );
                 }
             };
-
         } else if ( PolyType.INT_TYPES.contains( type ) ) {
-            function = ( o ) -> new BsonInt32( (Integer) o );
+            function = ( o ) -> {
+                if ( o instanceof Long ) {
+                    return new BsonInt32( ((Long) o).intValue() );
+                } else {
+                    return new BsonInt32( (Integer) o );
+                }
+
+            };
         } else if ( type == PolyType.FLOAT || type == PolyType.REAL ) {
             function = ( o ) -> new BsonDouble( Double.parseDouble( o.toString() ) );
         } else if ( PolyType.FRACTIONAL_TYPES.contains( type ) ) {

@@ -152,7 +152,7 @@ public class MongoRules {
                 new AbstractList<String>() {
                     @Override
                     public String get( int index ) {
-                        final String name = rowType.getFieldList().get( index ).getName();
+                        final String name = MongoRules.maybeFix( rowType.getFieldList().get( index ).getName() );
                         return name.startsWith( "$" ) ? "_" + name.substring( 2 ) : name;
                     }
 
@@ -187,6 +187,15 @@ public class MongoRules {
             }
         }
         return false;
+    }
+
+
+    public static String maybeFix( String name ) {
+        if ( name.contains( "." ) ) {
+            String[] splits = name.split( "\\." );
+            return splits[splits.length - 1];
+        }
+        return name;
     }
 
 
@@ -482,7 +491,7 @@ public class MongoRules {
 
         @Override
         public RelOptCost computeSelfCost( RelOptPlanner planner, RelMetadataQuery mq ) {
-            return super.computeSelfCost( planner, mq ).multiplyBy( .3 );
+            return super.computeSelfCost( planner, mq ).multiplyBy( .1 );
         }
 
 
