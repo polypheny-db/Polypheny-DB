@@ -28,8 +28,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
+import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.bson.Document;
+import org.polypheny.db.adapter.mongodb.bson.BsonFunctionHelper;
 import org.polypheny.db.type.PolyType;
 
 public class MongoDynamicUtil {
@@ -41,6 +43,7 @@ public class MongoDynamicUtil {
     private final GridFSBucket bucket;
     private final BsonDocument document;
     private final HashMap<Long, Boolean> isRegexMap = new HashMap<>();
+    private final HashMap<Long, Boolean> isFuncMap = new HashMap<>();
 
 
     public MongoDynamicUtil( BsonDocument preDocument, GridFSBucket bucket ) {
@@ -56,6 +59,7 @@ public class MongoDynamicUtil {
                 // prepared
                 BsonValue bsonIndex = ((BsonDocument) preDocument).get( "_dyn" );
                 Boolean isRegex = ((BsonDocument) preDocument).get( "_reg" ).asBoolean().getValue();
+                Boolean isFunction = ((BsonDocument) preDocument).get( "_func" ).asBoolean().getValue();
                 long pos;
                 if ( bsonIndex.isInt64() ) {
                     pos = bsonIndex.asInt64().getValue();
@@ -65,9 +69,9 @@ public class MongoDynamicUtil {
                 PolyType polyTyp = PolyType.valueOf( ((BsonDocument) preDocument).get( "_type" ).asString().getValue() );
 
                 if ( isDoc ) {
-                    addHandle( pos, (BsonDocument) parent, (String) key, polyTyp, isRegex );
+                    addHandle( pos, (BsonDocument) parent, (String) key, polyTyp, isRegex, isFunction );
                 } else {
-                    addHandle( pos, (BsonArray) parent, (int) key, polyTyp, isRegex );
+                    addHandle( pos, (BsonArray) parent, (int) key, polyTyp, isRegex, isFunction );
                 }
 
             } else {
@@ -84,11 +88,12 @@ public class MongoDynamicUtil {
     }
 
 
-    public void addHandle( long index, BsonDocument doc, String key, PolyType type, Boolean isRegex ) {
+    public void addHandle( long index, BsonDocument doc, String key, PolyType type, Boolean isRegex, Boolean isFunction ) {
 
         if ( !arrayHandles.containsKey( index ) ) {
             this.transformerMap.put( index, MongoTypeUtil.getBsonTransformer( type, bucket ) );
             this.isRegexMap.put( index, isRegex );
+            this.isFuncMap.put( index, isFunction );
             this.docHandles.put( index, new ArrayList<>() );
             this.arrayHandles.put( index, new ArrayList<>() );
         }
@@ -96,10 +101,11 @@ public class MongoDynamicUtil {
     }
 
 
-    public void addHandle( long index, BsonArray array, int pos, PolyType type, Boolean isRegex ) {
+    public void addHandle( long index, BsonArray array, int pos, PolyType type, Boolean isRegex, Boolean isFunction ) {
         if ( !arrayHandles.containsKey( index ) ) {
             this.transformerMap.put( index, MongoTypeUtil.getBsonTransformer( type, bucket ) );
             this.isRegexMap.put( index, isRegex );
+            this.isFuncMap.put( index, isFunction );
             this.docHandles.put( index, new ArrayList<>() );
             this.arrayHandles.put( index, new ArrayList<>() );
         }
@@ -111,10 +117,14 @@ public class MongoDynamicUtil {
         for ( Entry<Long, Object> entry : parameterValues.entrySet() ) {
             if ( arrayHandles.containsKey( entry.getKey() ) ) {
                 Boolean isRegex = isRegexMap.get( entry.getKey() );
+                Boolean isFuntion = isFuncMap.get( entry.getKey() );
 
                 if ( isRegex ) {
                     arrayHandles.get( entry.getKey() ).forEach( el -> el.insert( MongoTypeUtil.replaceRegex( (String) entry.getValue() ) ) );
                     docHandles.get( entry.getKey() ).forEach( el -> el.insert( MongoTypeUtil.replaceRegex( (String) entry.getValue() ) ) );
+                } else if ( isFuntion ) {
+                    // function is always part of a document
+                    docHandles.get( entry.getKey() ).forEach( el -> el.insert( new BsonString( BsonFunctionHelper.getUsedFunction( entry.getValue() ) ) ) );
                 } else {
                     Function<Object, BsonValue> transformer = transformerMap.get( entry.getKey() );
                     arrayHandles.get( entry.getKey() ).forEach( el -> el.insert( transformer.apply( entry.getValue() ) ) );

@@ -80,7 +80,7 @@ public interface MongoRel extends RelNode {
         @Getter
         @Setter
         public GridFSBucket bucket;
-        public BsonDocument preProjections = new BsonDocument();
+        public List<BsonDocument> preProjections = new ArrayList<>();
 
         RelOptTable table;
 
@@ -167,6 +167,11 @@ public interface MongoRel extends RelNode {
             }
 
             return filter.toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() );
+        }
+
+
+        public List<String> getPreProjections() {
+            return preProjections.stream().map( p -> p.toJson( JsonWriterSettings.builder().outputMode( JsonMode.RELAXED ).build() ) ).collect( Collectors.toList() );
         }
 
     }

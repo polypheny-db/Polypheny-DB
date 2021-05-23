@@ -96,7 +96,7 @@ public class MongoFilter extends Filter implements MongoRel {
         } else {
             translator = new Translator( MongoRules.mongoFieldNames( getRowType() ), implementor.getBucket() );
         }
-        translator.translateMatch( condition, implementor, implementor.isDML() );
+        translator.translateMatch( condition, implementor );
 
     }
 
@@ -127,17 +127,20 @@ public class MongoFilter extends Filter implements MongoRel {
         }
 
 
-        private void translateMatch( RexNode condition, Implementor implementor, boolean isDDL ) {
-            implementor.filter.add( translateOr( condition, implementor ) );
+        private void translateMatch( RexNode condition, Implementor implementor ) {
+            implementor.filter.add( translateOr( condition ) );
+
+            if ( preProjections.size() != 0 ) {
+                implementor.preProjections.add( preProjections );
+            }
         }
 
 
-        private BsonValue translateOr( RexNode condition, Implementor implementor ) {
+        private BsonValue translateOr( RexNode condition ) {
             for ( RexNode node : RelOptUtil.disjunctions( condition ) ) {
                 translateAnd( node );
             }
 
-            implementor.preProjections.putAll( preProjections );
             switch ( dynamics.size() ) {
                 case 0:
                     return new BsonDocument();
@@ -220,7 +223,7 @@ public class MongoFilter extends Filter implements MongoRel {
                             new BsonDocument()
                                     .append(
                                             getPhysicalName( (RexInputRef) left ),
-                                            new BsonDynamic( (RexDynamicParam) right, true ) ) );
+                                            new BsonDynamic( (RexDynamicParam) right ).setIsRegex( true ) ) );
                     return null;
                 case LITERAL:
 
@@ -271,7 +274,12 @@ public class MongoFilter extends Filter implements MongoRel {
                 if ( right.isA( SqlKind.DISTANCE ) ) {
                     String randomName = "__temp" + preProjections.size();
                     this.preProjections.put( randomName, BsonFunctionHelper.getFunction( (RexCall) right, rowType, bucket ) );
-                    this.dynamics.add( new BsonDocument( randomName, MongoTypeUtil.getAsBson( (RexLiteral) left, null ) ) );
+                    if ( op == null ) {
+                        this.dynamics.add( new BsonDocument( randomName, MongoTypeUtil.getAsBson( (RexLiteral) left, bucket ) ) );
+                    } else {
+                        this.dynamics.add( new BsonDocument( randomName, new BsonDocument( op, MongoTypeUtil.getAsBson( (RexLiteral) left, bucket ) ) ) );
+                    }
+
                 } else {
                     // $9[1] -> el1
                     String name = getPhysicalName( (RexInputRef) ((RexCall) right).operands.get( 0 ) );

@@ -195,11 +195,13 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
      * @param filter
      * @return Enumerator of results
      */
-    private Enumerable<Object> aggregate( ClientSession session, final MongoDatabase mongoDb, MongoTable table, final List<Entry<String, Class>> fields, List<Entry<String, Class>> arrayFields, final List<String> operations, Map<Long, Object> parameterValues, String filter ) {
+    private Enumerable<Object> aggregate( ClientSession session, final MongoDatabase mongoDb, MongoTable table, final List<Entry<String, Class>> fields, List<Entry<String, Class>> arrayFields, final List<String> operations, Map<Long, Object> parameterValues, String filter, List<String> preOps ) {
         final List<BsonDocument> list = new ArrayList<>();
 
         if ( parameterValues.size() == 0 ) {
             // direct query
+            preOps.forEach( op -> list.add( new BsonDocument( "$project", BsonDocument.parse( op ) ) ) );
+
             list.add( new BsonDocument( "$match", BsonDocument.parse( filter ) ) );
 
             for ( String operation : operations ) {
@@ -207,6 +209,10 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
             }
         } else {
             // prepared
+            preOps.stream()
+                    .map( op -> new MongoDynamicUtil( new BsonDocument( "$project", BsonDocument.parse( op ) ), mongoSchema.getBucket() ) )
+                    .forEach( util -> list.add( util.insert( parameterValues ) ) );
+
             MongoDynamicUtil util = new MongoDynamicUtil( BsonDocument.parse( filter ), getMongoSchema().getBucket() );
             list.add( new BsonDocument( "$match", util.insert( parameterValues ) ) );
 
@@ -334,7 +340,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
          * @see MongoMethod#MONGO_QUERYABLE_AGGREGATE
          */
         @SuppressWarnings("UnusedDeclaration")
-        public Enumerable<Object> aggregate( List<Map.Entry<String, Class>> fields, List<Map.Entry<String, Class>> arrayClass, List<String> operations, String filter ) {
+        public Enumerable<Object> aggregate( List<Map.Entry<String, Class>> fields, List<Map.Entry<String, Class>> arrayClass, List<String> operations, String filter, List<String> preOps ) {
             ClientSession session = getTable().getTransactionProvider().getSession( dataContext.getStatement().getTransaction().getXid() );
 
             Map<Long, Object> values = new HashMap<>();
@@ -342,7 +348,7 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 values = dataContext.getParameterValues().get( 0 );
             }
 
-            return getTable().aggregate( session, getMongoDb(), getTable(), fields, arrayClass, operations, values, filter );
+            return getTable().aggregate( session, getMongoDb(), getTable(), fields, arrayClass, operations, values, filter, preOps );
         }
 
 

@@ -33,42 +33,87 @@ import org.polypheny.db.sql.SqlKind;
 
 public class BsonFunctionHelper extends BsonDocument {
 
-    static String l2Function = "function(arr1, arr2){return Math.pow((arr1[0]-arr2[0]),2)+Math.pow((arr1[1]-arr2[1]),2)}";
-    static String l2squaredFunction = "function(arr1, arr2){return Math.sqrt(Math.pow((arr1[0]-arr2[0]),2)+Math.pow((arr1[1]-arr2[1]),2))}";
-    static String l1Function = "function(arr1, arr2){return Math.abs((arr1[0]-arr2[0]),2)+Math.abs((arr1[1]-arr2[1]),2)}";
+    static String l2Function = "function(arr1, arr2){var result = 0;\n"
+            + "        for ( var i = 0; i < arr1.length; i++){\n"
+            + "            result += Math.pow(arr1[i] - arr2[i], 2);\n"
+            + "        }\n"
+            + "        return result;}";
+    static String l2squaredFunction = "function(arr1, arr2){var result = 0;\n"
+            + "        for ( var i = 0; i < arr1.length; i++){\n"
+            + "            result += Math.pow(arr1[i] - arr2[i], 2);\n"
+            + "        }\n"
+            + "        return Math.sqrt(result);}";
+    static String l1Function = "function(arr1, arr2){var result = 0;\n"
+            + "        for ( var i = 0; i < arr1.length; i++){\n"
+            + "            result += Math.abs(arr1[i] - arr2[i]);\n"
+            + "        }\n"
+            + "        return result;}";
+    static String chiFunction = "function(arr1, arr2){var result = 0;\n"
+            + "        for ( var i = 0; i < arr1.length; i++){\n"
+            + "            result += Math.pow(arr1[i] - arr2[i], 2)/(arr1[i] + arr2[i]);\n"
+            + "        }\n"
+            + "        return result;}";
 
 
     public static BsonDocument getFunction( RexCall call, MongoRowType rowType, GridFSBucket bucket ) {
         String function;
         if ( call.operands.size() == 3 && call.operands.get( 2 ) instanceof RexLiteral ) {
             Object funcName = ((RexLiteral) call.operands.get( 2 )).getValue3();
-            if ( funcName.equals( "L2SQUARED" ) ) {
-                function = l2Function;
-            } else if ( funcName.equals( "L2" ) ) {
-                function = l2squaredFunction;
-            } else if ( funcName.equals( "L1" ) ) {
-                function = l1Function;
-            } else {
-                throw new IllegalArgumentException( "Unsupported function for MongoDB" );
-            }
-
-            BsonArray args = getArgsArray( call.operands, rowType, bucket );
+            function = getUsedFunction( funcName );
 
             return new BsonDocument().append( "$function",
                     new BsonDocument()
                             .append( "body", new BsonString( function ) )
-                            .append( "args", args )
+                            .append( "args", getArgsArray( call.operands, rowType, bucket ) )
                             .append( "lang", new BsonString( "js" ) ) );
 
         }
+        if ( call.operands.size() == 3 ) {
+            // prepared
+
+            return new BsonDocument().append( "$function", new BsonDocument()
+                    .append( "body", getDynamicFunction( call.operands.get( 2 ) ) )
+                    .append( "args", getArgsArray( call.operands, rowType, bucket ) )
+                    .append( "lang", new BsonString( "js" ) ) );
+        }
+
         throw new IllegalArgumentException( "Unsupported function for MongoDB" );
 
     }
 
 
+    private static BsonValue getDynamicFunction( RexNode rexNode ) {
+        if ( rexNode.isA( SqlKind.DYNAMIC_PARAM ) ) {
+            return new BsonDynamic( (RexDynamicParam) rexNode ).setIsFunc( true );
+
+        } else if ( rexNode.isA( SqlKind.CAST ) ) {
+            RexCall call = (RexCall) rexNode;
+            return getDynamicFunction( call.operands.get( 0 ) );
+        }
+        throw new IllegalArgumentException( "Unsupported dynamic parameter for MongoDB" );
+    }
+
+
+    public static String getUsedFunction( Object funcName ) {
+        String function;
+        if ( funcName.equals( "L2SQUARED" ) ) {
+            function = l2Function;
+        } else if ( funcName.equals( "L2" ) ) {
+            function = l2squaredFunction;
+        } else if ( funcName.equals( "L1" ) ) {
+            function = l1Function;
+        } else if ( funcName.equals( "CHISQUARED" ) ) {
+            function = chiFunction;
+        } else {
+            throw new IllegalArgumentException( "Unsupported function for MongoDB" );
+        }
+        return function;
+    }
+
+
     private static BsonArray getArgsArray( ImmutableList<RexNode> operands, MongoRowType rowType, GridFSBucket bucket ) {
         BsonArray array = new BsonArray();
-        if ( operands.size() == 3 && operands.get( 2 ) instanceof RexLiteral ) {
+        if ( operands.size() == 3 ) {
             array.add( getVal( operands.get( 0 ), rowType, bucket ) );
             array.add( getVal( operands.get( 1 ), rowType, bucket ) );
 

@@ -29,39 +29,40 @@ public class BsonDynamic extends BsonDocument {
     @Getter
     private final long id;
     private final String polyTypeName;
-    private boolean isRegex;
-
-
-    /**
-     * @param id
-     * @param polyTypeName
-     */
-    public BsonDynamic( long id, String polyTypeName ) {
-        this( id, polyTypeName, false );
-    }
+    private boolean isRegex = false;
+    private boolean isFunc = false;
 
 
     public BsonDynamic( RexDynamicParam rexNode ) {
-        this( rexNode, false );
-    }
-
-
-    public BsonDynamic( RexDynamicParam rexNode, boolean isRegex ) {
         this( rexNode.getIndex(),
                 rexNode.getType().getPolyType() == PolyType.ARRAY
                         ? rexNode.getType().getComponentType().getPolyType().getTypeName()
-                        : rexNode.getType().getPolyType().getTypeName(), isRegex );
+                        : rexNode.getType().getPolyType().getTypeName() );
     }
 
 
-    public BsonDynamic( long id, String polyTypeName, boolean isRegex ) {
+    public BsonDynamic( long id, String polyTypeName ) {
         super();
         this.id = id;
         this.polyTypeName = polyTypeName;
-        this.isRegex = isRegex;
         append( "_dyn", new BsonInt64( id ) );
         append( "_type", new BsonString( polyTypeName ) );
+        append( "_reg", new BsonBoolean( false ) );
+        append( "_func", new BsonBoolean( false ) );
+    }
+
+
+    public BsonDynamic setIsRegex( boolean isRegex ) {
+        this.isRegex = isRegex;
         append( "_reg", new BsonBoolean( isRegex ) );
+        return this;
+    }
+
+
+    public BsonDynamic setIsFunc( boolean isFunc ) {
+        this.isFunc = isFunc;
+        append( "_func", new BsonBoolean( isFunc ) );
+        return this;
     }
 
 }
