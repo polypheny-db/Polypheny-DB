@@ -110,11 +110,7 @@ class MongoEnumerator implements Enumerator<Object> {
         if ( current == null ) {
             return null;
         }
-        if ( current instanceof Decimal128 ) {
-            return ((Decimal128) current).bigDecimalValue();
-        } else if ( current instanceof Double ) {
-
-        } else if ( current.getClass().isArray() ) {
+        if ( current.getClass().isArray() ) {
             List<Object> temp = new ArrayList<>();
             for ( Object el : (Object[]) current ) {
                 temp.add( handleTransforms( el ) );
@@ -176,6 +172,8 @@ class MongoEnumerator implements Enumerator<Object> {
     static List<Object> arrayGetter( List<Object> objects, Class arrayFieldClass ) {
         if ( arrayFieldClass == Float.class || arrayFieldClass == float.class ) {
             return objects.stream().map( obj -> ((Double) obj).floatValue() ).collect( Collectors.toList() );
+        } else if ( arrayFieldClass == BigDecimal.class ) {
+            return objects.stream().map( obj -> ((Decimal128) obj).bigDecimalValue() ).collect( Collectors.toList() );
         } else {
             return objects;
         }
@@ -242,15 +240,10 @@ class MongoEnumerator implements Enumerator<Object> {
         if ( o instanceof Number && primitive != null ) {
             return primitive.number( (Number) o );
         }
+        if ( clazz == BigDecimal.class ) {
+            assert o instanceof Decimal128;
+            return ((Decimal128) o).bigDecimalValue();
 
-        if ( clazz.getName().equals( BigDecimal.class.getName() ) ) {
-            //assert o instanceof Double; // todo dl maybe use to correct types -> ARRAY
-            if ( o instanceof Double ) { // this should not happen anymore
-                return BigDecimal.valueOf( (Double) o );
-            } else {
-                assert o instanceof Decimal128;
-                return ((Decimal128) o).bigDecimalValue();
-            }
         }
 
         return o;
