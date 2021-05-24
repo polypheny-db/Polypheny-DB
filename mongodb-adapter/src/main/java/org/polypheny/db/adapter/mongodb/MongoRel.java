@@ -35,12 +35,16 @@ package org.polypheny.db.adapter.mongodb;
 
 
 import com.mongodb.client.gridfs.GridFSBucket;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
+import org.bson.json.JsonMode;
+import org.bson.json.JsonWriterSettings;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptTable;
 import org.polypheny.db.rel.RelNode;
@@ -65,7 +69,7 @@ public interface MongoRel extends RelNode {
     /**
      * Callback for the implementation process that converts a tree of {@link MongoRel} nodes into a MongoDB query.
      */
-    class Implementor {
+    class Implementor implements Serializable {
 
         final List<Pair<String, String>> list = new ArrayList<>();
         public List<BsonDocument> operations = new ArrayList<>();
@@ -143,6 +147,21 @@ public interface MongoRel extends RelNode {
             }
 
             return filter;
+        }
+
+
+        public String getFilterSerialized() {
+            return getFilter().toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() );
+        }
+
+
+        public List<String> getPreProjects() {
+            return preProjections.stream().map( p -> p.toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() ) ).collect( Collectors.toList() );
+        }
+
+
+        public List<String> getOperations() {
+            return operations.stream().map( p -> p.toJson( JsonWriterSettings.builder().outputMode( JsonMode.EXTENDED ).build() ) ).collect( Collectors.toList() );
         }
 
     }

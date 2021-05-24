@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
 import org.bson.BsonString;
+import org.bson.BsonType;
 import org.bson.BsonValue;
 import org.bson.Document;
 import org.polypheny.db.adapter.mongodb.bson.BsonFunctionHelper;
@@ -47,14 +48,14 @@ public class MongoDynamicUtil {
 
 
     public MongoDynamicUtil( BsonDocument preDocument, GridFSBucket bucket ) {
-        this.document = preDocument;
+        this.document = preDocument.clone();
         this.bucket = bucket;
-        preDocument.forEach( ( k, bsonValue ) -> replaceDynamic( bsonValue, preDocument, k, true ) );
+        this.document.forEach( ( k, bsonValue ) -> replaceDynamic( bsonValue, this.document, k, true ) );
     }
 
 
     public void replaceDynamic( BsonValue preDocument, BsonValue parent, Object key, boolean isDoc ) {
-        if ( preDocument instanceof BsonDocument ) {
+        if ( preDocument.getBsonType() == BsonType.DOCUMENT ) {
             if ( ((BsonDocument) preDocument).containsKey( "_dyn" ) ) {
                 // prepared
                 BsonValue bsonIndex = ((BsonDocument) preDocument).get( "_dyn" );
@@ -78,7 +79,7 @@ public class MongoDynamicUtil {
                 // normal
                 ((BsonDocument) preDocument).forEach( ( k, bsonValue ) -> replaceDynamic( bsonValue, preDocument, k, true ) );
             }
-        } else if ( preDocument instanceof BsonArray ) {
+        } else if ( preDocument.getBsonType() == BsonType.ARRAY ) {
             int i = 0;
             for ( BsonValue bsonValue : ((BsonArray) preDocument) ) {
                 replaceDynamic( bsonValue, preDocument, i, false );

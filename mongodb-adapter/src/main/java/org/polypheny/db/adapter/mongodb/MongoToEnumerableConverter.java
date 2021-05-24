@@ -56,6 +56,7 @@ import org.polypheny.db.plan.RelTraitSet;
 import org.polypheny.db.rel.AbstractRelNode;
 import org.polypheny.db.rel.RelNode;
 import org.polypheny.db.rel.convert.ConverterImpl;
+import org.polypheny.db.rel.core.TableModify.Operation;
 import org.polypheny.db.rel.metadata.RelMetadataQuery;
 import org.polypheny.db.rel.type.RelDataType;
 import org.polypheny.db.rel.type.RelDataTypeField;
@@ -178,15 +179,19 @@ public class MongoToEnumerableConverter extends ConverterImpl implements Enumera
 
         List<String> opList = Pair.right( mongoImplementor.list );
 
-        //final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );
-        long id = mongoImplementor.mongoTable.attachQueryContent( mongoImplementor );
-        Expression idExp = list.append( "id", Expressions.constant( id, Long.class ) );
+        final Expression ops = list.append( "ops", constantArrayList( opList, String.class ) );
+        final Expression filter = list.append( "filter", Expressions.constant( mongoImplementor.getFilterSerialized() ) );
 
         Expression enumerable;
         if ( !mongoImplementor.isDML() ) {
-            enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, arrayClassFields, idExp ) );
+            final Expression preProjects = list.append( "prePro", constantArrayList( mongoImplementor.getPreProjects(), String.class ) );
+
+            enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.MONGO_QUERYABLE_AGGREGATE.method, fields, arrayClassFields, ops, filter, preProjects ) );
         } else {
-            enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.HANDLE_DIRECT_DML.method, idExp ) );
+            final Expression operations = list.append( "operations", constantArrayList( mongoImplementor.getOperations(), String.class ) );
+            final Expression operation = list.append( "operation", Expressions.constant( mongoImplementor.getOperation(), Operation.class ) );
+
+            enumerable = list.append( "enumerable", Expressions.call( table, MongoMethod.HANDLE_DIRECT_DML.method, operation, filter, operations ) );
         }
 
         if ( RuntimeConfig.DEBUG.getBoolean() ) {
