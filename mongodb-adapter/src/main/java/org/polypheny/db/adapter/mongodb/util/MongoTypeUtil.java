@@ -44,7 +44,6 @@ import org.polypheny.db.rex.RexCall;
 import org.polypheny.db.rex.RexLiteral;
 import org.polypheny.db.rex.RexNode;
 import org.polypheny.db.type.PolyType;
-import org.polypheny.db.type.PolyTypeFamily;
 
 public class MongoTypeUtil {
 
@@ -65,169 +64,180 @@ public class MongoTypeUtil {
 
 
     private static Function<Object, BsonValue> getBsonTransformerSpecial( PolyType type, GridFSBucket bucket ) {
-        Function<Object, BsonValue> function;
-        if ( type.getFamily() == PolyTypeFamily.CHARACTER ) {
-            function = ( o ) -> new BsonString( o.toString() );
-        } else if ( type == PolyType.BIGINT ) {
-            function = ( o ) -> new BsonInt64( (Long) o );
-        } else if ( type == PolyType.DECIMAL ) {
-            function = ( o ) -> {
-                if ( o instanceof String ) {
-                    return new BsonDecimal128( new Decimal128( new BigDecimal( (String) o ) ) );
-                } else {
-                    return new BsonDecimal128( new Decimal128( new BigDecimal( String.valueOf( o ) ) ) );
-                }
-            };
+        switch ( type ) {
+            case CHAR:
+            case VARCHAR:
+            case JSON:
+                return ( o ) -> new BsonString( o.toString() );
+            case BIGINT:
+                return ( o ) -> new BsonInt64( (Long) o );
+            case DECIMAL:
+                return ( o ) -> {
+                    if ( o instanceof String ) {
+                        return new BsonDecimal128( new Decimal128( new BigDecimal( (String) o ) ) );
+                    } else {
+                        return new BsonDecimal128( new Decimal128( new BigDecimal( String.valueOf( o ) ) ) );
+                    }
+                };
 
-        } else if ( type == PolyType.TINYINT ) {
-            function = ( o ) -> {
-                if ( o instanceof Long ) {
-                    return new BsonInt32( Math.toIntExact( (Long) o ) );
-                } else {
-                    return new BsonInt32( (Byte) o );
-                }
-            };
-        } else if ( type == PolyType.SMALLINT ) {
-            function = ( o ) -> {
-                if ( o instanceof Long ) {
-                    return new BsonInt32( Math.toIntExact( (Long) o ) );
-                } else if ( o instanceof Integer ) {
-                    return new BsonInt32( (Integer) o );
-                } else {
-                    return new BsonInt32( (Short) o );
-                }
-            };
-        } else if ( PolyType.INT_TYPES.contains( type ) ) {
-            function = ( o ) -> {
-                if ( o instanceof Long ) {
-                    return new BsonInt32( ((Long) o).intValue() );
-                } else {
-                    return new BsonInt32( (Integer) o );
-                }
+            case TINYINT:
+                return ( o ) -> {
+                    if ( o instanceof Long ) {
+                        return new BsonInt32( Math.toIntExact( (Long) o ) );
+                    } else {
+                        return new BsonInt32( (Byte) o );
+                    }
+                };
+            case SMALLINT:
+                return ( o ) -> {
+                    if ( o instanceof Long ) {
+                        return new BsonInt32( Math.toIntExact( (Long) o ) );
+                    } else if ( o instanceof Integer ) {
+                        return new BsonInt32( (Integer) o );
+                    } else {
+                        return new BsonInt32( (Short) o );
+                    }
+                };
+            case INTEGER:
+                return ( o ) -> {
+                    if ( o instanceof Long ) {
+                        return new BsonInt32( ((Long) o).intValue() );
+                    } else {
+                        return new BsonInt32( (Integer) o );
+                    }
 
-            };
-        } else if ( type == PolyType.FLOAT || type == PolyType.REAL ) {
-            function = ( o ) -> new BsonDouble( Double.parseDouble( o.toString() ) );
-        } else if ( PolyType.FRACTIONAL_TYPES.contains( type ) ) {
-            function = ( o ) -> new BsonDouble( (Double) o );
-        } else if ( type.getFamily() == PolyTypeFamily.DATE ) {
-            function = ( o ) -> {
-                if ( o instanceof Integer ) {
-                    return new BsonInt64( (Integer) o );
-                } else if ( o instanceof Date ) {
-                    return new BsonInt64( ((Date) o).toLocalDate().toEpochDay() );
-                } else {
-                    return new BsonInt64( new Date( ((Time) o).getTime() ).toLocalDate().toEpochDay() );
-                }
-            };
-        } else if ( type.getFamily() == PolyTypeFamily.TIME ) {
-            function = ( o ) -> {
-                if ( o instanceof Integer ) {
-                    return new BsonInt64( ((Integer) o) );
-                } else {
-                    return new BsonInt64( ((Time) o).toLocalTime().toNanoOfDay() / 1000000 );
-                }
-            };
-        } else if ( type.getFamily() == PolyTypeFamily.TIMESTAMP ) {
-            function = ( o ) -> {
-                if ( o instanceof Timestamp ) {
-                    return new BsonInt64( ((Timestamp) o).toInstant().toEpochMilli() + 3600000 );
-                } else {
-                    return new BsonInt64( (Long) o );
-                }
-            };
-        } else if ( type.getFamily() == PolyTypeFamily.BOOLEAN ) {
-            function = ( o ) -> new BsonBoolean( (Boolean) o );
-        } else if ( type.getFamily() == PolyTypeFamily.BINARY ) {
-            function = ( o ) -> new BsonString( ((ByteString) o).toBase64String() );
-        } else if ( PolyTypeFamily.MULTIMEDIA == type.getFamily() ) {
-            function = ( o ) -> {
-                ObjectId id = bucket.uploadFromStream( "_", (InputStream) o );
-                return new BsonDocument()
-                        .append( "_type", new BsonString( "s" ) )
-                        .append( "_id", new BsonString( id.toString() ) );
-            };
-        } else {
-            function = ( o ) -> new BsonString( o.toString() );
+                };
+            case FLOAT:
+            case REAL:
+                return ( o ) -> new BsonDouble( Double.parseDouble( o.toString() ) );
+            case DOUBLE:
+                return ( o ) -> new BsonDouble( (Double) o );
+            case DATE:
+                return ( o ) -> {
+                    if ( o instanceof Integer ) {
+                        return new BsonInt64( (Integer) o );
+                    } else if ( o instanceof Date ) {
+                        return new BsonInt64( ((Date) o).toLocalDate().toEpochDay() );
+                    } else {
+                        return new BsonInt64( new Date( ((Time) o).getTime() ).toLocalDate().toEpochDay() );
+                    }
+                };
+            case TIME:
+                return ( o ) -> {
+                    if ( o instanceof Integer ) {
+                        return new BsonInt64( ((Integer) o) );
+                    } else {
+                        return new BsonInt64( ((Time) o).toLocalTime().toNanoOfDay() / 1000000 );
+                    }
+                };
+            case TIMESTAMP:
+                return ( o ) -> {
+                    if ( o instanceof Timestamp ) {
+                        return new BsonInt64( ((Timestamp) o).toInstant().toEpochMilli() + 3600000 );
+                    } else {
+                        return new BsonInt64( (Long) o );
+                    }
+                };
+            case BOOLEAN:
+                return ( o ) -> new BsonBoolean( (Boolean) o );
+            case BINARY:
+                return ( o ) -> new BsonString( ((ByteString) o).toBase64String() );
+            case SOUND:
+            case IMAGE:
+            case VIDEO:
+            case FILE:
+                return ( o ) -> {
+                    ObjectId id = bucket.uploadFromStream( "_", (InputStream) o );
+                    return new BsonDocument()
+                            .append( "_type", new BsonString( "s" ) )
+                            .append( "_id", new BsonString( id.toString() ) );
+                };
+            default:
+                return ( o ) -> new BsonString( o.toString() );
         }
-        return function;
     }
 
 
     public static BsonValue getAsBson( Object obj, PolyType type, GridFSBucket bucket ) {
-        BsonValue value;
         if ( obj instanceof List ) { // TODO DL: reevaluate
             BsonArray array = new BsonArray();
             ((List<?>) obj).forEach( el -> array.add( getAsBson( el, type, bucket ) ) );
-            value = array;
-        } else if ( type == PolyType.NULL || obj == null ) {
-            value = new BsonNull();
-        } else if ( type.getFamily() == PolyTypeFamily.CHARACTER ) {
-            value = new BsonString( obj.toString() );
-        } else if ( type == PolyType.BIGINT ) {
-            value = new BsonInt64( (Long) obj );
-        } else if ( type == PolyType.DECIMAL ) {
-            if ( obj instanceof String ) {
-                value = new BsonDecimal128( new Decimal128( new BigDecimal( (String) obj ) ) );
-            } else {
-                value = new BsonDecimal128( new Decimal128( new BigDecimal( String.valueOf( obj ) ) ) );
-            }
-        } else if ( type == PolyType.TINYINT ) {
-            if ( obj instanceof Long ) {
-                value = new BsonInt32( Math.toIntExact( (Long) obj ) );
-            } else {
-                value = new BsonInt32( (Byte) obj );
-            }
-        } else if ( type == PolyType.SMALLINT ) {
-            if ( obj instanceof Long ) {
-                value = new BsonInt32( Math.toIntExact( (Long) obj ) );
-            } else if ( obj instanceof Integer ) {
-                value = new BsonInt32( (Integer) obj );
-            } else {
-                value = new BsonInt32( (Short) obj );
-            }
-
-        } else if ( PolyType.INT_TYPES.contains( type ) ) {
-            value = new BsonInt32( (Integer) obj );
-        } else if ( type == PolyType.FLOAT || type == PolyType.REAL ) {
-            value = new BsonDouble( Double.parseDouble( obj.toString() ) );
-        } else if ( PolyType.FRACTIONAL_TYPES.contains( type ) ) {
-            value = new BsonDouble( (Double) obj );
-        } else if ( type.getFamily() == PolyTypeFamily.DATE ) {
-            if ( obj instanceof Integer ) {
-                value = new BsonInt64( (Integer) obj );
-            } else if ( obj instanceof Date ) {
-                value = new BsonInt64( ((Date) obj).toLocalDate().toEpochDay() );
-            } else {
-                value = new BsonInt64( new Date( ((Time) obj).getTime() ).toLocalDate().toEpochDay() );
-            }
-        } else if ( type.getFamily() == PolyTypeFamily.TIME ) {
-            //value = new BsonTimestamp( ((Time) obj).getTime() );
-            if ( obj instanceof Integer ) {
-                value = new BsonInt64( ((Integer) obj) );
-            } else {
-                value = new BsonInt64( ((Time) obj).toLocalTime().toNanoOfDay() / 1000000 ); // TODO DL: why not getEpoch?
-            }
-        } else if ( type.getFamily() == PolyTypeFamily.TIMESTAMP ) {
-            if ( obj instanceof Timestamp ) {
-                //value = new BsonTimestamp( ((Timestamp) obj).getTime() );
-                value = new BsonInt64( ((Timestamp) obj).toInstant().toEpochMilli() + 3600000 ); // todo dl fix
-            } else {
-                value = new BsonInt64( (Long) obj );
-            }
-        } else if ( type.getFamily() == PolyTypeFamily.BOOLEAN ) {
-            value = new BsonBoolean( (Boolean) obj );
-        } else if ( type.getFamily() == PolyTypeFamily.BINARY ) {
-            value = new BsonString( ((ByteString) obj).toBase64String() );
-        } else if ( PolyTypeFamily.MULTIMEDIA == type.getFamily() ) {
-            ObjectId id = bucket.uploadFromStream( "_", (InputStream) obj );
-            value = new BsonDocument()
-                    .append( "_type", new BsonString( "s" ) )
-                    .append( "_id", new BsonString( id.toString() ) );
-        } else {
-            value = new BsonString( obj.toString() );
+            return array;
+        } else if ( obj == null ) {
+            return new BsonNull();
         }
-        return value;
+        switch ( type ) {
+            case CHAR:
+            case VARCHAR:
+            case JSON:
+                return new BsonString( obj.toString() );
+            case BIGINT:
+                return new BsonInt64( (Long) obj );
+            case DECIMAL:
+                if ( obj instanceof String ) {
+                    return new BsonDecimal128( new Decimal128( new BigDecimal( (String) obj ) ) );
+                } else {
+                    return new BsonDecimal128( new Decimal128( new BigDecimal( String.valueOf( obj ) ) ) );
+                }
+            case TINYINT:
+                if ( obj instanceof Long ) {
+                    return new BsonInt32( Math.toIntExact( (Long) obj ) );
+                } else {
+                    return new BsonInt32( (Byte) obj );
+                }
+            case SMALLINT:
+                if ( obj instanceof Long ) {
+                    return new BsonInt32( Math.toIntExact( (Long) obj ) );
+                } else if ( obj instanceof Integer ) {
+                    return new BsonInt32( (Integer) obj );
+                } else {
+                    return new BsonInt32( (Short) obj );
+                }
+
+            case INTEGER:
+                return new BsonInt32( (Integer) obj );
+            case FLOAT:
+            case REAL:
+                return new BsonDouble( Double.parseDouble( obj.toString() ) );
+            case DOUBLE:
+                return new BsonDouble( (Double) obj );
+            case DATE:
+                if ( obj instanceof Integer ) {
+                    return new BsonInt64( (Integer) obj );
+                } else if ( obj instanceof Date ) {
+                    return new BsonInt64( ((Date) obj).toLocalDate().toEpochDay() );
+                } else {
+                    return new BsonInt64( new Date( ((Time) obj).getTime() ).toLocalDate().toEpochDay() );
+                }
+            case TIME:
+                //value = new BsonTimestamp( ((Time) obj).getTime() );
+                if ( obj instanceof Integer ) {
+                    return new BsonInt64( ((Integer) obj) );
+                } else {
+                    return new BsonInt64( ((Time) obj).toLocalTime().toNanoOfDay() / 1000000 ); // TODO DL: why not getEpoch?
+                }
+            case TIMESTAMP:
+                if ( obj instanceof Timestamp ) {
+                    //value = new BsonTimestamp( ((Timestamp) obj).getTime() );
+                    return new BsonInt64( ((Timestamp) obj).toInstant().toEpochMilli() + 3600000 ); // todo dl fix
+                } else {
+                    return new BsonInt64( (Long) obj );
+                }
+            case BOOLEAN:
+                return new BsonBoolean( (Boolean) obj );
+            case BINARY:
+                return new BsonString( ((ByteString) obj).toBase64String() );
+            case SOUND:
+            case IMAGE:
+            case VIDEO:
+            case FILE:
+                ObjectId id = bucket.uploadFromStream( "_", (InputStream) obj );
+                return new BsonDocument()
+                        .append( "_type", new BsonString( "s" ) )
+                        .append( "_id", new BsonString( id.toString() ) );
+            default:
+                return new BsonString( obj.toString() );
+        }
     }
 
 

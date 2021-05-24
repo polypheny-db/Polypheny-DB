@@ -37,15 +37,10 @@ package org.polypheny.db.adapter.mongodb;
 import com.mongodb.client.gridfs.GridFSBucket;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import lombok.Getter;
 import lombok.Setter;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
-import org.polypheny.db.catalog.Catalog;
-import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptTable;
 import org.polypheny.db.rel.RelNode;
@@ -95,10 +90,6 @@ public interface MongoRel extends RelNode {
         private Operation operation;
 
         @Getter
-        @Setter
-        List<Object> results;
-
-        @Getter
         private RelRecordType staticRowType;
 
 
@@ -129,22 +120,6 @@ public interface MongoRel extends RelNode {
             } else {
                 this.staticRowType = staticRowType;
             }
-        }
-
-
-        public Map<String, String> getLogicalPhysicalNameMapping() {
-            if ( staticRowType == null ) {
-                throw new RuntimeException( "Could no come up with mapping as rowtype was not specified" );
-            }
-            Catalog catalog = Catalog.getInstance();
-            CatalogTable table = catalog.getTable( mongoTable.getCatalogTable().id );
-            List<String> physicalNames = table.columnIds.stream().map( MongoStore::getPhysicalColumnName ).collect( Collectors.toList() );
-            return IntStream
-                    .range( 0, table.columnIds.size() )
-                    .boxed()
-                    .collect( Collectors.toMap( key -> table.getColumnNames().get( key ), physicalNames::get ) );
-
-
         }
 
 

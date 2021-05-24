@@ -511,8 +511,6 @@ public class MongoRules {
         @Override
         public void implement( Implementor implementor ) {
             implementor.setDML( true );
-            implementor.results = new ArrayList<>();
-
             Table preTable = ((RelOptTableImpl) table).getTable();
 
             if ( !(preTable instanceof MongoTable) ) {
