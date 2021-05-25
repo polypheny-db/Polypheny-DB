@@ -362,10 +362,10 @@ public class MongoFilter extends Filter implements MongoRel {
         private void translateOp2( String op, String name, RexLiteral right ) {
             if ( op == null ) {
                 // E.g.: {deptno: 100}
-                dynamics.add( new BsonDocument().append( name, MongoTypeUtil.getAsBson( right, null ) ) );
+                dynamics.add( new BsonDocument().append( name, MongoTypeUtil.getAsBson( right, bucket ) ) );
             } else {
                 // E.g. {deptno: {$lt: 100}} which may later be combined with other conditions: E.g. {deptno: [$lt: 100, $gt: 50]}
-                dynamics.add( new BsonDocument().append( name, new BsonDocument().append( op, MongoTypeUtil.getAsBson( right, null ) ) ) );
+                dynamics.add( new BsonDocument().append( name, new BsonDocument().append( op, MongoTypeUtil.getAsBson( right, bucket ) ) ) );
             }
         }
 

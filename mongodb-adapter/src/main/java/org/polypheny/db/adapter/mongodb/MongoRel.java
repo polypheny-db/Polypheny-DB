@@ -119,6 +119,9 @@ public interface MongoRel extends RelNode {
 
 
         public void setStaticRowType( RelRecordType staticRowType ) {
+            if ( this.staticRowType != null ) {
+                return;
+            }
             if ( mongoTable != null ) {
                 this.staticRowType = MongoRowType.fromRecordType( staticRowType, mongoTable );
             } else {

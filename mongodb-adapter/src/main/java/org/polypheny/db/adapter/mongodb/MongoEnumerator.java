@@ -40,7 +40,6 @@ import com.mongodb.client.gridfs.GridFSDownloadStream;
 import java.io.PushbackInputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -241,9 +240,7 @@ class MongoEnumerator implements Enumerator<Object> {
             return primitive.number( (Number) o );
         }
         if ( clazz == BigDecimal.class ) {
-            assert o instanceof Decimal128;
             return ((Decimal128) o).bigDecimalValue();
-
         }
 
         return o;
@@ -294,49 +291,6 @@ class MongoEnumerator implements Enumerator<Object> {
 
     }
 
-
-    static class ChangeMongoEnumerator implements Enumerator<Object> {
-
-        private final Iterator<Integer> iterator;
-        private Object current = null;
-        private int left = 1;
-
-
-        public ChangeMongoEnumerator( Iterator<Integer> iterator ) {
-            this.iterator = iterator;
-        }
-
-
-        @Override
-        public Object current() {
-            return Collections.singletonList( current ).toArray();
-        }
-
-
-        @Override
-        public boolean moveNext() {
-            boolean res = left > 0;
-            if ( res ) {
-                left--;
-                current = iterator.next();
-            }
-
-            return res;
-        }
-
-
-        @Override
-        public void reset() {
-
-        }
-
-
-        @Override
-        public void close() {
-
-        }
-
-    }
 
 }
 
