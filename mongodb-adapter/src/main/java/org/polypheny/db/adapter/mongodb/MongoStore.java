@@ -44,8 +44,6 @@ import org.bson.BsonInt64;
 import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.bson.Document;
-import org.bson.json.JsonMode;
-import org.bson.json.JsonWriterSettings;
 import org.polypheny.db.adapter.Adapter.AdapterProperties;
 import org.polypheny.db.adapter.Adapter.AdapterSettingBoolean;
 import org.polypheny.db.adapter.Adapter.AdapterSettingInteger;
@@ -367,8 +365,8 @@ public class MongoStore extends DataStore {
         List<BsonDocument> updates = Collections.singletonList( new BsonDocument( "$set", new BsonDocument( name, new BsonDocument( "$convert", new BsonDocument()
                 .append( "input", new BsonString( "$" + name ) )
                 .append( "to", new BsonInt32( MongoTypeUtil.getTypeNumber( catalogColumn.type ) ) ) ) ) ) );
-        updates.forEach( el -> System.out.println( el.toJson( JsonWriterSettings.builder().outputMode( JsonMode.SHELL ).build() ) ) );
-        this.currentSchema.database.getCollection( columnPlacement.physicalTableName ).updateMany( filter, updates ).;
+        //updates.forEach( el -> System.out.println( el.toJson( JsonWriterSettings.builder().outputMode( JsonMode.SHELL ).build() ) ) );
+        this.currentSchema.database.getCollection( columnPlacement.physicalTableName ).updateMany( filter, updates );
     }
 
 
