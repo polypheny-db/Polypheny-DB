@@ -22,6 +22,7 @@ import com.mongodb.MongoClientException;
 import com.mongodb.ReadConcern;
 import com.mongodb.ReadPreference;
 import com.mongodb.TransactionOptions;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.ClientSession;
 import com.mongodb.client.MongoClient;
 import java.util.ArrayList;
@@ -47,7 +48,10 @@ public class TransactionProvider {
         if ( !sessions.containsKey( xid ) ) {
 
             ClientSession session = client.startSession();
-            TransactionOptions options = TransactionOptions.builder().readPreference( ReadPreference.primary() ).readConcern( ReadConcern.LOCAL ).build();
+            TransactionOptions options = TransactionOptions.builder()
+                    .readPreference( ReadPreference.primary() )
+                    .readConcern( ReadConcern.LOCAL )
+                    .writeConcern( WriteConcern.MAJORITY ).build();
             session.startTransaction( options );
             sessions.put( xid, session );
         }

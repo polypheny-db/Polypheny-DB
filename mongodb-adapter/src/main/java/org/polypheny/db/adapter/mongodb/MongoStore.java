@@ -16,6 +16,7 @@
 
 package org.polypheny.db.adapter.mongodb;
 
+import com.google.common.collect.ImmutableList;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ServerAddress;
 import com.mongodb.client.MongoClient;
@@ -316,6 +317,7 @@ public class MongoStore extends DataStore {
 
                 break;
             case DEFAULT:
+            case COMPOUND:
                 addCompositeIndex( catalogIndex, catalogIndex.key.getColumnNames() );
                 break;
             case MULTIKEY:
@@ -326,6 +328,8 @@ public class MongoStore extends DataStore {
             case HASHED:
                 throw new UnsupportedOperationException( "The mongodb adapter does not yet support this index" );
         }
+
+        Catalog.getInstance().setIndexPhysicalName( catalogIndex.id, catalogIndex.name );
     }
 
 
@@ -367,13 +371,13 @@ public class MongoStore extends DataStore {
 
     @Override
     public AvailableIndexMethod getDefaultIndexMethod() {
-        return HASH_FUNCTION.DEFAULT.asMethod();
+        return HASH_FUNCTION.COMPOUND.asMethod();
     }
 
 
     @Override
     public List<FunctionalIndexInfo> getFunctionalIndexes( CatalogTable catalogTable ) {
-        return null;
+        return ImmutableList.of();
     }
 
 
@@ -415,7 +419,8 @@ public class MongoStore extends DataStore {
 
 
     private enum HASH_FUNCTION {
-        DEFAULT, //COMPOUND
+        DEFAULT,
+        COMPOUND, //COMPOUND
         SINGLE,
         MULTIKEY,
         GEOSPATIAL,

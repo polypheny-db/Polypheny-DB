@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.function.Function;
@@ -134,6 +135,8 @@ public class MongoTypeUtil {
                 return ( o ) -> {
                     if ( o instanceof Timestamp ) {
                         return new BsonInt64( ((Timestamp) o).toInstant().toEpochMilli() + 3600000 );
+                    } else if ( o instanceof Calendar ) {
+                        return new BsonInt64( ((Calendar) o).toInstant().getEpochSecond() + 3600000 );
                     } else {
                         return new BsonInt64( (Long) o );
                     }
@@ -220,6 +223,8 @@ public class MongoTypeUtil {
                 if ( obj instanceof Timestamp ) {
                     //value = new BsonTimestamp( ((Timestamp) obj).getTime() );
                     return new BsonInt64( ((Timestamp) obj).toInstant().toEpochMilli() + 3600000 ); // todo dl fix
+                } else if ( obj instanceof Calendar ) {
+                    return new BsonInt64( ((Calendar) obj).toInstant().getEpochSecond() + 3600000 );
                 } else {
                     return new BsonInt64( (Long) obj );
                 }
