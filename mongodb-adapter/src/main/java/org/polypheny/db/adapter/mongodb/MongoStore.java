@@ -37,12 +37,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.calcite.avatica.util.ByteString;
 import org.bson.BsonBinary;
 import org.bson.BsonBoolean;
+import org.bson.BsonDocument;
 import org.bson.BsonDouble;
 import org.bson.BsonInt32;
 import org.bson.BsonInt64;
 import org.bson.BsonString;
 import org.bson.BsonValue;
 import org.bson.Document;
+import org.bson.json.JsonMode;
+import org.bson.json.JsonWriterSettings;
 import org.polypheny.db.adapter.Adapter.AdapterProperties;
 import org.polypheny.db.adapter.Adapter.AdapterSettingBoolean;
 import org.polypheny.db.adapter.Adapter.AdapterSettingInteger;
@@ -51,6 +54,7 @@ import org.polypheny.db.adapter.AdapterManager;
 import org.polypheny.db.adapter.DataStore;
 import org.polypheny.db.adapter.DeployMode;
 import org.polypheny.db.adapter.DeployMode.DeploySetting;
+import org.polypheny.db.adapter.mongodb.util.MongoTypeUtil;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.catalog.entity.CatalogColumn;
 import org.polypheny.db.catalog.entity.CatalogColumnPlacement;
@@ -358,6 +362,13 @@ public class MongoStore extends DataStore {
     @Override
     public void updateColumnType( Context context, CatalogColumnPlacement columnPlacement, CatalogColumn catalogColumn, PolyType polyType ) {
         // this is not really possible in mongodb, only way would be to reinsert all date, which is not really performant, but could be a possibility
+        String name = columnPlacement.physicalColumnName;
+        BsonDocument filter = new BsonDocument();
+        List<BsonDocument> updates = Collections.singletonList( new BsonDocument( "$set", new BsonDocument( name, new BsonDocument( "$convert", new BsonDocument()
+                .append( "input", new BsonString( "$" + name ) )
+                .append( "to", new BsonInt32( MongoTypeUtil.getTypeNumber( catalogColumn.type ) ) ) ) ) ) );
+        updates.forEach( el -> System.out.println( el.toJson( JsonWriterSettings.builder().outputMode( JsonMode.SHELL ).build() ) ) );
+        this.currentSchema.database.getCollection( columnPlacement.physicalTableName ).updateMany( filter, updates ).;
     }
 
 

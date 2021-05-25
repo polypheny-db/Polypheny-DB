@@ -396,4 +396,42 @@ public class MongoTypeUtil {
         return doc;
     }
 
+
+    public static int getTypeNumber( PolyType type ) {
+        switch ( type ) {
+
+            case BOOLEAN:
+                return 8;
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+                return 16;
+            case BIGINT:
+            case DATE:
+            case TIME:
+            case TIME_WITH_LOCAL_TIME_ZONE:
+            case TIMESTAMP:
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return 18;
+            case DECIMAL:
+                return 19;
+            case FLOAT:
+            case REAL:
+            case DOUBLE:
+                return 1;
+            case CHAR:
+            case VARCHAR:
+            case BINARY:
+            case VARBINARY:
+                return 2;
+            /*case FILE:
+            case IMAGE:
+            case VIDEO:
+            case SOUND:
+                return PushbackInputStream.class;*/
+            default:
+                throw new IllegalStateException( "Unexpected value: " + type );
+        }
+    }
+
 }
