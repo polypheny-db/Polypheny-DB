@@ -49,7 +49,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import org.apache.calcite.linq4j.AbstractEnumerable;
@@ -66,7 +65,6 @@ import org.polypheny.db.adapter.AdapterManager;
 import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.java.AbstractQueryableTable;
 import org.polypheny.db.adapter.mongodb.MongoEnumerator.IterWrapper;
-import org.polypheny.db.adapter.mongodb.MongoRel.Implementor;
 import org.polypheny.db.adapter.mongodb.util.MongoDynamicUtil;
 import org.polypheny.db.adapter.mongodb.util.MongoTypeUtil;
 import org.polypheny.db.catalog.entity.CatalogTable;
@@ -110,9 +108,6 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
     private final TransactionProvider transactionProvider;
     @Getter
     private final int storeId;
-    @Getter
-    private HashMap<Long, Implementor> queries = new HashMap<>();
-    private AtomicLong idBuilder = new AtomicLong();
 
 
     /**
@@ -305,14 +300,6 @@ public class MongoTable extends AbstractQueryableTable implements TranslatableTa
                 updateColumnList,
                 sourceExpressionList,
                 flattened );
-    }
-
-
-    public long attachQueryContent( Implementor implementor ) {
-        long id = idBuilder.getAndIncrement();
-        this.queries.put( id, implementor );
-        return id;
-
     }
 
 

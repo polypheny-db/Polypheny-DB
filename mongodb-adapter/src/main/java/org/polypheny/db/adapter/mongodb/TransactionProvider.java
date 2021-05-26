@@ -89,8 +89,10 @@ public class TransactionProvider {
             try {
                 session.abortTransaction();
             } catch ( MongoClientException e ) {
-                session.close();
+                // empty on purpose
+            } finally {
                 sessions.remove( xid );
+                session.close();
             }
         } else {
             log.info( "No-op rollback" );

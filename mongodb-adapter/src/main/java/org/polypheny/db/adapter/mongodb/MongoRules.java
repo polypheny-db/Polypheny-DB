@@ -440,7 +440,7 @@ public class MongoRules {
 
         @Override
         public void implement( Implementor implementor ) {
-            return;
+
         }
 
     }
@@ -463,6 +463,11 @@ public class MongoRules {
             if ( modifiableTable == null ) {
                 return null;
             }
+
+            if ( modify.getTable().unwrap( MongoTable.class ) == null ) {
+                return null;
+            }
+
             final RelTraitSet traitSet = modify.getTraitSet().replace( out );
             return new MongoTableModify(
                     modify.getCluster(),
@@ -658,7 +663,7 @@ public class MongoRules {
                 } else if ( rexNode.getKind() == SqlKind.INPUT_REF && input.getInput() instanceof MongoValues ) {
                     // TODO DL handle and refactor
                     handleDirectInsert( implementor, (MongoValues) input.getInput() );
-                    break;
+                    return;
                 } else {
                     throw new RuntimeException( "This rexType was not considered" );
                 }

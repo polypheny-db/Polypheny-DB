@@ -259,6 +259,8 @@ public class FileAdapterTest {
                     statement.executeUpdate( "INSERT INTO public.partitioned (id, username, pic) VALUES(1, 'user1', x'6869')" );
                     statement.executeUpdate( "INSERT INTO public.partitioned (id, username, pic) VALUES(2, 'user2', x'6869')" );
 
+                    connection.commit();
+
                     ResultSet rs = statement.executeQuery( "SELECT username, pic FROM public.partitioned WHERE id = 1" );
                     TestHelper.checkResultSet( rs, ImmutableList.of( new Object[]{ "user1", "hi".getBytes() } ) );
                     rs.close();
