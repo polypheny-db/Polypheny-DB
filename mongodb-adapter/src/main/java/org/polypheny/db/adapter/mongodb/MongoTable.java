@@ -67,6 +67,8 @@ import org.polypheny.db.adapter.AdapterManager;
 import org.polypheny.db.adapter.DataContext;
 import org.polypheny.db.adapter.java.AbstractQueryableTable;
 import org.polypheny.db.adapter.mongodb.MongoEnumerator.IterWrapper;
+import org.polypheny.db.adapter.mongodb.rules.MongoRel;
+import org.polypheny.db.adapter.mongodb.rules.MongoTableScan;
 import org.polypheny.db.adapter.mongodb.transaction.TransactionProvider;
 import org.polypheny.db.adapter.mongodb.util.MongoDynamicUtil;
 import org.polypheny.db.adapter.mongodb.util.MongoTypeUtil;

@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-package org.polypheny.db.adapter.mongodb;
+package org.polypheny.db.adapter.mongodb.rules;
 
 import java.util.HashMap;
 import java.util.List;
+import org.polypheny.db.adapter.mongodb.MongoStore;
+import org.polypheny.db.adapter.mongodb.MongoTable;
 import org.polypheny.db.catalog.Catalog;
 import org.polypheny.db.rel.type.RelDataTypeField;
 import org.polypheny.db.rel.type.RelRecordType;

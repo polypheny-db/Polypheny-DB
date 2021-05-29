@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.polypheny.db.adapter.mongodb;
+package org.polypheny.db.adapter.mongodb.rules;
 
 import com.google.common.collect.ImmutableList;
 import com.mongodb.client.gridfs.GridFSBucket;
@@ -28,8 +28,10 @@ import org.bson.BsonArray;
 import org.bson.BsonDocument;
 import org.bson.BsonString;
 import org.bson.BsonValue;
-import org.polypheny.db.adapter.mongodb.MongoRules.MongoValues;
+import org.polypheny.db.adapter.mongodb.MongoStore;
+import org.polypheny.db.adapter.mongodb.MongoTable;
 import org.polypheny.db.adapter.mongodb.bson.BsonDynamic;
+import org.polypheny.db.adapter.mongodb.rules.MongoRules.MongoValues;
 import org.polypheny.db.adapter.mongodb.util.MongoTypeUtil;
 import org.polypheny.db.catalog.entity.CatalogTable;
 import org.polypheny.db.plan.RelOptCluster;
@@ -112,8 +114,8 @@ class MongoTableModify extends TableModify implements MongoRel {
                 condImplementor.setStaticRowType( implementor.getStaticRowType() );
                 ((MongoRel) input).implement( condImplementor );
                 implementor.filter = condImplementor.filter;
-                assert condImplementor.getStaticRowType() instanceof MongoRowType;
-                MongoRowType rowType = (MongoRowType) condImplementor.getStaticRowType();
+
+                MongoRowType rowType = condImplementor.getStaticRowType();
                 int pos = 0;
                 BsonDocument doc = new BsonDocument();
                 GridFSBucket bucket = implementor.mongoTable.getMongoSchema().getBucket();

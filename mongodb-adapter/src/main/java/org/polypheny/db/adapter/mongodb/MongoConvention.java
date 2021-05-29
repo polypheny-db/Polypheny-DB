@@ -16,6 +16,8 @@
 
 package org.polypheny.db.adapter.mongodb;
 
+import org.polypheny.db.adapter.mongodb.rules.MongoRel;
+import org.polypheny.db.adapter.mongodb.rules.MongoRules;
 import org.polypheny.db.plan.Convention;
 import org.polypheny.db.plan.RelOptPlanner;
 import org.polypheny.db.plan.RelOptRule;

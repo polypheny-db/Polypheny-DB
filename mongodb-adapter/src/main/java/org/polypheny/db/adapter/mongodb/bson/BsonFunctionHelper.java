@@ -22,7 +22,7 @@ import org.bson.BsonArray;
 import org.bson.BsonDocument;
 import org.bson.BsonString;
 import org.bson.BsonValue;
-import org.polypheny.db.adapter.mongodb.MongoRowType;
+import org.polypheny.db.adapter.mongodb.rules.MongoRowType;
 import org.polypheny.db.adapter.mongodb.util.MongoTypeUtil;
 import org.polypheny.db.rex.RexCall;
 import org.polypheny.db.rex.RexDynamicParam;
