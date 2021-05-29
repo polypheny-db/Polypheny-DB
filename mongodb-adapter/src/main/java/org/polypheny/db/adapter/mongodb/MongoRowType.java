@@ -58,13 +58,18 @@ public class MongoRowType extends RelRecordType {
     }
 
 
-    public static RelRecordType fromRecordType( RelRecordType rowType, MongoTable mongoTable ) {
+    public static MongoRowType fromRecordType( RelRecordType rowType, MongoTable mongoTable ) {
         return new MongoRowType( rowType.getStructKind(), rowType.getFieldList(), mongoTable );
     }
 
 
     public boolean containsPhysicalName( String name ) {
         return nameToId.containsKey( name );
+    }
+
+
+    public String getPhysicalFromLogical( String logicalName ) {
+        return MongoStore.getPhysicalColumnName( getId( logicalName ) );
     }
 
 }

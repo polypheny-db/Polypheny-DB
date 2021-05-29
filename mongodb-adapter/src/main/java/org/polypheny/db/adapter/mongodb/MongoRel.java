@@ -94,7 +94,7 @@ public interface MongoRel extends RelNode {
         private Operation operation;
 
         @Getter
-        private RelRecordType staticRowType;
+        private MongoRowType staticRowType;
 
 
         public Implementor() {
@@ -125,7 +125,8 @@ public interface MongoRel extends RelNode {
             if ( mongoTable != null ) {
                 this.staticRowType = MongoRowType.fromRecordType( staticRowType, mongoTable );
             } else {
-                this.staticRowType = staticRowType;
+                assert staticRowType instanceof MongoRowType;
+                this.staticRowType = (MongoRowType) staticRowType;
             }
         }
 

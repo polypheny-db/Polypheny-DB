@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.polypheny.db.adapter.mongodb;
+package org.polypheny.db.adapter.mongodb.transaction;
 
 import static org.reflections.Reflections.log;
 

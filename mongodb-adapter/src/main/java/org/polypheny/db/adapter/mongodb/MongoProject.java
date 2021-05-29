@@ -85,7 +85,7 @@ public class MongoProject extends Project implements MongoRel {
     public void implement( Implementor implementor ) {
         implementor.visitChild( 0, getInput() );
 
-        final MongoRules.RexToMongoTranslator translator = new MongoRules.RexToMongoTranslator( (JavaTypeFactory) getCluster().getTypeFactory(), MongoRules.mongoFieldNames( getInput().getRowType() ) );
+        final MongoRules.RexToMongoTranslator translator = new MongoRules.RexToMongoTranslator( (JavaTypeFactory) getCluster().getTypeFactory(), MongoRules.mongoFieldNames( getInput().getRowType() ), implementor.getStaticRowType() );
         final List<String> items = new ArrayList<>();
         GridFSBucket bucket = implementor.getBucket();
         // we us our specialized rowType to derive the mapped underlying column identifiers
