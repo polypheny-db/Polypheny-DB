@@ -286,8 +286,15 @@ public class Condition {
             case LESS_THAN_OR_EQUAL:
                 return comparison <= 0;
             case LIKE:
-                //todo maybe replace '%' by '(.*)' etc.
-                Pattern pattern = Pattern.compile( parameterValue.toString() );
+                //todo maybe replace '%' by '(.*)' etc
+                Pattern pattern =  Pattern.compile( parameterValue.toString() );
+                pattern = Pattern.compile(
+                        parameterValue.toString()
+                                .replaceAll("%", ".*")
+                                .replaceAll("_", ".")
+                );
+
+
                 Matcher matcher = pattern.matcher( columnValue.toString() );
                 return matcher.matches();
             default:
